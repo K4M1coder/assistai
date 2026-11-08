@@ -1,0 +1,10 @@
+{
+  "name": "Mochi Voice & Multi-Agent Harness",
+  "description": "Full-duplex real-time voice chat server with interruption handling and tool calling, multi-platform clients (Web, Smartphone GUI, Terminal), and agent server harness for code, 3D engines, image generation, audio synthesis, and enterprise integrations.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
