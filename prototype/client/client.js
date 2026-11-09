@@ -15,7 +15,12 @@ function stopPlayback() {
   playbackTime = 0;
   carry = null;
 }
-function interrupt() { stopPlayback(); send(JSON.stringify({ type: 'interrupt' })); }
+function interrupt(reason = 'manual') {
+  const wasPlaying = speechOpen || playbackSources.size > 0;
+  stopPlayback();
+  if (reason === 'voice_activity' && wasPlaying) log('Playback interrupted: microphone detected speech.');
+  send(JSON.stringify({ type: 'interrupt', reason }));
+}
 function play(data, rate) {
   if (!speechOpen || !playbackContext) return;
   let bytes = new Uint8Array(data);
@@ -50,7 +55,7 @@ ws.onmessage = ({ data }) => {
   else if (event.type === 'speech.end') { speechOpen = false; }
   else if (event.type === 'speech.cancelled') stopPlayback();
 };
-$('interrupt').onclick = interrupt;
+$('interrupt').onclick = () => interrupt('manual');
 $('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
@@ -69,7 +74,7 @@ $('start').onclick = async () => {
       let power = 0; for (const value of frame) power += (value / 32768) ** 2;
       const voice = Math.sqrt(power / frame.length) > 0.025;
       voiceFrames = voice ? voiceFrames + 1 : 0;
-      if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt(); }
+      if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); }
       if (speaking) {
         silenceFrames = voice ? 0 : silenceFrames + 1;
         if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; send(JSON.stringify({ type: 'audio.end' })); }

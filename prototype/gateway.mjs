@@ -108,12 +108,13 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
-  const cancel = () => {
+  const cancel = (reason = 'new_turn') => {
     if (!active) return;
     const previous = active;
     active = undefined;
     previous.controller.abort();
-    send({ type: 'speech.cancelled', turn_id: previous.id });
+    record(session, previous.id, 'speech.cancelled', { reason });
+    send({ type: 'speech.cancelled', turn_id: previous.id, reason });
   };
   const respond = async (text) => {
     cancel();
@@ -206,10 +207,10 @@ wss.on('connection', (client, req) => {
     if (binary) { if (asr.readyState === WebSocket.OPEN && !waitingForFinal) asr.send(data, { binary: true }); return; }
     let event;
     try { event = JSON.parse(data.toString()); } catch { client.close(1003, 'Invalid JSON'); return; }
-    if (event.type === 'interrupt') { cancel(); return; }
+    if (event.type === 'interrupt') { cancel(event.reason === 'voice_activity' ? 'voice_activity' : 'manual'); return; }
     if (event.type === 'audio.end' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { waitingForFinal = true; asr.send(JSON.stringify({ type: 'end' })); return; }
     if (event.type === 'text' && typeof event.text === 'string' && event.text.trim().length <= 4000 && event.text.trim()) { void respond(event.text.trim()); return; }
   });
-  client.on('close', () => { cancel(); asr.close(); });
+  client.on('close', () => { cancel('disconnected'); asr.close(); });
 });
 server.listen(port, '127.0.0.1', () => console.log(`Experimental voice gateway: http://127.0.0.1:${port}`));
