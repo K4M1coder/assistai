@@ -1,0 +1,4 @@
+fastapi==0.162.2
+uvicorn==0.54.0
+vosk==0.3.45
+pocket-tts==4.0.1

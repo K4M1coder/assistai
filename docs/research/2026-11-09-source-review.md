@@ -25,3 +25,9 @@ Installed assets include `Qwen3.8-27B-Q4_K_M.gguf` (16,810,714,336 bytes), its B
 - H-02/H-04: the cited sources do not demonstrate the proposed thresholds on this machine. A cascaded streaming implementation with barge-in does not by itself prove native full-duplex conversational behavior.
 - H-05/H-06: baseline Moshi English-only support weakens its suitability for French. Compare it separately; prioritize French-capable STT and TTS.
 - H-03: OpenCode's API supports programmatic delegation, but API availability does not prove a sandbox or safe permission enforcement. Test them separately.
+
+## Follow-up, 2026-11-10
+
+[Upstream llama.cpp issue #22034](https://github.com/ggml-org/llama.cpp/issues/22034) contains reports of Vulkan device loss on Intel Arc and a workaround disabling cooperative matrices. A commenter reports that a newer driver resolved their reproduction; that does not prove the cause on this machine. Our tests with `GGML_VK_DISABLE_COOPMAT=1` produced successful structured tool calls and a simple vision response (EXP-006), but do not establish sustained stability. Do not alter driver or operating-system settings automatically.
+
+[Vosk](https://alphacephei.com/vosk/models) offers a streaming, CPU-capable French model under Apache 2.0; its published error rates indicate that the small model is a baseline rather than a quality guarantee. EXP-007 tested one synthesized phrase. [Moonshine's current model list](https://github.com/moonshine-ai/moonshine/blob/main/docs/models/available-models.md) does not list French STT, so it is not a French recognition candidate on this evidence.
