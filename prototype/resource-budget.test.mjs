@@ -10,7 +10,7 @@ test('admits a measured profile with room for GPU and RAM reserves', () => {
   assert.equal(evaluateBudget(baseline, { vramBytes: 2 * GiB, ramBytes: GiB }).allowed, true);
 });
 
-test('rejects shared-memory spill even when dedicated VRAM is under 24 GiB', () => {
+test('rejects excessive shared-memory growth even when dedicated VRAM is under 24 GiB', () => {
   const decision = evaluateBudget({ ...baseline, dedicatedBytes: 20.7 * GiB, sharedBytes: 1.27 * GiB });
   assert.equal(decision.allowed, false);
   assert.match(decision.reasons.join(' '), /Shared GPU memory/);
