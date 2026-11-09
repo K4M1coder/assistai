@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateBudget } from './resource-budget.mjs';
+import { DEFAULT_BUDGET, evaluateBudget } from './resource-budget.mjs';
 
 const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
@@ -20,4 +20,6 @@ test('fails closed if telemetry is missing or the next allocation would consume 
   assert.equal(evaluateBudget({ ...baseline, availableRamBytes: undefined }).allowed, false);
   assert.equal(evaluateBudget(baseline, { vramBytes: 9 * GiB }).allowed, false);
   assert.equal(evaluateBudget(baseline, { ramBytes: 5 * GiB }).allowed, false);
+  assert.equal(evaluateBudget(baseline, {}, { ...DEFAULT_BUDGET, maxDedicatedBytes: NaN }).allowed, false);
+  assert.equal(evaluateBudget(baseline, {}, { ...DEFAULT_BUDGET, dedicatedReserveBytes: 25 * GiB }).allowed, false);
 });
