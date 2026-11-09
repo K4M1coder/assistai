@@ -1,6 +1,8 @@
 node_modules/
 .cache/
 .venv-voice/
+__pycache__/
+*.pyc
 build/
 dist/
 coverage/
