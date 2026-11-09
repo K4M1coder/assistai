@@ -7,7 +7,14 @@ let captureContext, playbackContext, stream, captureNode;
 let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
+let pushToTalkActive = false;
 const send = data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
+function finishPushToTalk() {
+  if (!pushToTalkActive) return;
+  pushToTalkActive = false;
+  $('talk').textContent = 'Start talking';
+  send(JSON.stringify({ type: 'audio.end' }));
+}
 function stopPlayback() {
   speechOpen = false;
   for (const source of playbackSources) { try { source.stop(); } catch {} }
@@ -56,6 +63,20 @@ ws.onmessage = ({ data }) => {
   else if (event.type === 'speech.cancelled') stopPlayback();
 };
 $('interrupt').onclick = () => interrupt('manual');
+$('push-to-talk').onchange = () => {
+  finishPushToTalk();
+  speaking = false; voiceFrames = 0; silenceFrames = 0;
+  send(JSON.stringify({ type: 'audio.reset' }));
+  $('talk').disabled = !$('push-to-talk').checked || !stream?.active;
+};
+$('talk').onclick = () => {
+  if (pushToTalkActive) { finishPushToTalk(); return; }
+  if (!$('push-to-talk').checked || !stream?.active) return;
+  if (speechOpen || playbackSources.size) interrupt('manual');
+  send(JSON.stringify({ type: 'audio.reset' }));
+  pushToTalkActive = true;
+  $('talk').textContent = 'Finish talking';
+};
 $('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
@@ -70,6 +91,10 @@ $('start').onclick = async () => {
     // Keep the worklet active without routing the microphone to the speakers.
     const muted = captureContext.createGain(); muted.gain.value = 0; captureNode.connect(muted).connect(captureContext.destination);
     captureNode.port.onmessage = ({ data }) => {
+      if ($('push-to-talk').checked) {
+        if (pushToTalkActive) send(data);
+        return;
+      }
       // Avoid feeding loudspeaker echo to ASR. Manual interruption immediately reopens the microphone.
       if ($('speaker-safe').checked && (speechOpen || playbackSources.size)) {
         speaking = false; voiceFrames = 0; silenceFrames = 0;
@@ -86,13 +111,14 @@ $('start').onclick = async () => {
       }
       send(data);
     };
-    $('start').disabled = true; $('stop').disabled = false; status('Listening in French.');
+    $('start').disabled = true; $('stop').disabled = false; $('talk').disabled = !$('push-to-talk').checked; status('Listening in French.');
   } catch (error) { stream?.getTracks().forEach(track => track.stop()); await captureContext?.close(); captureContext = undefined; status(`Microphone unavailable: ${error.message}`); }
 };
 $('stop').onclick = async () => {
+  finishPushToTalk();
   if (speaking) send(JSON.stringify({ type: 'audio.end' }));
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   captureNode?.disconnect(); stream?.getTracks().forEach(track => track.stop());
   await captureContext?.close(); captureContext = undefined;
-  $('start').disabled = false; $('stop').disabled = true; status('Microphone stopped.');
+  $('start').disabled = false; $('stop').disabled = true; $('talk').disabled = true; status('Microphone stopped.');
 };
