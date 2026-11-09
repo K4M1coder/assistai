@@ -4,7 +4,9 @@ import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
@@ -25,8 +27,15 @@ const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
 const history = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text') ORDER BY rowid DESC LIMIT 20");
 const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const record = (session, turn, kind, payload) => insert.run(randomUUID(), session, turn, kind, JSON.stringify(payload), new Date().toISOString());
-const server = http.createServer((req, res) => {
+const clientRoot = fileURLToPath(new URL('./client/', import.meta.url));
+const staticFiles = new Map([['/', ['index.html', 'text/html; charset=utf-8']], ['/client.js', ['client.js', 'text/javascript; charset=utf-8']], ['/capture-worklet.js', ['capture-worklet.js', 'text/javascript; charset=utf-8']]]);
+const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental' }));
+  const file = staticFiles.get(req.url);
+  if (req.method === 'GET' && file) {
+    try { return res.writeHead(200, { 'content-type': file[1], 'cache-control': 'no-store' }).end(await readFile(resolve(clientRoot, file[0]))); }
+    catch { return res.writeHead(500).end('Client unavailable'); }
+  }
   res.writeHead(404).end();
 });
 const wss = new WebSocketServer({ server, path: '/voice', maxPayload: 64 * 1024 });

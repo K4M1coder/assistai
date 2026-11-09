@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Voice Prototype</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; background: #111827; color: #f3f4f6; }
+    button, input { font: inherit; padding: .6rem; margin: .3rem; } button { cursor: pointer; }
+    #log { white-space: pre-wrap; background: #1f2937; border-radius: .5rem; padding: 1rem; min-height: 10rem; overflow-wrap: anywhere; }
+    .status { color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <h1>Local Voice Prototype</h1>
+  <p>Spoken language: French. This experimental client uses local services.</p>
+  <button id="start">Start microphone</button><button id="stop" disabled>Stop microphone</button><button id="interrupt">Interrupt</button>
+  <p id="status" class="status" role="status">Connecting…</p>
+  <p id="partial" aria-live="polite"></p>
+  <div id="log" aria-live="polite"></div>
+  <form id="form"><label for="text">Text input</label><input id="text" autocomplete="off"><button>Send</button></form>
+  <script type="module" src="/client.js"></script>
+</body>
+</html>
