@@ -51,7 +51,7 @@ ws.onmessage = ({ data }) => {
   else if (event.type === 'task.started') log(`Agent started: ${event.task}`);
   else if (event.type === 'task.completed') log(`Agent completed: ${event.text}`);
   else if (event.type === 'task.error' || event.type === 'error') { status(event.message); log(`Error: ${event.message}`); }
-  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; }
+  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
   else if (event.type === 'speech.end') { speechOpen = false; }
   else if (event.type === 'speech.cancelled') stopPlayback();
 };
@@ -70,6 +70,11 @@ $('start').onclick = async () => {
     // Keep the worklet active without routing the microphone to the speakers.
     const muted = captureContext.createGain(); muted.gain.value = 0; captureNode.connect(muted).connect(captureContext.destination);
     captureNode.port.onmessage = ({ data }) => {
+      // Avoid feeding loudspeaker echo to ASR. Manual interruption immediately reopens the microphone.
+      if ($('speaker-safe').checked && (speechOpen || playbackSources.size)) {
+        speaking = false; voiceFrames = 0; silenceFrames = 0;
+        return;
+      }
       const frame = new Int16Array(data);
       let power = 0; for (const value of frame) power += (value / 32768) ** 2;
       const voice = Math.sqrt(power / frame.length) > 0.025;
