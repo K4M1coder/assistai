@@ -12,4 +12,8 @@ From the repository root, start `python -m uvicorn prototype.asr_server:app --ho
 
 ## Limitations
 
-There is no connected microphone client, agent orchestration, spoken response, authentication, or concurrency/resource policy yet. Bind the sidecar to loopback and avoid exposing it to the network. Vosk's small French model is a baseline, not the final model choice; compare it against Kyutai STT and other candidates with an authorized corpus.
+There is no connected microphone client, authentication, or enforced resource policy yet. Bind the sidecar to loopback and avoid exposing it to the network. Vosk's small French model is a baseline, not the final model choice; compare it against Kyutai STT and other candidates with an authorized corpus.
+
+`gateway.mjs` is a separate experimental integration of the sidecar, a local OpenAI-compatible model server, and a local Pocket TTS server. It accepts text or PCM through `/voice` and writes conversation events to `.cache/assistant/events.sqlite`. Optionally, `ASSISTAI_OPENCODE_URL` enables background delegation to a separately configured OpenCode server. Task completion is currently an event, not an automatic spoken notification. OpenCode's own permissions apply: the gateway is **not** a sandbox. It is not yet connected to the UI and must not be exposed to the network. Its short synthetic-audio test is `scripts/test-voice-gateway.py`; `scripts/test-gateway-delegation.mjs` exercises a read-only fixture. Neither test establishes live microphone performance or sustained hardware-budget compliance.
+
+On Windows, `scripts/measure-windows-memory.ps1 -ModelPid <pid>` samples dedicated and shared GPU allocations, model process memory, available physical RAM and global page-file use. Establish a baseline before starting services and compare it with sustained audio, vision and agent workloads. This is monitoring, not an automatic memory limiter.

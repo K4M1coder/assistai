@@ -36,7 +36,7 @@ Each event carries `event_id`, `session_id`, `turn_id`, `mono_time_ms`, `source`
 
 An interruption creates a new `turn_id`, cancels TTS immediately, marks the preceding LLM stream as stale, and allows a task worker to continue only if its policy permits. Late results are stored and announced in a new turn, never injected into a cancelled response.
 
-## VRAM budget: hypothesis H-01
+## VRAM and system-memory budget: hypothesis H-01
 
 On a 24 GB B60, do not allocate the theoretical total to weights. Reserve 15–25% for buffers, KV cache, runtime, and peaks. Initial targets, to be reconciled and measured together:
 
@@ -48,6 +48,8 @@ On a 24 GB B60, do not allocate the theoretical total to weights. Reserve 15–2
 | Runtime/display headroom | At least 3 GB | No second LLM instance |
 
 These upper bounds add up to more than 24 GB; a viable configuration must fit the combined measured peak, not each upper bound independently. Moshi is a reference for full-duplex dynamics and must be tested separately for footprint and actual coexistence.
+
+The 24 GB constraint includes all resident models, projectors, caches and runtime allocations, not merely model file sizes. On the observed Windows desktop, other processes already consume roughly 5.4 GiB of dedicated GPU memory. The actual free headroom must therefore be measured at startup. Treat substantial model-process shared GPU memory as a failed configuration, even if Windows allows it to continue. Record system RAM availability and page-file usage before loading and under sustained concurrent load; a short snapshot or page-file total alone does not establish whether paging was caused by the assistant. Keep a configurable safety reserve and refuse an oversized profile rather than silently relying on system-memory spill. The 27B experiment exceeded this practical limit and is not the current default candidate.
 
 ## Portability
 
