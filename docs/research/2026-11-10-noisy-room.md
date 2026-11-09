@@ -20,3 +20,24 @@ On the running Windows/Vosk small-French service, the clean result was `bonjour 
 1. Acquire a small consented, diverse French corpus with separate clean speech, competing speech, TV/music, and room recordings; keep recordings local and untracked. Evaluate word error rate and unintended activation separately.
 2. Measure the current browser microphone settings and compare close-talking with far-field capture. Compare optional local noise suppression and streaming VAD on identical recordings before enabling them by default.
 3. Identify a reproducible licensed causal target-speaker checkpoint and enrollment method. Evaluate separation plus ASR together, clean-speech degradation, voice mismatch, latency, CPU/RAM, GPU/shared-memory and page-file deltas under concurrent voice and agent workloads. Stop if it threatens the 24 GB and RAM budgets.
+
+## Follow-up: quantized target-speaker extraction (EXP-013)
+
+[VoxLock](https://huggingface.co/arbazsiddiqui/voxlock) publishes an Apache-2.0 causal target-speaker extractor, quantized ONNX models, and a streaming Python implementation. The authors report a 24 ms algorithmic delay plus chunking and an RTF of 0.77 for 40 ms chunks on their Xeon setup. Those are external claims under different conditions; its model card identifies English, so French performance needs independent evaluation. Initial enrollment must identify the intended speaker; automatic enrollment can select a TV or another person. We must not treat this as verified speaker authentication.
+
+We pinned model revision `1df3074af3359070ec1c08d9627f3a28d711b9b9`, verified SHA-256 for the enrollment and int8 files with `scripts/setup-voxlock-experiment.py`, and used `voxlock==1.3.0`, `onnxruntime==1.31.1`, one inference thread and 640-sample (40 ms) chunks. The local ONNX Runtime installation has CPU and Azure providers, no GPU provider. The test does not use the microphone or add a GPU model.
+
+`scripts/setup-voxlock-test-audio.ps1` uses installed Microsoft Windows French voices: one target phrase, a different target enrollment phrase, and an interfering speaker. `scripts/probe-voxlock.py` mixes the two utterances at 0 dB whole-clip SNR, streams the mixture through the extractor, and compares Vosk outputs. On one 6.918 s synthetic example, the target and isolated transcripts were identical, while the mixture transcript combined words from both voices. Model load took 240 ms; streamed extraction took 6213 ms wall and 6203 ms process CPU, RTF 0.898. Enrollment time is excluded from the stream timing. The host was not isolated and this is one trial, so the result does not guarantee real-time performance under load, p95 chunk latency, memory headroom, or reliability for the user's voice, music, television, reverberation, and longer sessions. The example's target and interfering voices are synthetic, not real speakers.
+
+The indexed model card for `penta2himajin/tse-conv-tasnet-48k` described a smaller streaming ONNX candidate, but its Hugging Face API returned 401 on 2026-11-10; it was not downloaded or tested. The current [WeSep README](https://github.com/wenet-e2e/wesep) describes its current version as a research preview and states that its local-model CLI and official pretrained packages are under validation; the separately documented Real-TSE checkpoints include causal variants. These constraints prevent assuming a deployable WeSep streaming path.
+
+Reproduce the VoxLock test from the repository root after starting the existing ASR sidecar:
+
+```powershell
+.\.venv-voice\Scripts\python.exe -m pip install -r prototype/requirements-voxlock-experiment.txt
+.\.venv-voice\Scripts\python.exe scripts/setup-voxlock-experiment.py
+./scripts/setup-voxlock-test-audio.ps1
+.\.venv-voice\Scripts\python.exe scripts/probe-voxlock.py
+```
+
+The audio setup requires the specified Windows voices and produces local untracked WAVs. For integration, build explicit, user-controlled enrollment and a bypass, preserve stream state per session, account for chunk buffering and model warm-up, and compare actual French recordings with and without filtering before enabling it. Measure CPU/RAM peaks and p95 latency while both agent and voice models are active; the measured RTF is close enough to one that overload is a material concern.
