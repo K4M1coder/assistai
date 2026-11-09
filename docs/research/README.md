@@ -27,6 +27,7 @@ Code, identifiers, comments, documentation, and the initial UI are written in En
 - [Experiment log](experiments.jsonl): append-only record of experiments.
 - [Benchmark protocol](bench-protocol.md): common Windows/Linux measurement protocol.
 - [Source review, 2026-11-09](2026-11-09-source-review.md): published implementations and local hardware findings.
+- [Noisy-room research](2026-11-10-noisy-room.md): interfering speech, target-speaker extraction, and a controlled ASR stress test.
 
 ## Initial decision
 

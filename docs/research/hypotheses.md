@@ -8,6 +8,7 @@
 | H-04 | Streaming delivers first speech in under one second without degrading tool use. | 50 short French turns, cold and warm. | P50 < 1 s, P95 < 1.5 s, valid structured tool calls. | Planned |
 | H-05 | A unified full-duplex model provides a perceptible gain that justifies VRAM and porting costs. | Same script with Moshi/unified reference versus H-04. | Measured interruption improvement without invalidating H-01. | Planned |
 | H-06 | The local voice pipeline supports French recognition and speech generation while the UI remains in English. | Select French for a voice session; run the French corpus through STT and TTS with the UI set to English. | Recognized text and audible output are French; language selection does not change the UI; quality and latency are recorded. | Planned |
+| H-07 | A CPU streaming target-speaker extractor improves French ASR in overlapping speech while retaining low latency and staying within the combined resource budget. | Compare clean and consented real-room French mixtures, with and without extraction, against human reference transcripts; measure incremental CPU/RAM, GPU/shared memory, RTF and end-to-end delay. | Improved aggregate WER and false activations without unacceptable clean-speech regression; RTF < 1 with sufficient concurrent resource headroom. | Planned; no candidate validated |
 
 ## Experiment order
 
