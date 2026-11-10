@@ -38,6 +38,8 @@ if ($baseline.dedicated -gt 12GB -or $baseline.available_ram -lt 8GB) { throw 'I
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $env:GGML_VK_DISABLE_COOPMAT = '1'
 $env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM = '1'
+$env:GGML_VK_MEMORY_LOGGER = '1'
+$env:ASSISTAI_VK_SYNC_UPLOAD_LIMIT = '16777216'
 Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
 $trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--low-host-memory', '--q8-kv', '--test', $prefix, '4', '--stream-interval', '1000', '-o', $output)
 $p = Start-Process -FilePath $exe -ArgumentList $trialArguments -WorkingDirectory $source -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err -PassThru

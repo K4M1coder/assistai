@@ -1,3 +1,28 @@
+diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+index c9f906d..1a265e1 100644
+--- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
++++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+@@ -7416,7 +7416,19 @@ static void ggml_vk_buffer_write_2d(vk_buffer& dst, size_t offset, const void *
+ 
+ static void ggml_vk_buffer_write(vk_buffer& dst, size_t offset, const void * src, size_t size) {
+     VK_LOG_DEBUG("ggml_vk_buffer_write(" << size << ")");
+-    ggml_vk_buffer_write_2d(dst, offset, src, size, size, size, 1);
++    // Experimental bounded synchronous uploads; leave the default path unchanged.
++    const char * value = std::getenv("ASSISTAI_VK_SYNC_UPLOAD_LIMIT");
++    const size_t requested = value ? std::strtoull(value, nullptr, 10) : 0;
++    const size_t limit = requested >= 4096 ? requested & ~size_t(3) : 0;
++    if (!limit || size <= limit) {
++        ggml_vk_buffer_write_2d(dst, offset, src, size, size, size, 1);
++        return;
++    }
++    for (size_t done = 0; done < size;) {
++        const size_t n = std::min(limit, size - done);
++        ggml_vk_buffer_write_2d(dst, offset + done, static_cast<const uint8_t *>(src) + done, n, n, n, 1);
++        done += n;
++    }
+ }
+ 
+ static bool ggml_vk_buffer_read_2d_async(vk_context subctx, vk_buffer& src, size_t offset, void * dst, size_t spitch, size_t dpitch, size_t width, size_t height, bool sync_staging = false) {
 diff --git a/src/llama-moe-slot.cpp b/src/llama-moe-slot.cpp
 index 647c0b2..1bfb4ae 100644
 --- a/src/llama-moe-slot.cpp
