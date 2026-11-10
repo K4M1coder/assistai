@@ -8,6 +8,11 @@ let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
 let pushToTalkActive = false;
+let detectionThreshold = Number($('noise-threshold').value) / 100;
+$('noise-threshold').oninput = event => {
+  detectionThreshold = Number(event.target.value) / 100;
+  $('noise-threshold-value').textContent = `${Number(event.target.value).toFixed(1)}%`;
+};
 const send = data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
 function finishPushToTalk() {
   if (!pushToTalkActive) return;
@@ -102,7 +107,7 @@ $('start').onclick = async () => {
       }
       const frame = new Int16Array(data);
       let power = 0; for (const value of frame) power += (value / 32768) ** 2;
-      const voice = Math.sqrt(power / frame.length) > 0.025;
+      const voice = Math.sqrt(power / frame.length) > detectionThreshold;
       voiceFrames = voice ? voiceFrames + 1 : 0;
       if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); }
       if (speaking) {
