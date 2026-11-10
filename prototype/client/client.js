@@ -112,6 +112,7 @@ function beginPushToTalk() {
   if (speechOpen || playbackSources.size) interrupt('manual');
   send(JSON.stringify({ type: 'audio.reset' }));
   pushToTalkActive = true;
+  send(JSON.stringify({ type: 'audio.start' }));
   $('talk').textContent = 'Release to send';
 }
 $('talk').onpointerdown = event => {
@@ -178,7 +179,7 @@ $('start').onclick = async () => {
       let power = 0; for (const value of frame) power += (value / 32768) ** 2;
       const voice = Math.sqrt(power / frame.length) > detectionThreshold;
       voiceFrames = voice ? voiceFrames + 1 : 0;
-      if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); }
+      if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); send(JSON.stringify({ type: 'audio.start' })); }
       if (speaking) {
         silenceFrames = voice ? 0 : silenceFrames + 1;
         if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; send(JSON.stringify({ type: 'audio.end' })); }

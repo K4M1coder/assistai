@@ -36,3 +36,13 @@ test('rejects input overflow, malformed audio, and transport pressure',()=>{
  const y=session();y.a.appendAudio(Buffer.alloc(2));y.a.endAudio();response(y.ws,'r1');y.ws.event({type:'response.output_audio.delta',response_id:'r1',delta:'%%%'});assert.equal(y.ws.closed,true);
  const z=session();z.ws.bufferedAmount=300000;assert.equal(z.a.appendAudio(Buffer.alloc(2)),false);assert.equal(z.ws.closed,true);
 });
+test('cancellation before response creation is deferred and drops subsequent audio',()=>{
+ const {ws,a}=session();a.appendAudio(Buffer.alloc(2));a.endAudio();assert.equal(a.cancel(),true);response(ws,'r1');
+ assert.equal(a.state,'cancelling');assert.equal(ws.sent.at(-1).type,'response.cancel');
+ let count=0;a.on('audio',()=>count++);ws.event({type:'response.output_audio.delta',response_id:'r1',delta:Buffer.alloc(4).toString('base64')});assert.equal(count,0);
+ ws.event({type:'response.done',response:{id:'r1',status:'cancelled',output:[]}});assert.equal(a.state,'ready');
+});
+test('notification text requests audio with tools disabled',()=>{
+ const {ws,a}=session();assert.equal(a.speakText('Task finished'),true);
+ assert.equal(ws.sent.at(-2).item.content[0].text,'Task finished');assert.equal(ws.sent.at(-1).response.tool_choice,'none');assert.equal(a.state,'waiting');
+});

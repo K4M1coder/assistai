@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { getServiceStatus } from './service-status.mjs';
+import { attachLfmBridge } from './lfm-bridge.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -16,8 +17,12 @@ const llmUrl = process.env.ASSISTAI_LLM_URL ?? 'http://127.0.0.1:18084/v1';
 const visionUrl = process.env.ASSISTAI_VISION_URL ?? 'http://127.0.0.1:18080/v1';
 const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
+const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
+const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
+if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
+if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
 const dbPath = resolve(process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite');
-for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : [])]) {
+for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : []), ...(lfmRealtimeUrl ? [lfmRealtimeUrl] : [])]) {
   if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(address).hostname)) {
     throw new Error('Prototype providers must bind to a loopback address');
   }
@@ -47,7 +52,8 @@ const aecFiles = new Map([
 const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental' }));
   if (req.method === 'GET' && req.url === '/services') {
-    const services = await getServiceStatus({ voiceUrl: llmUrl, asrUrl, ttsUrl, opencodeUrl });
+    let services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl });
+    if (lfmRealtimeUrl) services = services.filter(service => !['Speech recognition', 'Speech synthesis'].includes(service.role)).map(service => service.role === 'Voice controller' ? { ...service, role: 'Speech-to-speech model' } : service);
     return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ services }));
   }
   const file = staticFiles.get(req.url) ?? aecFiles.get(req.url);
@@ -66,7 +72,7 @@ wss.on('connection', (client, req) => {
     } catch { client.close(1008, 'Origin not allowed'); return; }
   }
   const session = randomUUID();
-  const asr = new WebSocket(asrUrl);
+  const asr = lfmRealtimeUrl ? null : new WebSocket(asrUrl);
   let active;
   let segments = [];
   let waitingForFinal = false;
@@ -127,6 +133,10 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
+  if (lfmRealtimeUrl) {
+    attachLfmBridge(client, { url: lfmRealtimeUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, canNotify: taskId => typeof taskId === 'string' && taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === taskId) });
+    return;
+  }
   const cancel = (reason = 'new_turn') => {
     if (!active) return;
     const previous = active;

@@ -30,9 +30,11 @@ export class LfmRealtimeSession extends EventEmitter {
       this.send({ type: 'session.update', session: { type: 'realtime', instructions: this.instructions, tools: this.tools } });
     } else if (event.type === 'session.updated' && this.state === 'initializing') {
       this.state = 'ready'; this.emit('ready');
-    } else if (event.type === 'response.created' && this.state === 'waiting') {
+    } else if (event.type === 'response.created' && ['waiting', 'cancel_on_create'].includes(this.state)) {
       if (typeof event.response?.id !== 'string') throw Error('Missing response ID');
-      this.responseId = event.response.id; this.state = 'responding'; this.emit('responseStart', this.responseId);
+      const cancelImmediately = this.state === 'cancel_on_create';
+      this.responseId = event.response.id; this.state = 'responding';
+      if (cancelImmediately) this.cancel(); else this.emit('responseStart', this.responseId);
     } else if (event.type === 'response.output_audio.delta' || event.type === 'response.output_text.delta') {
       if (this.state !== 'responding' || event.response_id !== this.responseId) return;
       if (event.type === 'response.output_text.delta') {
@@ -73,6 +75,12 @@ export class LfmRealtimeSession extends EventEmitter {
     this.inputBytes = 0; this.state = 'waiting';
     return this.send({ type: 'response.create' });
   }
+  speakText(text) {
+    if (this.state !== 'ready' || typeof text !== 'string' || !text.trim() || text.length > 1000) return false;
+    if (!this.send({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } })) return false;
+    this.state = 'waiting';
+    return this.send({ type: 'response.create', response: { output_modalities: ['text', 'audio'], tool_choice: 'none' } });
+  }
   submitToolResult(callId, output) {
     if (this.state !== 'awaiting_tool' || callId !== this.pendingCall || typeof output !== 'string' || output.length > 16000) return false;
     if (!this.send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output } })) return false;
@@ -80,6 +88,7 @@ export class LfmRealtimeSession extends EventEmitter {
     return this.send({ type: 'response.create', response: { output_modalities: ['text', 'audio'] } });
   }
   cancel() {
+    if (this.state === 'waiting') { this.state = 'cancel_on_create'; return true; }
     if (this.state !== 'responding') return false;
     this.state = 'cancelling'; this.emit('stopAudio', this.responseId);
     return this.send({ type: 'response.cancel' });
