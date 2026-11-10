@@ -9,8 +9,9 @@ async function refreshServices() {
     const { services } = await response.json();
     list.replaceChildren(...services.map(service => {
       const item = document.createElement('li');
-      const names = service.models?.map(model => `${model.name}${model.context ? ` (${model.context} context)` : ''}`).join(', ');
-      item.textContent = `${service.role}: ${service.available ? 'online' : 'unavailable'}${service.server ? ` — ${service.server}` : ''}${names ? ` — ${names}` : ''}${service.message ? ` — ${service.message}` : ''}`;
+      const names = service.models?.map(model => `${model.engine ?? 'Unknown engine'}: ${model.name}${model.context ? ` (${model.context} context)` : ''}`).join(', ');
+      const engine = service.engine ? ` — ${service.engine}` : '';
+      item.textContent = `${service.role}: ${service.available ? 'online' : 'unavailable'}${service.server ? ` — ${service.server}` : ''}${engine}${service.model ? ` — ${service.model}` : ''}${names ? ` — ${names}` : ''}${service.harness ? ` — OpenCode: ${service.harness}` : ''}${service.message ? ` — ${service.message}` : ''}`;
       return item;
     }));
   } catch { list.textContent = 'Service status unavailable. Restart the gateway to update it.'; }

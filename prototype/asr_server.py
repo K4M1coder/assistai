@@ -26,7 +26,7 @@ def load_model() -> None:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ready" if model else "loading", "language": "fr", "sample_rate": SAMPLE_RATE}
+    return {"status": "ready" if model else "loading", "engine": "Vosk", "model": MODEL_PATH.name, "language": "fr", "sample_rate": SAMPLE_RATE}
 
 
 @app.websocket("/asr")
