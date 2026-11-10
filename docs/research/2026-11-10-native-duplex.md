@@ -153,3 +153,11 @@ One synthetic French request for a moon anecdote was sent as PCM chunks in a bur
 A separate synthetic English voice clip asking to set volume to 30 generated a `set_volume` function call with `volume: 30`. The probe did not execute the tool or alter any device setting. Tool continuation, French tool calling, agent delegation and user interruption were not tested.
 
 Across 69 samples, adapter dedicated peaked at 16,004,472,832 bytes from a 13,802,246,144-byte baseline; shared peaked at 247,943,168 bytes from 194,351,104; available RAM remained above 12,349,628,416 bytes. Measurements include Gemma but no concurrent agent inference and cannot establish peak bounds or no paging. The temporary model was intentionally stopped and the original voice controller restored.
+
+## EXP-047: French spoken delegation and transcription
+
+Generated a French test utterance locally: “Délègue à l'agent la tâche de vérifier la météo à Paris.” With Gemma loaded but idle, LFM3-Audio Q4_K_M was served separately under the watchdog. Two identical realtime probes returned three `delegate_task` calls each with the same garbled task strings. One included “Paris” but none contained a recognizable weather task. The first version of the probe incorrectly passed because it only checked the city; its check was strengthened to require both the city and a weather term, and the repeat correctly failed. No tool call was executed.
+
+The same synthetic clip sent to `/v1/audio/transcriptions` with French language selection returned HTTP 200, but the transcript was badly corrupted and omitted the weather term. This is one synthetic voice on one runtime/build, not a model-wide French accuracy measurement. It provides concrete evidence against enabling this configuration for French delegation without further work. Test inputs were sent in a burst; neither full duplex nor live latency was tested.
+
+Across 36 adapter samples, dedicated peaked at 15,988,133,888 bytes from a 13,802,622,976-byte baseline; shared peaked at 248,434,688 bytes from 179,867,648; available RAM remained above 12,728,705,024 bytes. The agent model was idle; sampling cannot prove hard memory limits or no paging. The temporary model was stopped, and the normal voice controller restored.
