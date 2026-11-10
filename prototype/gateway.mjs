@@ -28,12 +28,24 @@ const history = db.prepare("SELECT kind, payload FROM events WHERE session_id = 
 const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const record = (session, turn, kind, payload) => insert.run(randomUUID(), session, turn, kind, JSON.stringify(payload), new Date().toISOString());
 const clientRoot = fileURLToPath(new URL('./client/', import.meta.url));
-const staticFiles = new Map([['/', ['index.html', 'text/html; charset=utf-8']], ['/client.js', ['client.js', 'text/javascript; charset=utf-8']], ['/capture-worklet.js', ['capture-worklet.js', 'text/javascript; charset=utf-8']]]);
+const aecRoot = fileURLToPath(new URL('../node_modules/@ennuicastr/webrtcaec3.js/dist/', import.meta.url));
+const staticFiles = new Map([
+  ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/client.js', ['client.js', 'text/javascript; charset=utf-8']],
+  ['/capture-worklet.js', ['capture-worklet.js', 'text/javascript; charset=utf-8']],
+  ['/echo-reference-worklet.js', ['echo-reference-worklet.js', 'text/javascript; charset=utf-8']],
+  ['/echo-canceller-worker.js', ['echo-canceller-worker.js', 'text/javascript; charset=utf-8']],
+  ['/echo-bridge.js', ['echo-bridge.js', 'text/javascript; charset=utf-8']],
+]);
+const aecFiles = new Map([
+  ['/aec3/webrtcaec3-0.3.0.js', ['webrtcaec3-0.3.0.js', 'text/javascript; charset=utf-8']],
+  ['/aec3/webrtcaec3-0.3.0.wasm', ['webrtcaec3-0.3.0.wasm', 'application/wasm']],
+]);
 const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental' }));
-  const file = staticFiles.get(req.url);
+  const file = staticFiles.get(req.url) ?? aecFiles.get(req.url);
   if (req.method === 'GET' && file) {
-    try { return res.writeHead(200, { 'content-type': file[1], 'cache-control': 'no-store' }).end(await readFile(resolve(clientRoot, file[0]))); }
+    try { return res.writeHead(200, { 'content-type': file[1], 'cache-control': 'no-store' }).end(await readFile(resolve(aecFiles.has(req.url) ? aecRoot : clientRoot, file[0]))); }
     catch { return res.writeHead(500).end('Client unavailable'); }
   }
   res.writeHead(404).end();

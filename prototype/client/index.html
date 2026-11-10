@@ -20,6 +20,7 @@
     <label><input type="checkbox" id="push-to-talk"> Push-to-talk</label> — hold the button while speaking; pressing it interrupts playback.<br>
     <label><input type="checkbox" id="ai-suppression" disabled> AI voice suppression</label> — not available yet.
   </fieldset>
+  <p><label><input type="checkbox" id="experimental-aec"> Experimental playback-reference echo filter (select before starting the microphone)</label></p>
   <p id="echo-status" role="status">Echo cancellation: start the microphone to check.</p>
   <p><label for="noise-threshold">Microphone detection threshold: <output id="noise-threshold-value" for="noise-threshold">2.5%</output></label><br>
     <input id="noise-threshold" type="range" min="0.5" max="12" step="0.5" value="2.5">

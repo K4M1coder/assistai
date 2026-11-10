@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'start', 'stop', 'echo-status', 'partial'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;

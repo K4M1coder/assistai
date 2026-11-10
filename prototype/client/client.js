@@ -3,7 +3,7 @@ const status = text => { $('status').textContent = text; };
 const log = text => { $('log').textContent += `${text}\n`; };
 const ws = new WebSocket(`ws://${location.host}/voice`);
 ws.binaryType = 'arraybuffer';
-let captureContext, playbackContext, stream, captureNode;
+let captureContext, playbackContext, stream, captureNode, echoBridge, referenceNode;
 let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
@@ -45,6 +45,7 @@ function play(data, rate) {
   for (let i = 0; i < channel.length; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
   const source = playbackContext.createBufferSource();
   source.buffer = buffer; source.connect(playbackContext.destination);
+  if (referenceNode && captureContext === playbackContext) source.connect(referenceNode, 0, 1);
   playbackTime = Math.max(playbackTime, playbackContext.currentTime + 0.04);
   source.start(playbackTime); playbackTime += buffer.duration;
   playbackSources.add(source); source.onended = () => playbackSources.delete(source);
@@ -105,22 +106,23 @@ $('form').onsubmit = async event => { event.preventDefault(); const text = $('te
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: !$('experimental-aec').checked, noiseSuppression: true, autoGainControl: true } });
     const echoSetting = stream.getAudioTracks()[0]?.getSettings().echoCancellation;
     $('echo-status').textContent = echoSetting === undefined
       ? 'Echo cancellation: requested; browser did not report its status.'
       : echoSetting === false
         ? 'Echo cancellation: unavailable or disabled on this microphone.'
         : 'Echo cancellation: enabled by browser (effectiveness depends on your setup).';
-    captureContext = new AudioContext(); playbackContext ??= new AudioContext();
+    if ($('experimental-aec').checked) {
+      playbackContext ??= new AudioContext({ sampleRate: 48000 });
+      captureContext = playbackContext;
+      if (captureContext.sampleRate !== 48000) throw new Error('Experimental echo filter requires a 48 kHz audio context. Reload and try again.');
+    } else { captureContext = new AudioContext(); playbackContext ??= new AudioContext(); }
     await playbackContext.resume();
     await captureContext.audioWorklet.addModule('/capture-worklet.js');
-    captureNode = new AudioWorkletNode(captureContext, 'capture-processor');
     const lowpass = captureContext.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 7200;
-    captureContext.createMediaStreamSource(stream).connect(lowpass).connect(captureNode);
-    // Keep the worklet active without routing the microphone to the speakers.
-    const muted = captureContext.createGain(); muted.gain.value = 0; captureNode.connect(muted).connect(captureContext.destination);
-    captureNode.port.onmessage = ({ data }) => {
+    const microphone = captureContext.createMediaStreamSource(stream);
+    const handleAudio = data => {
       if ($('push-to-talk').checked) {
         if (pushToTalkActive) send(data);
         return;
@@ -141,15 +143,47 @@ $('start').onclick = async () => {
       }
       send(data);
     };
+    if ($('experimental-aec').checked) {
+      const { createEchoBridge } = await import('/echo-bridge.js');
+      await captureContext.audioWorklet.addModule('/echo-reference-worklet.js');
+      const worker = new Worker('/echo-canceller-worker.js');
+      let pending = null;
+      echoBridge = await new Promise((resolve, reject) => {
+        let bridge;
+        bridge = createEchoBridge(worker, {
+          onReady: () => resolve(bridge),
+          onError: message => { $('speaker-safe').checked = true; status(`Echo filter stopped: ${message}. Restart the microphone.`); stream?.getTracks().forEach(track => track.stop()); captureNode?.disconnect(); reject(new Error(message)); },
+          onAudio: ({ capture }) => {
+            const reduced = new Int16Array(160);
+            for (let i = 0; i < reduced.length; i++) reduced[i] = Math.max(-32768, Math.min(32767, Math.round(capture[i * 3] * 32767)));
+            if (!pending) pending = reduced;
+            else { const frame = new Int16Array(320); frame.set(pending); frame.set(reduced, 160); pending = null; handleAudio(frame.buffer); }
+          }
+        });
+      });
+      referenceNode = captureNode = new AudioWorkletNode(captureContext, 'echo-reference-processor', { numberOfInputs: 2 });
+      captureNode.port.onmessage = ({ data }) => echoBridge?.send(data);
+      microphone.connect(lowpass).connect(captureNode, 0, 0);
+      $('echo-status').textContent += ' Experimental playback-reference filter active.';
+    } else {
+      captureNode = new AudioWorkletNode(captureContext, 'capture-processor');
+      microphone.connect(lowpass).connect(captureNode);
+      captureNode.port.onmessage = ({ data }) => handleAudio(data);
+    }
+    // Keep the worklet active without routing the microphone to the speakers.
+    const muted = captureContext.createGain(); muted.gain.value = 0; captureNode.connect(muted).connect(captureContext.destination);
+    $('experimental-aec').disabled = true;
     $('start').disabled = true; $('stop').disabled = false; $('talk').disabled = !$('push-to-talk').checked; status('Listening in French.');
-  } catch (error) { stream?.getTracks().forEach(track => track.stop()); await captureContext?.close(); captureContext = undefined; $('echo-status').textContent = 'Echo cancellation: microphone unavailable.'; status(`Microphone unavailable: ${error.message}`); }
+  } catch (error) { echoBridge?.close(); echoBridge = undefined; referenceNode = undefined; stream?.getTracks().forEach(track => track.stop()); if (captureContext && captureContext !== playbackContext) await captureContext.close(); captureContext = undefined; $('echo-status').textContent = 'Echo cancellation: microphone unavailable.'; status(`Microphone unavailable: ${error.message}`); }
 };
 $('stop').onclick = async () => {
   finishPushToTalk();
   if (speaking) send(JSON.stringify({ type: 'audio.end' }));
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   captureNode?.disconnect(); stream?.getTracks().forEach(track => track.stop());
+  echoBridge?.close(); echoBridge = undefined; referenceNode = undefined;
   $('echo-status').textContent = 'Echo cancellation: microphone stopped.';
-  await captureContext?.close(); captureContext = undefined;
+  if (captureContext && captureContext !== playbackContext) await captureContext.close(); captureContext = undefined;
+  $('experimental-aec').disabled = false;
   $('start').disabled = false; $('stop').disabled = true; $('talk').disabled = true; status('Microphone stopped.');
 };

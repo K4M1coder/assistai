@@ -1,5 +1,5 @@
 // Bounded transport: fail visibly rather than allowing stale audio to accumulate.
-export function createEchoBridge(worker, { maxInFlight = 5, onAudio, onError }) {
+export function createEchoBridge(worker, { maxInFlight = 5, onAudio, onError, onReady = () => {} }) {
   let inFlight = 0, state = 'starting';
   const fail = message => {
     if (state === 'failed' || state === 'closed') return;
@@ -9,7 +9,7 @@ export function createEchoBridge(worker, { maxInFlight = 5, onAudio, onError }) 
   };
   worker.onmessage = ({ data }) => {
     if (state === 'failed' || state === 'closed') return;
-    if (data.type === 'ready' && state === 'starting') state = 'ready';
+    if (data.type === 'ready' && state === 'starting') { state = 'ready'; onReady(); }
     else if (data.type === 'audio' && state === 'ready' && inFlight > 0) { inFlight--; onAudio(data); }
     else if (data.type === 'error') fail(data.message);
     else fail('Unexpected echo canceller response');
