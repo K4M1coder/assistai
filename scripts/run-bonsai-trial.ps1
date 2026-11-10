@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds = 180)
+param([int]$TimeoutSeconds = 180, [switch]$AllowNative)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $engine = Join-Path $env:USERPROFILE '.lmstudio/extensions/backends/llama.cpp-win-x86_64-vulkan-avx2-2.71.0/llama-server.exe'
@@ -32,7 +32,8 @@ try {
  while(!$p.HasExited -and [DateTime]::UtcNow -lt $deadline){
   try {$r=resources} catch {$reason='telemetry unavailable';break}
   ($r|ConvertTo-Json -Compress)|Add-Content -LiteralPath $sample -Encoding utf8
-  if($r.dedicated -gt 18GB){$reason='dedicated threshold';break}
+  $dedicatedLimit = if ($AllowNative) { 22GB } else { 18GB }
+  if($r.dedicated -gt $dedicatedLimit){$reason='dedicated threshold';break}
   if($r.shared-$base.shared -gt 256MB){$reason='shared growth threshold';break}
   if($r.available_ram -lt 6GB){$reason='RAM reserve';break}
   $p.Refresh()
