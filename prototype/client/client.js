@@ -87,6 +87,12 @@ $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const echoSetting = stream.getAudioTracks()[0]?.getSettings().echoCancellation;
+    $('echo-status').textContent = echoSetting === undefined
+      ? 'Echo cancellation: requested; browser did not report its status.'
+      : echoSetting === false
+        ? 'Echo cancellation: unavailable or disabled on this microphone.'
+        : 'Echo cancellation: enabled by browser (effectiveness depends on your setup).';
     captureContext = new AudioContext(); playbackContext ??= new AudioContext();
     await playbackContext.resume();
     await captureContext.audioWorklet.addModule('/capture-worklet.js');
@@ -117,13 +123,14 @@ $('start').onclick = async () => {
       send(data);
     };
     $('start').disabled = true; $('stop').disabled = false; $('talk').disabled = !$('push-to-talk').checked; status('Listening in French.');
-  } catch (error) { stream?.getTracks().forEach(track => track.stop()); await captureContext?.close(); captureContext = undefined; status(`Microphone unavailable: ${error.message}`); }
+  } catch (error) { stream?.getTracks().forEach(track => track.stop()); await captureContext?.close(); captureContext = undefined; $('echo-status').textContent = 'Echo cancellation: microphone unavailable.'; status(`Microphone unavailable: ${error.message}`); }
 };
 $('stop').onclick = async () => {
   finishPushToTalk();
   if (speaking) send(JSON.stringify({ type: 'audio.end' }));
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   captureNode?.disconnect(); stream?.getTracks().forEach(track => track.stop());
+  $('echo-status').textContent = 'Echo cancellation: microphone stopped.';
   await captureContext?.close(); captureContext = undefined;
   $('start').disabled = false; $('stop').disabled = true; $('talk').disabled = true; status('Microphone stopped.');
 };

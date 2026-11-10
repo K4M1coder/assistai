@@ -16,6 +16,7 @@
   <p>Spoken language: French. This experimental client uses local services.</p>
   <button id="start">Start microphone</button><button id="stop" disabled>Stop microphone</button><button id="interrupt">Interrupt</button>
   <p><label><input id="speaker-safe" type="checkbox" checked> Speaker-safe mode: use the Interrupt button while the assistant is speaking</label></p>
+  <p id="echo-status" role="status">Echo cancellation: start the microphone to check.</p>
   <p><label for="noise-threshold">Microphone detection threshold: <output id="noise-threshold-value" for="noise-threshold">2.5%</output></label><br>
     <input id="noise-threshold" type="range" min="0.5" max="12" step="0.5" value="2.5">
     <br>Increase to ignore quieter background noise; decrease to detect a quieter voice.</p>
