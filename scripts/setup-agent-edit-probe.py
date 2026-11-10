@@ -1,16 +1,20 @@
 """Create a disposable coding fixture; this is not an OS-level sandbox."""
 import json
+import os
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-workspace = root / '.cache/agent-coding-probe'
+cache = (root / '.cache').resolve()
+workspace = (root / os.environ.get('ASSISTAI_PROBE_WORKSPACE', '.cache/agent-coding-probe')).resolve()
+if workspace == cache or not workspace.is_relative_to(cache):
+    raise ValueError('Probe workspace must be a subdirectory of .cache')
 workspace.mkdir(parents=True, exist_ok=True)
 config = {
     '$schema': 'https://opencode.ai/config.json',
-    'model': 'local/gemma',
+    'model': 'local/probe',
     'provider': {'local': {'npm': '@ai-sdk/openai-compatible', 'name': 'Local llama.cpp',
-        'options': {'baseURL': 'http://127.0.0.1:18080/v1', 'apiKey': 'local'},
-        'models': {'gemma': {'name': 'Gemma 12B', 'tool_call': True,
+        'options': {'baseURL': os.environ.get('LOCAL_MODEL_URL', 'http://127.0.0.1:18080/v1'), 'apiKey': 'local'},
+        'models': {'probe': {'name': 'Local probe model', 'tool_call': True,
                               'limit': {'context': 8192, 'output': 1024}}}}},
     'enabled_providers': ['local'],
     # OpenCode evaluates ordered matches; the catch-all must precede exceptions.

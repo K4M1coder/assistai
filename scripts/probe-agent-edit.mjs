@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { spawnSync } from 'node:child_process';
 
+const workspace = process.env.ASSISTAI_PROBE_WORKSPACE ?? '.cache/agent-coding-probe';
 const base = process.env.ASSISTAI_OPENCODE_URL ?? 'http://127.0.0.1:18089';
 const request = async (path, options = {}) => {
   const response = await fetch(`${base}${path}`, { ...options, signal: AbortSignal.timeout(10000) });
@@ -20,8 +21,8 @@ for (let i = 0; i < 90; i++) {
   const last = [...messages].reverse().find(item => item.info?.role === 'assistant' && item.info?.time?.completed);
   if (!status[session.id] && last) {
     const python = process.env.ASSISTAI_PYTHON ?? '.venv-voice/Scripts/python.exe';
-    const check = spawnSync(python, ['-I', '-c', "import runpy; f=runpy.run_path('.cache/agent-coding-probe/calculator.py')['add']; assert f(2, 3)==5 and f(-4, 2)==-2 and f(0, 0)==0"], { encoding: 'utf8' });
-    console.log(JSON.stringify({ elapsed_ms: Math.round(performance.now() - start), error: last.info.error ?? null, parts: last.parts, file: await readFile('.cache/agent-coding-probe/calculator.py', 'utf8'), validation_exit: check.status, validation_error: check.stderr }));
+    const check = spawnSync(python, ['-I', '-c', "import runpy,sys; f=runpy.run_path(sys.argv[1])['add']; assert f(2, 3)==5 and f(-4, 2)==-2 and f(0, 0)==0", `${workspace}/calculator.py`], { encoding: 'utf8' });
+    console.log(JSON.stringify({ elapsed_ms: Math.round(performance.now() - start), error: last.info.error ?? null, parts: last.parts, file: await readFile(`${workspace}/calculator.py`, 'utf8'), validation_exit: check.status, validation_error: check.stderr }));
     if (last.info.error || check.status !== 0) process.exitCode = 1;
     process.exit();
   }
