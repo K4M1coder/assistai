@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
@@ -21,7 +21,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
   const stream = { active: true, getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: true }) }], getTracks: () => [] };
-  const context = vm.createContext({ document: { getElementById: id => elements[id] }, location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
+  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
   vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'asr.ready'})})", context);
   await elements.start.onclick();

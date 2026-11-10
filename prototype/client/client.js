@@ -1,6 +1,22 @@
 const $ = id => document.getElementById(id);
 const status = text => { $('status').textContent = text; };
 const log = text => { $('log').textContent += `${text}\n`; };
+async function refreshServices() {
+  const list = $('services');
+  try {
+    const response = await fetch('/services', { cache: 'no-store' });
+    if (!response.ok) throw Error('Status endpoint unavailable');
+    const { services } = await response.json();
+    list.replaceChildren(...services.map(service => {
+      const item = document.createElement('li');
+      const names = service.models?.map(model => `${model.name}${model.context ? ` (${model.context} context)` : ''}`).join(', ');
+      item.textContent = `${service.role}: ${service.available ? 'online' : 'unavailable'}${service.server ? ` — ${service.server}` : ''}${names ? ` — ${names}` : ''}${service.message ? ` — ${service.message}` : ''}`;
+      return item;
+    }));
+  } catch { list.textContent = 'Service status unavailable. Restart the gateway to update it.'; }
+}
+$('refresh-services').onclick = refreshServices;
+void refreshServices();
 const ws = new WebSocket(`ws://${location.host}/voice`);
 ws.binaryType = 'arraybuffer';
 let captureContext, playbackContext, stream, captureNode, echoBridge, referenceNode;

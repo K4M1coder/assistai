@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
+import { getServiceStatus } from './service-status.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -44,6 +45,10 @@ const aecFiles = new Map([
 ]);
 const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental' }));
+  if (req.method === 'GET' && req.url === '/services') {
+    const services = await getServiceStatus({ voiceUrl: llmUrl, asrUrl, ttsUrl, opencodeUrl });
+    return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ services }));
+  }
   const file = staticFiles.get(req.url) ?? aecFiles.get(req.url);
   if (req.method === 'GET' && file) {
     try { return res.writeHead(200, { 'content-type': file[1], 'cache-control': 'no-store' }).end(await readFile(resolve(aecFiles.has(req.url) ? aecRoot : clientRoot, file[0]))); }
