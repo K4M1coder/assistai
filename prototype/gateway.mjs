@@ -36,6 +36,7 @@ const staticFiles = new Map([
   ['/echo-reference-worklet.js', ['echo-reference-worklet.js', 'text/javascript; charset=utf-8']],
   ['/echo-canceller-worker.js', ['echo-canceller-worker.js', 'text/javascript; charset=utf-8']],
   ['/echo-bridge.js', ['echo-bridge.js', 'text/javascript; charset=utf-8']],
+  ['/decimate-48k.js', ['decimate-48k.js', 'text/javascript; charset=utf-8']],
 ]);
 const aecFiles = new Map([
   ['/aec3/webrtcaec3-0.3.0.js', ['webrtcaec3-0.3.0.js', 'text/javascript; charset=utf-8']],

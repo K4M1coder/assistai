@@ -145,6 +145,8 @@ $('start').onclick = async () => {
     };
     if ($('experimental-aec').checked) {
       const { createEchoBridge } = await import('/echo-bridge.js');
+      const { Decimate48k } = await import('/decimate-48k.js');
+      const decimator = new Decimate48k();
       await captureContext.audioWorklet.addModule('/echo-reference-worklet.js');
       const worker = new Worker('/echo-canceller-worker.js');
       let pending = null;
@@ -154,8 +156,7 @@ $('start').onclick = async () => {
           onReady: () => resolve(bridge),
           onError: message => { $('speaker-safe').checked = true; status(`Echo filter stopped: ${message}. Restart the microphone.`); stream?.getTracks().forEach(track => track.stop()); captureNode?.disconnect(); reject(new Error(message)); },
           onAudio: ({ capture }) => {
-            const reduced = new Int16Array(160);
-            for (let i = 0; i < reduced.length; i++) reduced[i] = Math.max(-32768, Math.min(32767, Math.round(capture[i * 3] * 32767)));
+            const reduced = decimator.process(capture);
             if (!pending) pending = reduced;
             else { const frame = new Int16Array(320); frame.set(pending); frame.set(reduced, 160); pending = null; handleAudio(frame.buffer); }
           }
