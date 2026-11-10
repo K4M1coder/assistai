@@ -1,0 +1,36 @@
+diff --git a/src/llama-moe-slot.cpp b/src/llama-moe-slot.cpp
+index 647c0b2..1bfb4ae 100644
+--- a/src/llama-moe-slot.cpp
++++ b/src/llama-moe-slot.cpp
+@@ -28,6 +28,7 @@
+ #ifdef _WIN32
+ #include <fcntl.h>
+ #include <io.h>
++struct iovec { void * iov_base; size_t iov_len; };
+ #else
+ #include <fcntl.h>
+ #include <sys/uio.h>
+@@ -1424,7 +1425,7 @@ struct llama_moe_slot_runtime::impl {
+             if (_lseeki64(fd, (int64_t) (offset + done), SEEK_SET) < 0) {
+                 throw std::runtime_error("failed to seek MoE experts");
+             }
+-            const ssize_t result = _read(fd, cur[0].iov_base, (unsigned int) cur[0].iov_len);
++            const int result = _read(fd, cur[0].iov_base, (unsigned int) cur[0].iov_len);
+ #else
+             const ssize_t result = preadv(fd, cur, cn, (off_t) (offset + done));
+ #endif
+diff --git a/tools/omni/test/test-duplex.cpp b/tools/omni/test/test-duplex.cpp
+index 225707f..24de5a1 100644
+--- a/tools/omni/test/test-duplex.cpp
++++ b/tools/omni/test/test-duplex.cpp
+@@ -300,7 +300,9 @@ int main(int argc, char ** argv) {
+         return 1;
+     }
+ 
+-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(_WIN32)
++#if defined(_WIN32)
++    signal(SIGINT, sigint_handler);
++#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+     struct sigaction sigint_action;
+     sigint_action.sa_handler = sigint_handler;
+     sigemptyset(&sigint_action.sa_mask);
