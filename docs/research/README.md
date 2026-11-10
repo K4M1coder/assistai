@@ -30,6 +30,7 @@ Code, identifiers, comments, documentation, and the initial UI are written in En
 - [Noisy-room research](2026-11-10-noisy-room.md): interfering speech, target-speaker extraction, and a controlled ASR stress test.
 - [Playback-reference echo research](2026-11-10-echo-reference.md): AEC3 and a synthetic echo-path experiment.
 - [Windows Vulkan memory comparison](2026-11-10-vulkan-memory.md): measured load-mode and host-buffer experiments.
+- [Native duplex feasibility](2026-11-10-native-duplex.md): current candidates, language constraints and a B60 build check.
 
 ## Initial decision
 
