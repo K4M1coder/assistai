@@ -8,6 +8,10 @@ Build a local, interruptible, real-time personal assistant that can speak and li
 
 The existing React demo is a client mockup and integration test bed, not an implementation of this objective.
 
+## Ongoing documentation requirement
+
+Keep the root [README](../../README.md), [architecture](../ARCHITECTURE.md), and [RBAC](../RBAC.md) current as research, experiments and implementation evolve. Distinguish observed behavior, research-only prototypes, assumptions and unverified security or hardware properties. Commit completed checkpoints regularly as K4M1coder. This requirement supplements the ongoing research and working-prototype objective.
+
 ## Language requirements
 
 Code, identifiers, comments, documentation, and the initial UI are written in English. The UI should eventually support multiple display languages. Spoken language is a separate user setting: users must be able to select French for both speech recognition and speech generation, independently of the UI language. The first voice implementation must validate French recognition and generated speech with local models; the current demo does not yet provide this capability.
