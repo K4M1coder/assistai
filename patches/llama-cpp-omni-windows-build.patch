@@ -1,5 +1,5 @@
 diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
-index c9f906d..1650db5 100644
+index c9f906d..c48c159 100644
 --- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
 +++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
 @@ -7280,6 +7280,7 @@ static void ggml_vk_buffer_write_nc_async(ggml_backend_vk_context * ctx, vk_cont
@@ -55,15 +55,37 @@ index c9f906d..1650db5 100644
          ggml_vk_ensure_sync_staging_buffer(src->device, size);
  
          // Copy to src staging buffer
-@@ -14569,6 +14585,7 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
+@@ -14545,6 +14561,21 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
+         return;
+     }
+ 
++    // Opt-in experiment: keep each single-row async upload bounded. The fallback
++    // synchronizes each unpinned chunk before its staging memory can be reused.
++    const char * limit_text = std::getenv("ASSISTAI_VK_ASYNC_UPLOAD_LIMIT");
++    const size_t requested = limit_text ? std::strtoull(limit_text, nullptr, 10) : 0;
++    const size_t limit = requested >= 4096 ? requested & ~size_t(3) : 0;
++    if (limit && n_copies == 1 && size > limit) {
++        for (size_t done = 0; done < size;) {
++            const size_t n = std::min(limit, size - done);
++            ggml_backend_vk_set_tensor_2d_async(backend, tensor,
++                static_cast<const uint8_t *>(data) + done, offset + done, n, 1, n, n);
++            done += n;
++        }
++        return;
++    }
++
+     ggml_backend_vk_buffer_context * buf_ctx = (ggml_backend_vk_buffer_context *)tensor->buffer->context;
+ 
+     vk_context cpy_ctx;
+@@ -14569,6 +14600,7 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
  
      if (!ret) {
          const size_t staging_size = size * n_copies;
-+        VK_LOG_MEMORY("ASSISTAI staging context-upload bytes=" << staging_size);
++        VK_LOG_MEMORY("ASSISTAI staging context-upload bytes=" << staging_size << " width=" << size << " rows=" << n_copies);
          ggml_vk_ensure_sync_staging_buffer(ctx, staging_size);
          ggml_vk_sync_buffers(nullptr, cpy_ctx);
  
-@@ -14625,6 +14642,7 @@ static void ggml_backend_vk_get_tensor_2d_async(ggml_backend_t backend, const gg
+@@ -14625,6 +14657,7 @@ static void ggml_backend_vk_get_tensor_2d_async(ggml_backend_t backend, const gg
  
      if (!ret) {
          const size_t staging_size = size * n_copies;

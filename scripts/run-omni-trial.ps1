@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds = 180, [ValidateSet('french', 'english')][string]$Language = 'french', [ValidateRange(4, 30)][int]$ChunkCount = 4)
+param([int]$TimeoutSeconds = 180, [ValidateSet('french', 'english')][string]$Language = 'french', [ValidateRange(4, 30)][int]$ChunkCount = 4, [switch]$BoundAsyncUploads)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root '.cache/llama-cpp-omni-build/bin/Release/llama-omni-test-duplex.exe'
@@ -40,6 +40,8 @@ $env:GGML_VK_DISABLE_COOPMAT = '1'
 $env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM = '1'
 $env:GGML_VK_MEMORY_LOGGER = '1'
 $env:ASSISTAI_VK_SYNC_UPLOAD_LIMIT = '16777216'
+if ($BoundAsyncUploads) { $env:ASSISTAI_VK_ASYNC_UPLOAD_LIMIT = '16777216' }
+else { Remove-Item Env:ASSISTAI_VK_ASYNC_UPLOAD_LIMIT -ErrorAction SilentlyContinue }
 Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
 $trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--low-host-memory', '--q8-kv', '--test', $prefix, "$ChunkCount", '--stream-interval', '1000', '-o', $output)
 $p = Start-Process -FilePath $exe -ArgumentList $trialArguments -WorkingDirectory $source -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err -PassThru
