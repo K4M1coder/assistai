@@ -17,7 +17,7 @@ const send = data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
 function finishPushToTalk() {
   if (!pushToTalkActive) return;
   pushToTalkActive = false;
-  $('talk').textContent = 'Start talking';
+  $('talk').textContent = 'Hold to talk';
   send(JSON.stringify({ type: 'audio.end' }));
 }
 function stopPlayback() {
@@ -68,20 +68,39 @@ ws.onmessage = ({ data }) => {
   else if (event.type === 'speech.cancelled') stopPlayback();
 };
 $('interrupt').onclick = () => interrupt('manual');
-$('push-to-talk').onchange = () => {
+function changeMicrophoneMode() {
   finishPushToTalk();
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   send(JSON.stringify({ type: 'audio.reset' }));
   $('talk').disabled = !$('push-to-talk').checked || !stream?.active;
-};
-$('talk').onclick = () => {
-  if (pushToTalkActive) { finishPushToTalk(); return; }
+}
+$('push-to-talk').onchange = changeMicrophoneMode;
+$('speaker-safe').onchange = changeMicrophoneMode;
+function beginPushToTalk() {
+  if (pushToTalkActive) return;
   if (!$('push-to-talk').checked || !stream?.active) return;
   if (speechOpen || playbackSources.size) interrupt('manual');
   send(JSON.stringify({ type: 'audio.reset' }));
   pushToTalkActive = true;
-  $('talk').textContent = 'Finish talking';
+  $('talk').textContent = 'Release to send';
+}
+$('talk').onpointerdown = event => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  $('talk').setPointerCapture(event.pointerId);
+  beginPushToTalk();
 };
+$('talk').onpointerup = finishPushToTalk;
+$('talk').onpointercancel = finishPushToTalk;
+$('talk').onlostpointercapture = finishPushToTalk;
+$('talk').onkeydown = event => {
+  if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); beginPushToTalk(); }
+};
+$('talk').onkeyup = event => {
+  if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); finishPushToTalk(); }
+};
+$('talk').onblur = finishPushToTalk;
+window.addEventListener('blur', finishPushToTalk);
 $('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
