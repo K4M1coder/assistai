@@ -40,4 +40,8 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext('captureNode.port.onmessage', context)({ data: frame });
   assert.equal(sent.length, count);
   assert.equal(JSON.parse(sent.at(-1)).type, 'audio.end');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.completed', task_id:'task-1', text:'done'})})", context);
+  assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})})", context);
+  assert.ok(sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
 });

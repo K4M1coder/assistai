@@ -129,6 +129,28 @@ wss.on('connection', (client, req) => {
     record(session, previous.id, 'speech.cancelled', { reason });
     send({ type: 'speech.cancelled', turn_id: previous.id, reason });
   };
+  const streamSpeech = async (text, turn) => {
+    const form = new FormData();
+    form.set('text', text);
+    const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: turn.controller.signal });
+    if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
+    let header = Buffer.alloc(0), started = false;
+    for await (const bytes of speech.body) {
+      if (active !== turn) return;
+      let chunk = Buffer.from(bytes);
+      if (!started) {
+        header = Buffer.concat([header, chunk]);
+        if (header.length < 44) continue;
+        if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WAVE' || header.toString('ascii', 36, 40) !== 'data' || header.readUInt16LE(20) !== 1 || header.readUInt16LE(22) !== 1 || header.readUInt16LE(34) !== 16) throw new Error('Unsupported TTS WAV format');
+        send({ type: 'speech.start', turn_id: turn.id, sample_rate: header.readUInt32LE(24), encoding: 'pcm_s16le' });
+        chunk = header.subarray(44);
+        started = true;
+      }
+      if (chunk.length && client.readyState === WebSocket.OPEN) client.send(chunk, { binary: true });
+    }
+    if (!started) throw new Error('TTS returned no WAV audio');
+    if (active === turn) { active = undefined; send({ type: 'speech.end', turn_id: turn.id }); }
+  };
   const respond = async (text) => {
     cancel();
     const turn = { id: randomUUID(), controller: new AbortController() };
@@ -175,27 +197,7 @@ wss.on('connection', (client, req) => {
       if (active !== turn) return;
       record(session, turn.id, 'assistant.text', { text: answer });
       send({ type: 'assistant.text', turn_id: turn.id, text: answer });
-      const form = new FormData();
-      form.set('text', answer);
-      const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: turn.controller.signal });
-      if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
-      let header = Buffer.alloc(0);
-      let started = false;
-      for await (const bytes of speech.body) {
-        if (active !== turn) return;
-        let chunk = Buffer.from(bytes);
-        if (!started) {
-          header = Buffer.concat([header, chunk]);
-          if (header.length < 44) continue;
-          if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WAVE' || header.toString('ascii', 36, 40) !== 'data' || header.readUInt16LE(20) !== 1 || header.readUInt16LE(22) !== 1 || header.readUInt16LE(34) !== 16) throw new Error('Unsupported TTS WAV format');
-          send({ type: 'speech.start', turn_id: turn.id, sample_rate: header.readUInt32LE(24), encoding: 'pcm_s16le' });
-          chunk = header.subarray(44);
-          started = true;
-        }
-        if (chunk.length && client.readyState === WebSocket.OPEN) client.send(chunk, { binary: true });
-      }
-      if (!started) throw new Error('TTS returned no WAV audio');
-      if (active === turn) { active = undefined; send({ type: 'speech.end', turn_id: turn.id }); }
+      await streamSpeech(answer, turn);
     } catch (error) {
       if (active === turn) { active = undefined; send({ type: 'error', turn_id: turn.id, message: String(error) }); }
     }
@@ -212,6 +214,7 @@ wss.on('connection', (client, req) => {
         const text = segments.join(' ').trim();
         segments = [];
         if (text) void respond(text);
+        else send({ type: 'asr.empty' });
       }
     } catch { send({ type: 'error', message: 'Invalid ASR response' }); }
   });
@@ -221,6 +224,17 @@ wss.on('connection', (client, req) => {
     let event;
     try { event = JSON.parse(data.toString()); } catch { client.close(1003, 'Invalid JSON'); return; }
     if (event.type === 'interrupt') { cancel(event.reason === 'voice_activity' ? 'voice_activity' : 'manual'); return; }
+    if (event.type === 'notification.speak' && typeof event.task_id === 'string') {
+      const exists = taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === event.task_id);
+      if (!exists || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id }); return; }
+      const turn = { id: randomUUID(), controller: new AbortController() };
+      active = turn;
+      send({ type: 'notification.started', task_id: event.task_id, turn_id: turn.id });
+      void streamSpeech('La tâche en arrière-plan est terminée. Le résultat est affiché.', turn).catch(error => {
+        if (active === turn) { active = undefined; send({ type: 'error', turn_id: turn.id, message: String(error) }); }
+      });
+      return;
+    }
     if (event.type === 'audio.reset' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { segments = []; asr.send(JSON.stringify({ type: 'reset' })); return; }
     if (event.type === 'audio.end' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { waitingForFinal = true; asr.send(JSON.stringify({ type: 'end' })); return; }
     if (event.type === 'text' && typeof event.text === 'string' && event.text.trim().length <= 4000 && event.text.trim()) { void respond(event.text.trim()); return; }

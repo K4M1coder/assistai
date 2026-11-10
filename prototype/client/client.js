@@ -8,16 +8,24 @@ let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
 let pushToTalkActive = false;
+let responsePending = false, notificationPending = false, currentNotification = null;
+const pendingNotifications = [];
 let detectionThreshold = Number($('noise-threshold').value) / 100;
 $('noise-threshold').oninput = event => {
   detectionThreshold = Number(event.target.value) / 100;
   $('noise-threshold-value').textContent = `${Number(event.target.value).toFixed(1)}%`;
 };
 const send = data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
+function announceWhenIdle() {
+  if (!pendingNotifications.length || notificationPending || responsePending || speaking || pushToTalkActive || speechOpen || playbackSources.size || !playbackContext || ws.readyState !== WebSocket.OPEN) return;
+  notificationPending = true;
+  send(JSON.stringify({ type: 'notification.speak', task_id: pendingNotifications[0] }));
+}
 function finishPushToTalk() {
   if (!pushToTalkActive) return;
   pushToTalkActive = false;
   $('talk').textContent = 'Hold to talk';
+  responsePending = true;
   send(JSON.stringify({ type: 'audio.end' }));
 }
 function stopPlayback() {
@@ -30,6 +38,7 @@ function stopPlayback() {
 function interrupt(reason = 'manual') {
   const wasPlaying = speechOpen || playbackSources.size > 0;
   stopPlayback();
+  responsePending = false;
   if (reason === 'voice_activity' && wasPlaying) log('Playback interrupted: microphone detected speech.');
   send(JSON.stringify({ type: 'interrupt', reason }));
 }
@@ -48,7 +57,7 @@ function play(data, rate) {
   if (referenceNode && captureContext === playbackContext) source.connect(referenceNode, 0, 1);
   playbackTime = Math.max(playbackTime, playbackContext.currentTime + 0.04);
   source.start(playbackTime); playbackTime += buffer.duration;
-  playbackSources.add(source); source.onended = () => playbackSources.delete(source);
+  playbackSources.add(source); source.onended = () => { playbackSources.delete(source); announceWhenIdle(); };
 }
 let outputRate = 24000;
 ws.onopen = () => status('Connected. Waiting for speech recognition.');
@@ -58,15 +67,18 @@ ws.onmessage = ({ data }) => {
   if (data instanceof ArrayBuffer) { play(data, outputRate); return; }
   const event = JSON.parse(data);
   if (event.type === 'asr.ready') { asrReady = true; status('Ready. Start the microphone to speak French.'); }
+  else if (event.type === 'asr.empty') { responsePending = false; announceWhenIdle(); }
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
   else if (event.type === 'task.started') log(`Agent started: ${event.task}`);
-  else if (event.type === 'task.completed') log(`Agent completed: ${event.text}`);
-  else if (event.type === 'task.error' || event.type === 'error') { status(event.message); log(`Error: ${event.message}`); }
+  else if (event.type === 'task.completed') { log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
+  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); currentNotification = event.task_id; notificationPending = false; responsePending = true; }
+  else if (event.type === 'notification.rejected') { notificationPending = false; }
+  else if (event.type === 'task.error' || event.type === 'error') { responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { speechOpen = false; }
-  else if (event.type === 'speech.cancelled') stopPlayback();
+  else if (event.type === 'speech.end') { speechOpen = false; currentNotification = null; responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'speech.cancelled') { if (currentNotification) pendingNotifications.unshift(currentNotification); currentNotification = null; stopPlayback(); }
 };
 $('interrupt').onclick = () => interrupt('manual');
 function changeMicrophoneMode() {
@@ -102,7 +114,7 @@ $('talk').onkeyup = event => {
 };
 $('talk').onblur = finishPushToTalk;
 window.addEventListener('blur', finishPushToTalk);
-$('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
+$('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); responsePending = true; send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
   try {
@@ -139,7 +151,7 @@ $('start').onclick = async () => {
       if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); }
       if (speaking) {
         silenceFrames = voice ? 0 : silenceFrames + 1;
-        if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; send(JSON.stringify({ type: 'audio.end' })); }
+        if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; send(JSON.stringify({ type: 'audio.end' })); }
       }
       send(data);
     };
