@@ -152,9 +152,10 @@ $('start').onclick = async () => {
       let pending = null;
       echoBridge = await new Promise((resolve, reject) => {
         let bridge;
+        const timeout = setTimeout(() => { bridge?.close(); reject(new Error('Echo filter initialization timed out')); }, 10000);
         bridge = createEchoBridge(worker, {
-          onReady: () => resolve(bridge),
-          onError: message => { $('speaker-safe').checked = true; status(`Echo filter stopped: ${message}. Restart the microphone.`); stream?.getTracks().forEach(track => track.stop()); captureNode?.disconnect(); reject(new Error(message)); },
+          onReady: () => { clearTimeout(timeout); resolve(bridge); },
+          onError: message => { clearTimeout(timeout); $('speaker-safe').checked = true; status(`Echo filter stopped: ${message}. Restart the microphone.`); stream?.getTracks().forEach(track => track.stop()); captureNode?.disconnect(); reject(new Error(message)); },
           onAudio: ({ capture }) => {
             const reduced = decimator.process(capture);
             if (!pending) pending = reduced;
