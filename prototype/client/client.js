@@ -130,7 +130,20 @@ $('talk').onkeyup = event => {
 };
 $('talk').onblur = finishPushToTalk;
 window.addEventListener('blur', finishPushToTalk);
-$('form').onsubmit = async event => { event.preventDefault(); const text = $('text').value.trim(); if (text) { playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); responsePending = true; send(JSON.stringify({ type: 'text', text })); $('text').value = ''; } };
+$('form').onsubmit = async event => {
+  event.preventDefault();
+  const text = $('text').value.trim(), file = $('image').files?.[0];
+  if (!text) return;
+  if (file && (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 1024 * 1024)) { status('Choose a PNG or JPEG image under 1 MiB.'); return; }
+  let image;
+  if (file) {
+    try { image = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); }
+    catch { status('Could not read the selected image.'); return; }
+  }
+  playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); responsePending = true;
+  send(JSON.stringify(file ? { type: 'image', text, image } : { type: 'text', text }));
+  $('text').value = ''; $('image').value = '';
+};
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
   try {

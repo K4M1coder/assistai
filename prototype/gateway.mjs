@@ -13,10 +13,11 @@ import { getServiceStatus } from './service-status.mjs';
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
 const llmUrl = process.env.ASSISTAI_LLM_URL ?? 'http://127.0.0.1:18084/v1';
+const visionUrl = process.env.ASSISTAI_VISION_URL ?? 'http://127.0.0.1:18080/v1';
 const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const dbPath = resolve(process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite');
-for (const address of [asrUrl, llmUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : [])]) {
+for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : [])]) {
   if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(address).hostname)) {
     throw new Error('Prototype providers must bind to a loopback address');
   }
@@ -56,7 +57,7 @@ const server = http.createServer(async (req, res) => {
   }
   res.writeHead(404).end();
 });
-const wss = new WebSocketServer({ server, path: '/voice', maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ server, path: '/voice', maxPayload: 1500 * 1024 });
 wss.on('connection', (client, req) => {
   if (req.headers.origin) {
     try {
@@ -207,6 +208,23 @@ wss.on('connection', (client, req) => {
       if (active === turn) { active = undefined; send({ type: 'error', turn_id: turn.id, message: String(error) }); }
     }
   };
+  const respondToImage = async (text, image) => {
+    cancel();
+    const turn = { id: randomUUID(), controller: new AbortController() };
+    active = turn;
+    record(session, turn.id, 'user.text', { text: `[Image] ${text}` });
+    send({ type: 'user.text', turn_id: turn.id, text: `[Image] ${text}` });
+    try {
+      const response = await fetch(`${visionUrl}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: turn.controller.signal, body: JSON.stringify({ model: 'local', messages: [{ role: 'system', content: 'Answer the user in concise French. Describe only what you can see.' }, { role: 'user', content: [{ type: 'text', text }, { type: 'image_url', image_url: { url: image } }] }], max_tokens: 160, temperature: 0.2, chat_template_kwargs: { enable_thinking: false } }) });
+      if (!response.ok) throw Error(`Vision model HTTP ${response.status}`);
+      const answer = (await response.json()).choices?.[0]?.message?.content?.trim();
+      if (!answer) throw Error('Vision model returned no answer');
+      if (active !== turn) return;
+      record(session, turn.id, 'assistant.text', { text: answer });
+      send({ type: 'assistant.text', turn_id: turn.id, text: answer });
+      await streamSpeech(answer, turn);
+    } catch (error) { if (active === turn) { active = undefined; send({ type: 'error', turn_id: turn.id, message: String(error) }); } }
+  };
   asr.on('open', () => send({ type: 'asr.connected', session_id: session }));
   asr.on('message', data => {
     try {
@@ -242,6 +260,14 @@ wss.on('connection', (client, req) => {
     }
     if (event.type === 'audio.reset' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { segments = []; asr.send(JSON.stringify({ type: 'reset' })); return; }
     if (event.type === 'audio.end' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { waitingForFinal = true; asr.send(JSON.stringify({ type: 'end' })); return; }
+    if (event.type === 'image') {
+      const match = typeof event.image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(event.image);
+      const bytes = match ? Buffer.from(match[2], 'base64') : Buffer.alloc(0);
+      const signature = match && (match[1] === 'png' ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255);
+      if (!signature || bytes.length > 1024 * 1024 || typeof event.text !== 'string' || !event.text.trim() || event.text.trim().length > 4000) { send({ type: 'error', message: 'Choose a PNG or JPEG image under 1 MiB and provide a question.' }); return; }
+      void respondToImage(event.text.trim(), event.image);
+      return;
+    }
     if (event.type === 'text' && typeof event.text === 'string' && event.text.trim().length <= 4000 && event.text.trim()) { void respond(event.text.trim()); return; }
   });
   client.on('close', () => { cancel('disconnected'); asr.close(); });
