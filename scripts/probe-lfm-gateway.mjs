@@ -3,10 +3,10 @@ import {readFile} from 'node:fs/promises';
 import WebSocket from 'ws';
 const wav=await readFile('.cache/lfm3-fixture-french.wav');const p=wav.indexOf('data');if(p<0||wav.readUInt32LE(24)!==16000)throw Error('Expected 16 kHz WAV');
 const pcm=wav.subarray(p+8,p+8+wav.readUInt32LE(p+4));
-const ws=new WebSocket('ws://127.0.0.1:18093/voice');let ready=false,started=false,completed=false,audio=0,nonzero=0,speech=false,text='',failure=null,taskId=null,initialEnded=false,notificationStarted=false,notificationBytes=0;
+const ws=new WebSocket('ws://127.0.0.1:18093/voice');let ready=false,started=false,completed=false,audio=0,nonzero=0,speech=false,text='',failure=null,taskId=null,initialEnded=false,notificationStarted=false,notificationBytes=0,notificationNonzero=0;
 const timer=setTimeout(()=>{failure='timeout';ws.close()},120000);
 ws.on('message',async(data,binary)=>{
- if(binary){audio+=data.length;if(notificationStarted)notificationBytes+=data.length;for(let i=0;i+1<data.length;i+=2)if(data.readInt16LE(i)!==0)nonzero++;return;}
+ if(binary){audio+=data.length;if(notificationStarted)notificationBytes+=data.length;for(let i=0;i+1<data.length;i+=2)if(data.readInt16LE(i)!==0){nonzero++;if(notificationStarted)notificationNonzero++;}return;}
  const e=JSON.parse(data);
  if(e.type==='asr.ready'&&!ready){ready=true;ws.send(JSON.stringify({type:'audio.start'}));for(let i=0;i<pcm.length;i+=3200){ws.send(pcm.subarray(i,i+3200),{binary:true});await new Promise(r=>setTimeout(r,100));}ws.send(JSON.stringify({type:'audio.end'}));}
  else if(e.type==='task.started'){started=true;if(!/fixture/i.test(e.task)||!/secret/i.test(e.task)){failure=`Unexpected task: ${e.task}`;ws.close();}}
@@ -20,4 +20,4 @@ ws.on('message',async(data,binary)=>{
 
 });
 ws.on('error',e=>{failure=e.message});
-ws.on('close',()=>{clearTimeout(timer);console.log(JSON.stringify({ready,started,completed,speech,audio_bytes:audio,nonzero_samples:nonzero,text,notificationStarted,notificationBytes,failure}));if(!ready||!started||!completed||!speech||!audio||!nonzero||!notificationStarted||!notificationBytes||failure)process.exitCode=1});
+ws.on('close',()=>{clearTimeout(timer);console.log(JSON.stringify({ready,started,completed,speech,audio_bytes:audio,nonzero_samples:nonzero,text,notificationStarted,notificationBytes,notificationNonzero,failure}));if(!ready||!started||!completed||!speech||!audio||!nonzero||!notificationStarted||!notificationBytes||!notificationNonzero||failure)process.exitCode=1});
