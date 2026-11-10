@@ -156,8 +156,18 @@ Across 69 samples, adapter dedicated peaked at 16,004,472,832 bytes from a 13,80
 
 ## EXP-047: French spoken delegation and transcription
 
+**Superseded by EXP-048:** the synthetic input was corrupted by Windows PowerShell script encoding. The negative model conclusion below is invalid.
+
 Generated a French test utterance locally: “Délègue à l'agent la tâche de vérifier la météo à Paris.” With Gemma loaded but idle, LFM3-Audio Q4_K_M was served separately under the watchdog. Two identical realtime probes returned three `delegate_task` calls each with the same garbled task strings. One included “Paris” but none contained a recognizable weather task. The first version of the probe incorrectly passed because it only checked the city; its check was strengthened to require both the city and a weather term, and the repeat correctly failed. No tool call was executed.
 
 The same synthetic clip sent to `/v1/audio/transcriptions` with French language selection returned HTTP 200, but the transcript was badly corrupted and omitted the weather term. This is one synthetic voice on one runtime/build, not a model-wide French accuracy measurement. It provides concrete evidence against enabling this configuration for French delegation without further work. Test inputs were sent in a burst; neither full duplex nor live latency was tested.
 
 Across 36 adapter samples, dedicated peaked at 15,988,133,888 bytes from a 13,802,622,976-byte baseline; shared peaked at 248,434,688 bytes from 179,867,648; available RAM remained above 12,728,705,024 bytes. The agent model was idle; sampling cannot prove hard memory limits or no paging. The temporary model was stopped, and the normal voice controller restored.
+
+## EXP-048: corrected French synthetic input
+
+EXP-047 used a UTF-8 script without a BOM under Windows PowerShell 5, which interpreted accented characters using the system code page. An independent Vosk pass over the old generated WAV reproduced “symbol copyright” fragments. The generator now constructs accented characters using ASCII source and Unicode code points; Vosk transcribed the corrected clip as the intended delegation request, including weather and Paris. This exposes a fixture error in EXP-047, not a demonstrated model defect. Earlier EXP-046 used an ASCII-only French sentence, so this particular encoding defect does not explain that result.
+
+With the corrected clip, one LFM3-Audio realtime probe returned a single `delegate_task` call with `task` set to “check the weather in Paris”. A separate `/v1/audio/transcriptions` request returned both French weather and Paris terms. Both checks passed. The tool was not executed; one synthetic voice and one utterance cannot establish accuracy or safety for real user speech. Audio was sent in a burst, Gemma was idle, and neither interruption nor an actual harness task was exercised.
+
+With the agent model loaded, 20 adapter samples showed a dedicated maximum of 15,995,932,672 bytes, shared maximum 252,317,696 bytes from a baseline of 197,431,296, and minimum free RAM of 12,253,138,944 bytes. These samples cannot prove peak bounds or no paging. The temporary audio server was stopped and the original voice controller restored.
