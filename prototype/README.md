@@ -4,6 +4,8 @@ These components are an early implementation, not the complete assistant. The Re
 
 ## French speech recognition
 
+The Windows demonstration uses the repository's `.venv-voice` environment and `.cache/huggingface` model cache. Keep `HF_HUB_OFFLINE=1` for the existing Pocket TTS model; using the default cache path can make offline startup fail. The demonstration gateway uses port 18088. See the research log for the verified service configuration and its limits.
+
 Create a Python 3.11 or 3.12 environment, install the pinned direct dependencies in `requirements.txt`, then run `python scripts/setup-vosk-fr.py` from the repository root. This downloads the public Vosk French small model into `.cache/vosk`. After setup, the recognizer runs locally without network access. Set `ASSISTAI_VOSK_MODEL` to use a different Vosk model directory.
 
 From the repository root, start `python -m uvicorn prototype.asr_server:app --host 127.0.0.1 --port 18082`. `GET /health` reports readiness. The `/asr` WebSocket accepts binary mono 16 kHz little-endian PCM16 frames of at most one second. It emits JSON `partial` and `segment` events while audio arrives. Send `{"type":"end"}` to receive a `final` event and reset the recognizer, or `{"type":"reset"}` to discard the current utterance. Clients must collect `segment` events as well as the final text for longer utterances.
