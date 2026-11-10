@@ -16,13 +16,22 @@ foreach ($file in @($exe, $model, "${prefix}0000.wav", "${prefix}0001.wav", "${p
 if (Get-NetTCPConnection -LocalPort 18080,18084 -State Listen -ErrorAction SilentlyContinue) { throw 'Stop both existing model servers before this trial.' }
 $adapter = 'luid_0x00000000_0x00013269_phys_0'
 $queries = @("\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage")
-function Read-Resources {
+function Read-Resources([int]$TrialPid = 0) {
     $values = @((Get-Counter -Counter $queries).CounterSamples)
     $d = @($values | Where-Object { $_.Path -like '*\dedicated usage' })
     $s = @($values | Where-Object { $_.Path -like '*\shared usage' })
     if ($d.Count -ne 1 -or $s.Count -ne 1) { throw 'GPU telemetry unavailable or ambiguous.' }
     $os = Get-CimInstance Win32_OperatingSystem
-    return @{ dedicated = [long]$d[0].CookedValue; shared = [long]$s[0].CookedValue; available_ram = [long]$os.FreePhysicalMemory * 1024; at = [DateTimeOffset]::UtcNow.ToString('o') }
+    $result = @{ dedicated = [long]$d[0].CookedValue; shared = [long]$s[0].CookedValue; available_ram = [long]$os.FreePhysicalMemory * 1024; at = [DateTimeOffset]::UtcNow.ToString('o'); process_dedicated = $null; process_shared = $null }
+    if ($TrialPid -gt 0) {
+        try {
+            $counters = @((Get-Counter -Counter @("\GPU Process Memory(pid_$TrialPid*)\Dedicated Usage", "\GPU Process Memory(pid_$TrialPid*)\Shared Usage") -ErrorAction Stop).CounterSamples | Where-Object { $_.Path -like "*$adapter*" })
+            $pd = @($counters | Where-Object { $_.Path -like '*\dedicated usage' })
+            $ps = @($counters | Where-Object { $_.Path -like '*\shared usage' })
+            if ($pd.Count -eq 1 -and $ps.Count -eq 1) { $result.process_dedicated = [long]$pd[0].CookedValue; $result.process_shared = [long]$ps[0].CookedValue }
+        } catch { } # The GPU process counter may not exist before the first allocation.
+    }
+    return $result
 }
 $baseline = Read-Resources
 if ($baseline.dedicated -gt 12GB -or $baseline.available_ram -lt 8GB) { throw 'Insufficient starting headroom for the native model.' }
@@ -37,7 +46,7 @@ $reason = 'completed'
 try {
     while (-not $p.HasExited) {
         if ([DateTime]::UtcNow -gt $deadline) { $reason = 'timeout'; break }
-        try { $r = Read-Resources } catch { $reason = 'telemetry unavailable'; break }
+        try { $r = Read-Resources -TrialPid $p.Id } catch { $reason = 'telemetry unavailable'; break }
         ($r | ConvertTo-Json -Compress) | Add-Content -LiteralPath $samples -Encoding utf8
         if ($r.dedicated -gt 22GB) { $reason = 'dedicated GPU threshold exceeded'; break }
         if ($r.shared - $baseline.shared -gt 256MB) { $reason = 'shared GPU growth threshold exceeded'; break }
