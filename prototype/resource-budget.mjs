@@ -9,6 +9,9 @@ export const DEFAULT_BUDGET = Object.freeze({
 });
 
 export function evaluateBudget(measurement, requested = {}, budget = DEFAULT_BUDGET) {
+  if (!measurement || typeof measurement !== 'object' || !requested || typeof requested !== 'object' || !budget || typeof budget !== 'object') {
+    return { allowed: false, reasons: ['Missing or invalid resource inputs'] };
+  }
   for (const key of Object.keys(DEFAULT_BUDGET)) {
     if (!Number.isFinite(budget[key]) || budget[key] < 0) {
       return { allowed: false, reasons: [`Missing or invalid budget: ${key}`] };

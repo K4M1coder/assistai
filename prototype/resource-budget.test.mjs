@@ -17,6 +17,9 @@ test('rejects excessive shared-memory growth even when dedicated VRAM is under 2
 });
 
 test('fails closed if telemetry is missing or the next allocation would consume reserves', () => {
+  assert.equal(evaluateBudget(null).allowed, false);
+  assert.equal(evaluateBudget(baseline, null).allowed, false);
+  assert.equal(evaluateBudget(baseline, {}, null).allowed, false);
   assert.equal(evaluateBudget({ ...baseline, availableRamBytes: undefined }).allowed, false);
   assert.equal(evaluateBudget(baseline, { vramBytes: 9 * GiB }).allowed, false);
   assert.equal(evaluateBudget(baseline, { ramBytes: 5 * GiB }).allowed, false);
