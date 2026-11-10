@@ -1,8 +1,24 @@
 diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
-index c9f906d..1a265e1 100644
+index c9f906d..1650db5 100644
 --- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
 +++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
-@@ -7416,7 +7416,19 @@ static void ggml_vk_buffer_write_2d(vk_buffer& dst, size_t offset, const void *
+@@ -7280,6 +7280,7 @@ static void ggml_vk_buffer_write_nc_async(ggml_backend_vk_context * ctx, vk_cont
+     // Staging buffer required
+     vk_buffer& staging = ctx->device->sync_staging;
+     const uint64_t copy_size = ts*ne/bs;
++    VK_LOG_MEMORY("ASSISTAI staging tensor-copy bytes=" << copy_size);
+     ggml_vk_ensure_sync_staging_buffer(ctx->device, copy_size);
+     VkBufferCopy buf_copy{ 0, offset, copy_size };
+ 
+@@ -7345,6 +7346,7 @@ static bool ggml_vk_buffer_write_2d_async(vk_context subctx, vk_buffer& dst, siz
+ 
+     // Staging buffer required
+     const size_t staging_size = width * height;
++    VK_LOG_MEMORY("ASSISTAI staging upload-2d width=" << width << " height=" << height);
+     ggml_vk_ensure_sync_staging_buffer(dst->device, staging_size);
+ 
+     vk_buffer& staging_buffer = dst->device->sync_staging;
+@@ -7416,7 +7418,19 @@ static void ggml_vk_buffer_write_2d(vk_buffer& dst, size_t offset, const void *
  
  static void ggml_vk_buffer_write(vk_buffer& dst, size_t offset, const void * src, size_t size) {
      VK_LOG_DEBUG("ggml_vk_buffer_write(" << size << ")");
@@ -23,6 +39,38 @@ index c9f906d..1a265e1 100644
  }
  
  static bool ggml_vk_buffer_read_2d_async(vk_context subctx, vk_buffer& src, size_t offset, void * dst, size_t spitch, size_t dpitch, size_t width, size_t height, bool sync_staging = false) {
+@@ -7463,6 +7477,7 @@ static bool ggml_vk_buffer_read_2d_async(vk_context subctx, vk_buffer& src, size
+ 
+     // Fall back to staging buffer
+     const size_t staging_size = width * height;
++    VK_LOG_MEMORY("ASSISTAI staging download-2d bytes=" << staging_size);
+     ggml_vk_ensure_sync_staging_buffer(src->device, staging_size);
+ 
+     vk_buffer& staging_buffer = src->device->sync_staging;
+@@ -7561,6 +7576,7 @@ static void ggml_vk_buffer_copy(vk_buffer& dst, size_t dst_offset, vk_buffer& sr
+     } else {
+         VK_LOG_DEBUG("ggml_vk_buffer_copy(MULTI_DEVICE, " << size << ")");
+         // Copy device to device
++        VK_LOG_MEMORY("ASSISTAI staging device-copy bytes=" << size);
+         ggml_vk_ensure_sync_staging_buffer(src->device, size);
+ 
+         // Copy to src staging buffer
+@@ -14569,6 +14585,7 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
+ 
+     if (!ret) {
+         const size_t staging_size = size * n_copies;
++        VK_LOG_MEMORY("ASSISTAI staging context-upload bytes=" << staging_size);
+         ggml_vk_ensure_sync_staging_buffer(ctx, staging_size);
+         ggml_vk_sync_buffers(nullptr, cpy_ctx);
+ 
+@@ -14625,6 +14642,7 @@ static void ggml_backend_vk_get_tensor_2d_async(ggml_backend_t backend, const gg
+ 
+     if (!ret) {
+         const size_t staging_size = size * n_copies;
++        VK_LOG_MEMORY("ASSISTAI staging context-download bytes=" << staging_size);
+         ggml_vk_ensure_sync_staging_buffer(ctx, staging_size);
+         ggml_vk_sync_buffers(nullptr, compute_ctx);
+ 
 diff --git a/src/llama-moe-slot.cpp b/src/llama-moe-slot.cpp
 index 647c0b2..1bfb4ae 100644
 --- a/src/llama-moe-slot.cpp
