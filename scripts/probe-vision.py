@@ -1,6 +1,7 @@
 """Send a generated red image to the local vision model without storing user data."""
 import base64
 import json
+import os
 import struct
 import time
 import zlib
@@ -19,7 +20,7 @@ payload = {'model': 'local', 'messages': [{'role': 'user', 'content': [
     {'type': 'image_url', 'image_url': {'url': url}},
 ]}], 'max_tokens': 64, 'temperature': 0, 'chat_template_kwargs': {'enable_thinking': False}}
 start = time.perf_counter()
-response = requests.post('http://127.0.0.1:18080/v1/chat/completions', json=payload, timeout=60)
+response = requests.post(os.environ.get('LOCAL_MODEL_URL', 'http://127.0.0.1:18080/v1') + '/chat/completions', json=payload, timeout=60)
 response.raise_for_status()
 answer = response.json()['choices'][0]['message']['content']
 print(json.dumps({'elapsed_ms': round((time.perf_counter() - start) * 1000), 'answer': answer}))
