@@ -1,7 +1,7 @@
 // Read-only end-to-end probe against a gateway configured with OpenCode.
 import WebSocket from 'ws';
 
-const socket = new WebSocket('ws://127.0.0.1:18083/voice');
+const socket = new WebSocket(process.env.ASSISTAI_TEST_VOICE_URL ?? 'ws://127.0.0.1:18083/voice');
 const start = performance.now();
 const events = [];
 let audioBytes = 0;
