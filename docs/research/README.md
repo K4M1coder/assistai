@@ -28,6 +28,7 @@ Code, identifiers, comments, documentation, and the initial UI are written in En
 - [Benchmark protocol](bench-protocol.md): common Windows/Linux measurement protocol.
 - [Source review, 2026-11-09](2026-11-09-source-review.md): published implementations and local hardware findings.
 - [Noisy-room research](2026-11-10-noisy-room.md): interfering speech, target-speaker extraction, and a controlled ASR stress test.
+- [Playback-reference echo research](2026-11-10-echo-reference.md): AEC3 and a synthetic echo-path experiment.
 
 ## Initial decision
 
