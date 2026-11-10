@@ -1,16 +1,16 @@
-param([int]$TimeoutSeconds = 180)
+param([int]$TimeoutSeconds = 180, [ValidateSet('french', 'english')][string]$Language = 'french', [ValidateRange(4, 30)][int]$ChunkCount = 4)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $root '.cache/llama-cpp-omni-build/bin/Release/llama-omni-test-duplex.exe'
 $source = Join-Path $root '.cache/llama-cpp-omni'
 $model = Join-Path $root '.cache/minicpm-omni/MiniCPM-o-4_5-Q4_K_M.gguf'
-$prefix = Join-Path $root '.cache/omni-french/french_'
-$output = Join-Path $root '.cache/omni-output'
+$prefix = Join-Path $root ".cache/omni-$Language/${Language}_"
 $log = Join-Path $root '.cache/omni-trial.stdout.log'
 $err = Join-Path $root '.cache/omni-trial.stderr.log'
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $samples = Join-Path $root ".cache/omni-trial-memory-$stamp.jsonl"
-foreach ($file in @($exe, $model, "${prefix}0000.wav", "${prefix}0001.wav", "${prefix}0002.wav", "${prefix}0003.wav")) {
+$output = Join-Path $root ".cache/omni-output-$Language-$stamp"
+foreach ($file in @($exe, $model) + @(0..($ChunkCount - 1) | ForEach-Object { "${prefix}$($_.ToString('0000')).wav" })) {
     if (-not (Test-Path -LiteralPath $file)) { throw "Missing trial input: $file" }
 }
 if (Get-NetTCPConnection -LocalPort 18080,18084 -State Listen -ErrorAction SilentlyContinue) { throw 'Stop both existing model servers before this trial.' }
@@ -41,8 +41,9 @@ $env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM = '1'
 $env:GGML_VK_MEMORY_LOGGER = '1'
 $env:ASSISTAI_VK_SYNC_UPLOAD_LIMIT = '16777216'
 Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
-$trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--low-host-memory', '--q8-kv', '--test', $prefix, '4', '--stream-interval', '1000', '-o', $output)
+$trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--low-host-memory', '--q8-kv', '--test', $prefix, "$ChunkCount", '--stream-interval', '1000', '-o', $output)
 $p = Start-Process -FilePath $exe -ArgumentList $trialArguments -WorkingDirectory $source -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err -PassThru
+$null = $p.Handle # Retain the process handle so Windows PowerShell can read the exit code.
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $reason = 'completed'
 try {
@@ -58,5 +59,6 @@ try {
 } finally {
     if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; $p.WaitForExit() }
 }
-@{ reason = $reason; exit_code = $p.ExitCode; baseline = $baseline; stdout = $log; stderr = $err; samples = $samples } | ConvertTo-Json -Depth 5 -Compress
+$p.WaitForExit()
+@{ reason = $reason; exit_code = $p.ExitCode; baseline = $baseline; stdout = $log; stderr = $err; samples = $samples; output = $output } | ConvertTo-Json -Depth 5 -Compress
 if ($reason -ne 'completed' -or $p.ExitCode -ne 0) { exit 1 }
