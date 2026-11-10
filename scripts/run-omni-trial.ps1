@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force -Path $output | Out-Null
 $env:GGML_VK_DISABLE_COOPMAT = '1'
 $env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM = '1'
 Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
-$trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--test', $prefix, '4', '--stream-interval', '1000', '-o', $output)
+$trialArguments = @('-m', $model, '-c', '4096', '-ngl', '99', '--low-host-memory', '--q8-kv', '--test', $prefix, '4', '--stream-interval', '1000', '-o', $output)
 $p = Start-Process -FilePath $exe -ArgumentList $trialArguments -WorkingDirectory $source -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err -PassThru
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $reason = 'completed'
