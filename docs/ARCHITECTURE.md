@@ -18,7 +18,7 @@ flowchart LR
 
 The default gateway port is 18083; the currently running demonstration uses 18088. The service endpoint reports configured engines and models. Speaker-safe, hold-to-talk, manual interruption and a noise threshold exist; the experimental playback-reference filter has not solved speaker feedback reliably. The gateway is a local experiment, not an authenticated multi-user service or OS sandbox. An optional sampled resource check can reject new agent tasks, but is disabled by default and is not a hard runtime limit or allocation reservation.
 
-A native audio-client comparator uses timestamp-aligned capture and playback in its published implementation. Its AEC binding ran on a synthetic fixture locally, but it is not integrated into this gateway and physical-device performance is untested.
+A native audio-client comparator uses timestamp-aligned capture and playback in its published implementation. Synthetic echo-only and overlapping-speech tests ran locally, but it is not integrated into this gateway and physical-device performance is untested.
 
 When admission rejects a task, the gateway emits a `task.rejected` event. In the cascade path it also speaks a fixed resource-related explanation, because a real controller test generated an incorrect file-access explanation when asked to interpret the tool error. The experimental native-speech path receives the tool failure and UI event but does not yet guarantee the spoken explanation.
 

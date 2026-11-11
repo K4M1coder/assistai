@@ -16,7 +16,7 @@ Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech pat
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient; it does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
-A native timestamp-aware echo-cancellation client is under research as a comparator. The current browser filter has not solved speaker feedback; the native approach has only been tested on synthetic audio here.
+A native timestamp-aware echo-cancellation client is under research as a comparator. Synthetic overlap tests showed variable preservation of the constructed near-end signal. The current browser filter has not solved speaker feedback, and the native approach has not been tested with physical devices here.
 
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 

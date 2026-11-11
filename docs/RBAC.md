@@ -4,7 +4,7 @@
 
 The experimental voice gateway, including its opt-in LFM realtime path, does not authenticate users or enforce the React mockup's RBAC settings. It binds to loopback and rejects non-loopback provider URLs, but local processes can still access its services. SQLite event history is local and is not an immutable security audit.
 
-The separately researched native audio client is not integrated and does not change the gateway's authentication or permissions.
+The separately researched native audio client is not integrated and its synthetic tests do not open physical microphones or change the gateway's authentication or permissions.
 
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions.
 
