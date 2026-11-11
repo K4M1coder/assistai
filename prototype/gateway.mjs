@@ -88,6 +88,7 @@ wss.on('connection', (client, req) => {
   let segments = [];
   let waitingForFinal = false;
   const runningTasks = new Map();
+  const completedTasks = new Map();
   const send = (value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
   send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   const tool = { type: 'function', function: { name: 'delegate_task', description: 'Delegate a substantive coding or research task to the local OpenCode agent in the background. Do not use for ordinary conversation.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'The complete task for the agent' } }, required: ['task'] } } };
@@ -96,12 +97,19 @@ wss.on('connection', (client, req) => {
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`);
     return response.status === 204 ? null : response.json();
   };
-  const launchTask = async (task, turnId) => {
+  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false } = {}) => {
     if (!opencodeUrl) throw new Error('OpenCode is not configured');
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
     const taskKey = task.trim().toLocaleLowerCase('fr').replace(/\s+/g, ' ').replace(/[.!?]+$/g, '');
     const prior = runningTasks.get(taskKey);
     if (prior) return { accepted: true, already_running: true, ...(prior.id ? { task_id: prior.id } : {}) };
+    const completed = completedTasks.get(taskKey);
+    if (reuseCompleted && !rerun && completed) {
+      const event = { task_id: completed.task_id, task };
+      record(session, turnId, 'task.reused', event);
+      send({ type: 'task.reused', turn_id: turnId, ...event });
+      return { accepted: true, already_completed: true, result: completed.text.slice(0, 1000) };
+    }
     const reservation = {};
     runningTasks.set(taskKey, reservation);
     const headers = { 'content-type': 'application/json' };
@@ -138,6 +146,8 @@ wss.on('connection', (client, req) => {
             if (last.info.error) throw new Error('Agent reported an error');
             if (!text) continue;
             const result = { task_id: agentSession.id, text: text.slice(0, 8000) };
+            if (completedTasks.size >= 100) completedTasks.delete(completedTasks.keys().next().value);
+            completedTasks.set(taskKey, result);
             record(session, turnId, 'task.completed', result);
             send({ type: 'task.completed', ...result });
             return;

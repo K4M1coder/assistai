@@ -99,6 +99,7 @@ ws.onmessage = ({ data }) => {
   else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
   else if (event.type === 'task.started') log(`Agent started: ${event.task}`);
+  else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
   else if (event.type === 'task.completed') { log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
   else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); currentNotification = event.task_id; notificationPending = false; responsePending = true; }

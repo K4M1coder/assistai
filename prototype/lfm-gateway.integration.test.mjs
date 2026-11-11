@@ -32,7 +32,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       if(e.type!=='response.create')return;
       requestNumber++;const id=`r${requestNumber}`;
       socket.send(JSON.stringify({type:'response.created',response:{id}}));
-      if(requestNumber===1 || requestNumber===4){socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:`call${requestNumber}`,arguments:JSON.stringify({task:'Read fixture.txt and report the secret word'})}]}}));return;}
+      if([1,4,6,8].includes(requestNumber)){socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:`call${requestNumber}`,arguments:JSON.stringify({task:'Read fixture.txt and report the secret word',...(requestNumber===8?{rerun:true}:{})})}]}}));return;}
       if(requestNumber===3)assert.equal(e.response.tool_choice,'none');
       socket.send(JSON.stringify({type:'response.output_text.delta',response_id:id,delta:requestNumber===2?'Task started.':'Task finished.'}));
       socket.send(JSON.stringify({type:'response.output_audio.delta',response_id:id,delta:Buffer.from([1,0,2,0]).toString('base64')}));
@@ -97,4 +97,22 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   assert.match(sessionInstructions[1],/spoken fixture/);
   assert.match(sessionInstructions[1],/approximate parallel transcript/);
   assert.match(sessionInstructions[1],/BLUEBIRD/);
+  client.removeAllListeners('message');
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Completed-task reuse timed out')),5000);
+    let reused=false;
+    client.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='task.reused')reused=true;if(e.type==='speech.end'&&reused){clearTimeout(timer);resolve();}});
+    client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,1);
+  assert.equal(JSON.parse(rejectedToolResult).already_completed,true);
+  assert.equal(JSON.parse(rejectedToolResult).result,'BLUEBIRD');
+  await writeFile(budgetPath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:0,sharedBytes:0,availableRamBytes:10*1024**3}));
+  client.removeAllListeners('message');
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Explicit rerun timed out')),5000);
+    client.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='task.completed'){clearTimeout(timer);resolve();}else if(e.type==='task.reused'){clearTimeout(timer);reject(Error('Explicit rerun reused a result'));}});
+    client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,2);
 });

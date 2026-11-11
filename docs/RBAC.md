@@ -12,7 +12,7 @@ Native task notifications retrieve completed results only from the current gatew
 
 Reset context may also contain untrusted task results and approximate transcripts. Labeling them as data does not prevent prompt injection; the replacement speech session may use tools under the existing harness permissions.
 
-Real-model synthetic reset tests repeated an already completed task. Duplicate execution is not prevented after completion; the read-only fixture made the observed repeats low impact, but other harness permissions could make repeats consequential.
+Real-model synthetic reset tests repeated an already completed task. After a native reset, exact normalized requests can now reuse a session-local completed result unless the model sets a rerun flag; a single regression succeeded. Different wording, reconnection, cache eviction or an incorrect model-selected rerun flag can still repeat work. Reuse can also return stale information. This is not an authorization or idempotency guarantee; broader harness permissions could make repeated work consequential.
 
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 

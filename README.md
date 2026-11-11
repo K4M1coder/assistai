@@ -20,7 +20,7 @@ The client identifies the active voice mode. In experimental native speech mode 
 
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.
 
-Native speech-session resets can restore a bounded recent context from the gateway's local session events. In two synthetic real-model tests the model repeated an already completed task instead of answering a follow-up, so this recovery is not reliable. It does not provide persistent memory across client reconnections.
+Native speech-session resets can restore a bounded recent context from the gateway's local session events. After two synthetic tests repeated a completed task, a session-local exact-match reuse safeguard passed one real-model regression. This does not provide persistent memory across client reconnections or prevent all duplicate actions.
 
 ## Getting started with the interface mockup
 
