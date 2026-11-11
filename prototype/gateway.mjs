@@ -13,6 +13,7 @@ import { attachLfmBridge } from './lfm-bridge.mjs';
 import { createTaskAdmission } from './task-admission.mjs';
 import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
+import { resumeSessionId } from './session-resume.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -23,6 +24,7 @@ const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
 const lfmTranscriptUrl = process.env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
+const sessionResumeEnabled = process.env.ASSISTAI_ENABLE_SESSION_RESUME === '1';
 const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission({
   samplePath: process.env.ASSISTAI_BUDGET_SAMPLE_PATH,
   baselineSharedBytes: Number(process.env.ASSISTAI_BUDGET_BASELINE_SHARED_BYTES ?? NaN),
@@ -63,7 +65,7 @@ const aecFiles = new Map([
   ['/aec3/webrtcaec3-0.3.0.wasm', ['webrtcaec3-0.3.0.wasm', 'application/wasm']],
 ]);
 const server = http.createServer(async (req, res) => {
-  if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental', history_storage: dbPath === ':memory:' ? 'volatile' : 'file' }));
+  if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental', history_storage: dbPath === ':memory:' ? 'volatile' : 'file', session_resume_enabled: sessionResumeEnabled }));
   if (req.method === 'GET' && req.url === '/services') {
     const services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech: Boolean(lfmRealtimeUrl), nativeTranscriptUrl: lfmTranscriptUrl });
     return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ services }));
@@ -76,6 +78,7 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404).end();
 });
 const wss = new WebSocketServer({ server, path: '/voice', maxPayload: 1500 * 1024 });
+const activeResumeSessions = new Set();
 wss.on('connection', (client, req) => {
   if (req.headers.origin) {
     try {
@@ -83,7 +86,15 @@ wss.on('connection', (client, req) => {
       if (!['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname) || Number(origin.port) !== port) throw new Error();
     } catch { client.close(1008, 'Origin not allowed'); return; }
   }
-  const session = randomUUID();
+  let resumedSession;
+  try { resumedSession = resumeSessionId(req.headers['sec-websocket-protocol'], sessionResumeEnabled); }
+  catch { client.close(1008, 'Session resume unavailable'); return; }
+  if (resumedSession && activeResumeSessions.has(resumedSession)) { client.close(1008, 'Session already connected'); return; }
+  if (resumedSession) {
+    activeResumeSessions.add(resumedSession);
+    client.once('close', () => activeResumeSessions.delete(resumedSession));
+  }
+  const session = resumedSession ?? randomUUID();
   const asr = lfmRealtimeUrl ? null : new WebSocket(asrUrl);
   let active;
   let segments = [];

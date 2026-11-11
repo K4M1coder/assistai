@@ -50,7 +50,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   const root=process.cwd();const cache=path.resolve(root,'.cache');await mkdir(cache,{recursive:true});const temp=await mkdtemp(path.join(cache,'lfm-gateway-integration-'));
   const budgetPath=path.join(temp,'budget.json');
   await writeFile(budgetPath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:0,sharedBytes:0,availableRamBytes:10*1024**3}));
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_LFM_TRANSCRIPT_ASR_URL:`ws://127.0.0.1:${asrPort}/asr`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite'),ASSISTAI_BUDGET_SAMPLE_PATH:budgetPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:'1',ASSISTAI_TASK_RAM_ESTIMATE_BYTES:'1'};
+  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_LFM_TRANSCRIPT_ASR_URL:`ws://127.0.0.1:${asrPort}/asr`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite'),ASSISTAI_ENABLE_SESSION_RESUME:'1',ASSISTAI_BUDGET_SAMPLE_PATH:budgetPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:'1',ASSISTAI_TASK_RAM_ESTIMATE_BYTES:'1'};
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:root,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',x=>{stderr+=x});
   t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();for(const c of asrSockets.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>asrSockets.close(r)),new Promise(r=>asrServer.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});
@@ -59,7 +59,8 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   const transcriptService=serviceStatus.services.find(service=>service.role==='Parallel transcription');
   assert.equal(transcriptService?.engine,'Vosk');assert.equal(transcriptService?.model,'fixture');assert.equal(transcriptService?.available,true);
   assert.ok(!serviceStatus.services.some(service=>service.role==='Speech synthesis'));
-  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities,transcript;
+  const protocols=['assistai-v1',`resume.${'a'.repeat(64)}`];
+  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities,transcript;
   t.after(()=>client.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Gateway integration timed out')),12000);
@@ -121,4 +122,14 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   assert.equal(calls.length,2);
   assert.match(calls[1], /untrusted data/);
   assert.match(calls[1], /BLUEBIRD/);
+  client.close();await once(client,'close');
+  const resumed=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);
+  t.after(()=>resumed.terminate());
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Resumed native session timed out')),5000);
+    resumed.on('error',reject);
+    resumed.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='asr.ready'){clearTimeout(timer);resolve();}});
+  });
+  assert.match(sessionInstructions.at(-1),/BLUEBIRD/);
+  assert.match(sessionInstructions.at(-1),/approximate parallel transcript/);
 });

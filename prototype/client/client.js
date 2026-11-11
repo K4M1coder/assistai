@@ -18,7 +18,38 @@ async function refreshServices() {
 }
 $('refresh-services').onclick = refreshServices;
 void refreshServices();
-const ws = new WebSocket(`ws://${location.host}/voice`);
+const memoryKey = 'assistai.session-resume.v1';
+let memoryToken = null;
+try { memoryToken = localStorage.getItem(memoryKey); } catch {}
+const memoryButton = $('session-memory');
+const memoryStatus = $('session-memory-status');
+async function configureMemory() {
+  try {
+    const response = await fetch('/health', { cache: 'no-store' });
+    const health = await response.json();
+    if (!response.ok || !health.session_resume_enabled) {
+      memoryButton.disabled = !memoryToken;
+      memoryButton.textContent = memoryToken ? 'Stop resuming this conversation' : 'Session resume unavailable';
+      memoryStatus.textContent = memoryToken ? 'The gateway does not support resume. Stop resuming to reconnect; gateway history is not erased.' : 'Enable session resume on the gateway to use this option.';
+      return;
+    }
+    memoryButton.disabled = false;
+    memoryButton.textContent = memoryToken ? 'Stop resuming this conversation' : 'Start a resumable conversation';
+    memoryStatus.textContent = memoryToken ? 'This browser keeps a local session key. Stopping resume does not erase gateway history.' : 'Off. Enabling starts a new conversation, saves a local session key and reloads this page.';
+  } catch { memoryStatus.textContent = 'Session resume status unavailable.'; }
+}
+memoryButton.onclick = () => {
+  try {
+    if (memoryToken) localStorage.removeItem(memoryKey);
+    else {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      localStorage.setItem(memoryKey, Array.from(bytes, value => value.toString(16).padStart(2, '0')).join(''));
+    }
+    location.reload();
+  } catch { memoryStatus.textContent = 'Could not update the local session key.'; }
+};
+void configureMemory();
+const ws = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);
 ws.binaryType = 'arraybuffer';
 let captureContext, playbackContext, stream, captureNode, echoBridge, referenceNode;
 let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;

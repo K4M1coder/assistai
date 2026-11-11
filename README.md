@@ -18,7 +18,7 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
-When a new agent task is dispatched, the gateway includes a bounded selection of recent conversation and task events from that connection as untrusted background. In one synthetic test the real local agent returned a random code supplied only in an earlier session message; the voice controller was mocked. This is preliminary shared context, not persistent memory across reconnects or a prompt-injection boundary. Existing gateway processes need restarting to pick up this change.
+When a new agent task is dispatched, the gateway includes a bounded selection of recent conversation and task events as untrusted background. In one synthetic test the real local agent returned a random code supplied only in an earlier session message; the voice controller was mocked. An opt-in session-resume experiment can restore recent history after browser reloads, and after gateway restart when using file-backed history. It is not a complete shared memory or prompt-injection boundary. Existing gateway processes need restarting to pick up these changes.
 
 In one short synthetic run with the cascade, an agent task and CPU speaker extraction, sampled dedicated GPU use peaked at 14.86 GiB. Sampling cannot prove a 24 GB hard ceiling or rule out RAM or disk spill; see the [measurement limitations](docs/research/2026-11-10-noisy-room.md#exp-094-concurrent-extractor-and-system-memory-sampling).
 

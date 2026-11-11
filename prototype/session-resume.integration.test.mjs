@@ -1,0 +1,101 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { mkdtemp, unlink, rmdir } from 'node:fs/promises';
+import path from 'node:path';
+import http from 'node:http';
+import { tmpdir } from 'node:os';
+import WebSocket, { WebSocketServer } from 'ws';
+
+async function listen(server) { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server.address().port; }
+async function close(server) { await new Promise(resolve => server.close(resolve)); }
+async function startGateway(port, db, llm, tts, asr) {
+  const child = spawn(process.execPath, ['prototype/gateway.mjs'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: db, ASSISTAI_ENABLE_SESSION_RESUME: '1',
+      ASSISTAI_LLM_URL: `http://127.0.0.1:${llm}/v1`, ASSISTAI_TTS_URL: `http://127.0.0.1:${tts}`,
+      ASSISTAI_ASR_URL: `ws://127.0.0.1:${asr}/asr`, ASSISTAI_OPENCODE_URL: '', ASSISTAI_LFM_REALTIME_URL: '' } });
+  let error = '';
+  child.stderr.on('data', data => { error += data; });
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error(`Gateway startup timeout: ${error}`)), 8000);
+    child.once('exit', code => { clearTimeout(timer); reject(Error(`Gateway exited ${code}: ${error}`)); });
+    child.stdout.on('data', data => { if (data.toString().includes('Experimental voice gateway')) { clearTimeout(timer); resolve(); } });
+  });
+  return child;
+}
+async function connect(port, token) {
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/voice`, ['assistai-v1', `resume.${token}`]);
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error('Ready timed out')), 5000);
+    socket.on('error', reject);
+    socket.on('message', (data, binary) => {
+      if (!binary && JSON.parse(data.toString()).type === 'asr.ready') { clearTimeout(timer); resolve(); }
+    });
+  });
+  return socket;
+}
+async function turn(socket, text) {
+  const done = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error('Turn timed out')), 5000);
+    const handler = (data, binary) => {
+      if (binary) return;
+      const event = JSON.parse(data.toString());
+      if (event.type === 'speech.end') { clearTimeout(timer); socket.off('message', handler); resolve(); }
+      if (event.type === 'error') { clearTimeout(timer); reject(Error(event.message)); }
+    };
+    socket.on('message', handler);
+  });
+  socket.send(JSON.stringify({ type: 'text', text }));
+  await done;
+}
+
+test('opt-in session resume isolates clients and restores bounded history after restart', { timeout: 30000 }, async t => {
+  const prompts = [];
+  const llm = http.createServer(async (req, res) => {
+    const chunks = []; for await (const chunk of req) chunks.push(chunk);
+    prompts.push(JSON.parse(Buffer.concat(chunks).toString()).messages);
+    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'OK' } }] }));
+  });
+  const llmPort = await listen(llm);
+  const wav = Buffer.alloc(48); wav.write('RIFF', 0); wav.write('WAVE', 8); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt16LE(16, 34); wav.write('data', 36);
+  const tts = http.createServer((req, res) => { req.resume(); res.end(wav); });
+  const ttsPort = await listen(tts);
+  const asr = http.createServer(); const sockets = new WebSocketServer({ server: asr });
+  sockets.on('connection', socket => socket.send(JSON.stringify({ type: 'ready' })));
+  const asrPort = await listen(asr);
+  const reservation = http.createServer(); const port = await listen(reservation); await close(reservation);
+  const dir = await mkdtemp(path.join(tmpdir(), 'assistai-session-test-'));
+  const db = path.join(dir, 'events.sqlite');
+  let gateway = await startGateway(port, db, llmPort, ttsPort, asrPort);
+  t.after(async () => {
+    if (gateway.exitCode === null) { gateway.kill(); await once(gateway, 'exit'); }
+    for (const client of sockets.clients) client.terminate();
+    await new Promise(resolve => sockets.close(resolve));
+    await Promise.all([close(asr), close(tts), close(llm)]);
+    await unlink(db); await rmdir(dir);
+  });
+  const tokenA = randomBytes(32).toString('hex'), tokenB = randomBytes(32).toString('hex');
+  const marker = `MARKER${randomBytes(5).toString('hex')}`;
+  const a = await connect(port, tokenA);
+  await turn(a, marker);
+  const duplicate = new WebSocket(`ws://127.0.0.1:${port}/voice`, ['assistai-v1', `resume.${tokenA}`]);
+  const [duplicateCode] = await once(duplicate, 'close');
+  assert.equal(duplicateCode, 1008);
+  a.close(); await once(a, 'close');
+  const resumed = await connect(port, tokenA);
+  await turn(resumed, 'follow-up');
+  assert.ok(prompts.at(-1).some(message => message.content === marker));
+  resumed.close(); await once(resumed, 'close');
+  const b = await connect(port, tokenB);
+  await turn(b, 'different session');
+  assert.ok(!prompts.at(-1).some(message => message.content === marker));
+  b.close(); await once(b, 'close');
+  gateway.kill(); await once(gateway, 'exit');
+  gateway = await startGateway(port, db, llmPort, ttsPort, asrPort);
+  const restarted = await connect(port, tokenA);
+  await turn(restarted, 'after restart');
+  assert.ok(prompts.at(-1).some(message => message.content === marker));
+  restarted.close(); await once(restarted, 'close');
+});

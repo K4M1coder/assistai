@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
@@ -44,4 +44,36 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})})", context);
   assert.ok(sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
+});
+
+test('resumable memory is explicit and uses a browser-held capability', async () => {
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status'];
+  const storage = new Map();
+  let reloads = 0, selectedProtocols;
+  function start() {
+    const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: true }]));
+    elements['noise-threshold'].value = '2.5';
+    class Socket { static OPEN = 1; constructor(url, protocols) { selectedProtocols = protocols; } }
+    const context = vm.createContext({ document: { getElementById: id => elements[id] },
+      fetch: async url => url === '/health' ? { ok: true, json: async () => ({ session_resume_enabled: true }) } : { ok: false },
+      location: { host: 'localhost', reload() { reloads++; } }, WebSocket: Socket,
+      localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
+      crypto: { getRandomValues: bytes => bytes.fill(1) }, window: { addEventListener() {} },
+      Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON, Array });
+    vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
+    return elements;
+  }
+  const first = start();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(first['session-memory'].disabled, false);
+  assert.equal(selectedProtocols, undefined);
+  first['session-memory'].onclick();
+  assert.equal(storage.get('assistai.session-resume.v1'), '01'.repeat(32));
+  assert.equal(reloads, 1);
+  const second = start();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(Array.from(selectedProtocols), ['assistai-v1', `resume.${'01'.repeat(32)}`]);
+  second['session-memory'].onclick();
+  assert.equal(storage.size, 0);
+  assert.equal(reloads, 2);
 });
