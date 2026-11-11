@@ -15,7 +15,9 @@ export function createTaskAdmission({ samplePath, baselineSharedBytes, requested
       const decision = evaluateBudget({ ...sample, baselineSharedBytes }, { vramBytes: requestedVramBytes, ramBytes: requestedRamBytes }, DEFAULT_BUDGET);
       if (!decision.allowed) throw new Error(decision.reasons.join('; '));
     } catch (error) {
-      throw new Error(`Task rejected by resource admission: ${error.message}`);
+      const rejection = new Error(`Task rejected by resource admission: ${error.message}`);
+      rejection.code = 'RESOURCE_ADMISSION_REJECTED';
+      throw rejection;
     }
   };
 }

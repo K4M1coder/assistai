@@ -102,7 +102,15 @@ wss.on('connection', (client, req) => {
     const headers = { 'content-type': 'application/json' };
     let agentSession;
     try {
-      if (admitTask) await admitTask();
+      if (admitTask) {
+        try { await admitTask(); }
+        catch (error) {
+          const event = { task, message: String(error) };
+          record(session, turnId, 'task.rejected', event);
+          send({ type: 'task.rejected', turn_id: turnId, ...event });
+          throw error;
+        }
+      }
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
       await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: task }] }) });
       reservation.id = agentSession.id;
@@ -204,17 +212,18 @@ wss.on('connection', (client, req) => {
       if (active !== turn) return;
       if (message?.tool_calls?.length) {
         messages.push(message);
+        let resourceRejected = false;
         for (const call of message.tool_calls) {
           let result;
           try {
             if (call.function?.name !== 'delegate_task') throw new Error('Unknown tool');
             const args = JSON.parse(call.function.arguments);
             result = await launchTask(args.task, turn.id);
-          } catch (error) { result = { accepted: false, error: String(error) }; }
+          } catch (error) { if (error.code === 'RESOURCE_ADMISSION_REJECTED') resourceRejected = true; result = { accepted: false, error: String(error) }; }
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
         if (active !== turn) return;
-        message = await complete(false);
+        message = resourceRejected ? { content: 'La t\u00e2che a \u00e9t\u00e9 refus\u00e9e car les ressources disponibles ne peuvent pas \u00eatre v\u00e9rifi\u00e9es ou sont insuffisantes.' } : await complete(false);
       }
       const answer = message?.content?.trim();
       if (!answer) throw new Error('LLM returned no spoken text');

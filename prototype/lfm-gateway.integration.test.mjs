@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
 
@@ -11,7 +11,7 @@ async function listen(server) { server.listen(0, '127.0.0.1'); await once(server
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
 
 test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
-  const calls=[]; let requestNumber=0; let notificationPrompt='';
+  const calls=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult='';
   const agent=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST' && req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
@@ -28,10 +28,11 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       const e=JSON.parse(raw);
       if(e.type==='session.update')socket.send(JSON.stringify({type:'session.updated'}));
       if(e.type==='conversation.item.create' && e.item?.role==='user') notificationPrompt=e.item.content[0].text;
+      if(e.type==='conversation.item.create' && e.item?.type==='function_call_output') rejectedToolResult=e.item.output;
       if(e.type!=='response.create')return;
       requestNumber++;const id=`r${requestNumber}`;
       socket.send(JSON.stringify({type:'response.created',response:{id}}));
-      if(requestNumber===1){socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:'call1',arguments:JSON.stringify({task:'Read fixture.txt and report the secret word'})}]}}));return;}
+      if(requestNumber===1 || requestNumber===4){socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:`call${requestNumber}`,arguments:JSON.stringify({task:'Read fixture.txt and report the secret word'})}]}}));return;}
       if(requestNumber===3)assert.equal(e.response.tool_choice,'none');
       socket.send(JSON.stringify({type:'response.output_text.delta',response_id:id,delta:requestNumber===2?'Task started.':'Task finished.'}));
       socket.send(JSON.stringify({type:'response.output_audio.delta',response_id:id,delta:Buffer.from([1,0,2,0]).toString('base64')}));
@@ -64,4 +65,18 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     });
   });
   assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
+  await unlink(budgetPath);
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
+    let rejected=false;
+    client.on('message',(data,binary)=>{
+      if(binary)return;
+      const e=JSON.parse(data);
+      if(e.type==='task.rejected'){rejected=true;assert.match(e.message,/resource admission/);}
+      if(e.type==='speech.end'&&rejected){clearTimeout(timer);resolve();}
+    });
+    client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,1);
+  assert.equal(JSON.parse(rejectedToolResult).accepted,false);
 });
