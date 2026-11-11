@@ -17,6 +17,7 @@ import numpy as np
 from websockets.asyncio.client import connect
 
 from prototype.native_playback import NativePlayback
+from prototype.native_notifications import NotificationScheduler
 from prototype.native_turn import NativeTurnDetector
 from prototype.speaker_extraction import ExtractionFramer, ExtractionWorker
 
@@ -96,6 +97,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
     echo = _load_echo_canceller() if aec else None
     extractor_factory = await asyncio.to_thread(_load_speaker_extractor, speaker_enrollment) if speaker_enrollment is not None else None
     detector, playback = NativeTurnDetector(threshold=threshold), NativePlayback()
+    notifications = NotificationScheduler()
     if vad not in ('energy', 'silero'): raise ValueError('Unsupported voice detector')
     if vad == 'silero':
         from prototype.silero_vad import SileroSpeechDetector
@@ -176,6 +178,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                                 if worker is not None:
                                     await worker.close(); worker = None; worker_epoch = None
                                 for item in detector.feed(bytes(640), playback_active=True):
+                                    notifications.audio_event(item['type'])
                                     await socket.send(json.dumps(item))
                                 if speech_detector is not None: speech_detector.reset()
                                 continue
@@ -203,6 +206,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                             for item in detector.feed(frame, playback_active=playing, allow_barge_in=aec, speech_active=speech_active):
                                 if isinstance(item, bytes): await socket.send(item)
                                 else:
+                                    notifications.audio_event(item['type'])
                                     if item['type'] == 'interrupt':
                                         playback.interrupt(); generation = None
                                         print(json.dumps({'type':'playback.interrupted','reason':item.get('reason'),'elapsed_ms':round((time.monotonic()-playback_started)*1000)}), flush=True)
@@ -224,6 +228,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                         continue
                     event = json.loads(message)
                     kind = event.get('type')
+                    notifications.server_event(event)
                     if kind == 'speech.start':
                         if event.get('sample_rate') != 24000: raise RuntimeError('Unexpected gateway output rate')
                         audio_epoch += 1
@@ -233,7 +238,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                         playback.finish(generation)
                     elif kind == 'speech.cancelled':
                         playback.interrupt(); generation = None
-                    elif kind in ('user.text', 'assistant.text', 'task.started', 'task.completed', 'task.rejected', 'task.reused', 'task.error', 'error'):
+                    elif kind in ('user.text', 'assistant.text', 'task.started', 'task.completed', 'task.rejected', 'task.reused', 'task.error', 'notification.started', 'notification.rejected', 'error'):
                         print(json.dumps(event, ensure_ascii=False), flush=True)
                     if kind == 'error': raise RuntimeError(event.get('message', 'Gateway error'))
                 raise RuntimeError('Gateway disconnected')
@@ -244,11 +249,18 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                 while True:
                     if msvcrt.kbhit():
                         action = await _keyboard_action(msvcrt.getwch(), playback, detector, socket, speech_detector)
-                        if action == 'interrupt': generation = None; audio_epoch += 1
+                        if action == 'interrupt': generation = None; audio_epoch += 1; notifications.audio_event('interrupt')
                         if action == 'quit': return
                     await asyncio.sleep(0.05)
 
-            tasks = [asyncio.create_task(send_audio()), asyncio.create_task(receive_audio())]
+            async def announce_tasks():
+                while True:
+                    request = notifications.next_request(playback_active=playback.active())
+                    if request is not None:
+                        await socket.send(json.dumps(request))
+                    await asyncio.sleep(0.1)
+
+            tasks = [asyncio.create_task(send_audio()), asyncio.create_task(receive_audio()), asyncio.create_task(announce_tasks())]
             if sys.stdin.isatty(): tasks.append(asyncio.create_task(keyboard()))
             try:
                 done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)

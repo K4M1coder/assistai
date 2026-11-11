@@ -24,6 +24,9 @@ audio += bytes((-len(audio)) % 640) + bytes(640 * 60)
 finished = Event()
 streams = []
 output_nonzero = 0
+notification_output_nonzero = 0
+captured = io.StringIO()
+test_notification = os.environ.get('ASSISTAI_TEST_NOTIFICATION') == '1'
 last_render = bytes(640)
 quiet_output_frames = 0
 simulate_echo = os.environ.get('ASSISTAI_TEST_ECHO') == '1'
@@ -70,7 +73,7 @@ class FakeStream:
         self.thread.start()
 
     def _loop(self):
-        global output_nonzero, last_render, quiet_output_frames
+        global output_nonzero, notification_output_nonzero, last_render, quiet_output_frames
         while not self.stopped.is_set():
             now = time.monotonic()
             timing = SimpleNamespace(inputBufferAdcTime=now, outputBufferDacTime=now)
@@ -84,8 +87,10 @@ class FakeStream:
                 last_render = bytes(data)
                 nonzero = int(np.count_nonzero(np.frombuffer(data, dtype='<i2')))
                 output_nonzero += nonzero
+                if '"type": "notification.started"' in captured.getvalue(): notification_output_nonzero += nonzero
                 quiet_output_frames = quiet_output_frames + 1 if nonzero == 0 and output_nonzero > 1000 else 0
-                if output_nonzero > 1000 and ((not simulate_echo and not simulate_manual) or ((simulate_echo or simulate_manual) and quiet_output_frames >= 50)): finished.set()
+                if test_notification and notification_output_nonzero > 1000: finished.set()
+                elif not test_notification and output_nonzero > 1000 and ((not simulate_echo and not simulate_manual) or ((simulate_echo or simulate_manual) and quiet_output_frames >= 50)): finished.set()
             self.stopped.wait(0.02)
 
     def stop(self):
@@ -122,7 +127,6 @@ async def main():
     if simulate_manual:
         sys.modules['msvcrt'] = FakeKeyboard
         sys.stdin = SimpleNamespace(isatty=lambda:True)
-    captured = io.StringIO()
     with redirect_stdout(captured):
         task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy'), speaker_enrollment=os.environ.get('ASSISTAI_TEST_SPEAKER_ENROLLMENT')))
         try:
@@ -138,8 +142,8 @@ async def main():
     interrupt_events = [json.loads(line) for line in messages.splitlines() if line.startswith('{') and '"type": "playback.interrupted"' in line]
     trace = {'frames':len(echo_rms), 'raw_rms_p95':round(float(np.percentile([x[0] for x in echo_rms],95)),4), 'clean_rms_p95':round(float(np.percentile([x[1] for x in echo_rms],95)),4), 'clean_frames_above_threshold':sum(x[1]>float(os.environ.get('ASSISTAI_TEST_THRESHOLD','0.01')) for x in echo_rms)} if echo_rms else None
     modes = [json.loads(line).get('mode') for line in messages.splitlines() if line.startswith('{') and '"type": "client.mode"' in line]
-    print(json.dumps({'modes':modes,'input_streams':sum(s.is_input for s in streams),'output_streams':sum(not s.is_input for s in streams),'streams_closed':all(s.closed for s in streams),'user_transcript_observed':'quel est le mot secret' in messages.lower(),'transcript_count':transcript_count,'synthetic_transcripts':transcripts,'interruptions':interruptions,'interruption_elapsed_ms':[event.get('elapsed_ms') for event in interrupt_events],'simulated_echo':simulate_echo,'manual_interrupt_sent':manual_requested,'aec_trace':trace,'output_nonzero_samples':output_nonzero,'physical_devices_opened':False}, ensure_ascii=False))
-    if not all(s.closed for s in streams) or 'quel est le mot secret' not in messages.lower() or output_nonzero <= 1000 or (simulate_echo and (transcript_count != 1 or interruptions)) or (simulate_manual and (not manual_requested or interruptions != 1)):
+    print(json.dumps({'modes':modes,'input_streams':sum(s.is_input for s in streams),'output_streams':sum(not s.is_input for s in streams),'streams_closed':all(s.closed for s in streams),'user_transcript_observed':'quel est le mot secret' in messages.lower(),'transcript_count':transcript_count,'synthetic_transcripts':transcripts,'interruptions':interruptions,'interruption_elapsed_ms':[event.get('elapsed_ms') for event in interrupt_events],'simulated_echo':simulate_echo,'manual_interrupt_sent':manual_requested,'aec_trace':trace,'output_nonzero_samples':output_nonzero,'notification_output_nonzero_samples':notification_output_nonzero,'physical_devices_opened':False}, ensure_ascii=False))
+    if not all(s.closed for s in streams) or 'quel est le mot secret' not in messages.lower() or output_nonzero <= 1000 or (test_notification and notification_output_nonzero <= 1000) or (simulate_echo and (transcript_count != 1 or interruptions)) or (simulate_manual and (not manual_requested or interruptions != 1)):
         raise RuntimeError('Synthetic device client probe failed')
 
 

@@ -28,6 +28,8 @@ A native timestamp-aware echo-cancellation client is under research as a compara
 
 An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. In one user-reported test, it understood a spoken French question and the manual interruption key worked. Earlier physical-device smoke tests did not recognize a synthetic question at two thresholds. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; automatic voice interruption in a real room is not established.
 
+The native client can request spoken task-completion notifications after the current turn and playback finish. Its notification queue and mock-device flow have been tested; real-device notification timing and intelligibility remain unverified.
+
 An optional CPU speech-activity classifier is available in the native client for research. It reduced early activation from synthetic white noise and tones in one comparison, but did not improve the white-noise transcript or distinguish another synthetic speaker. It has not been validated in the user's noisy room.
 
 CPU target-speaker extraction is an opt-in experiment in the Windows native client, requiring an explicit local enrollment WAV. It is speaker-safe only and is not integrated into the browser client. A synthetic-device test initially clipped a question that began immediately; after a short extractor warm-up, one immediate-onset test transcribed it correctly. It can select the wrong person if enrolled incorrectly. Real-room quality, actual queue behavior and sustained concurrent resource use remain unverified. See the [noisy-room experiments](docs/research/2026-11-10-noisy-room.md).

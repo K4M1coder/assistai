@@ -248,6 +248,12 @@ Hypothesis: the voice gateway can give the local agent bounded recent conversati
 
 Unit tests verify filtering, excerpt bounds and eviction. A mock-native gateway test verifies that a later fresh task prompt includes the previous `BLUEBIRD` result. A real cascade test using the local voice controller, OpenCode fixture and Gemma agent completed the read-only fixture task and generated a spoken notification with the new prompt; it did not test whether the model actually used the appended context. The isolated test gateway used volatile history and was stopped afterward. The active demo gateway was not restarted.
 
+## EXP-099: native client task-completion notifications
+
+The Windows client previously printed completed agent tasks but did not request the gateway's spoken notification. It now maintains a connection-local queue of at most 20 task IDs and requests a notification when local input, response and playback state are idle. Rejections back off for two seconds and are retried up to three times. The oldest pending item is dropped on overflow; a manually interrupted notification is not automatically replayed. This is not durable notification delivery.
+
+Four scheduler tests cover idle gating, duplicate submissions, bounded overflow and rejection retry limits. A simulated-gateway, fake-device test sends one completion after a synthetic French turn, observes one notification request and nonzero notification playback, and confirms both fake streams close. The gateway and audio are mocks: no model, physical device, audible speech, overlapping real conversation or gateway timing race was tested. Reproduce with `.\.venv-voice\Scripts\python.exe -m unittest prototype.test_native_notifications` and `node scripts/probe-native-client-notification.mjs`.
+
 A local integration test starts the actual opt-in gateway with simulated realtime and OpenCode servers. It submits PCM, simulates a delegate tool call, checks that the task reaches the harness, supplies a completed fixture result, and requests a spoken completion notification. The mock confirms that the notification request disables tools and that PCM audio arrives through the gateway. This exercises gateway wiring and event ordering, not real model inference, speech quality, a browser, or memory usage. All 36 prototype tests passed. The real-model notification test remains outstanding when sufficient headroom is available.
 
 ## EXP-056: synthetic real-model completion notification

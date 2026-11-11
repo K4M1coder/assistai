@@ -26,6 +26,8 @@ A native audio-client comparator uses timestamp-aligned capture and playback in 
 
 The native Windows client displays the mode reported by the gateway. A simulated-device integration test exercises its native-speech gateway handshake, PCM input and playback using a mock realtime backend and a separate Vosk transcript. This does not validate the real native model or its audible output.
 
+The native client maintains a bounded queue of task-completion notifications. It requests playback only when its local turn and playback state are idle and backs off rejected requests, with at most three attempts. The queue is connection-local and volatile; overflow drops the oldest pending entry, and manual interruption does not replay a notification. Gateway/client races and real-device notification timing remain unverified.
+
 Gateway service discovery identifies native speech inference and an optional parallel transcription service separately. The status endpoint queries the configured transcription sidecar, rather than assuming the cascade's default ASR server; this is health reporting rather than a transcript provenance or authentication guarantee.
 
 On dispatch, the gateway sends OpenCode the explicit task followed by up to 1,800 JSON characters of recent, session-scoped conversation and task events. Individual excerpts are capped at 200 characters, older entries are dropped first, and parallel ASR transcripts are marked approximate. The text is labeled untrusted but the model can still follow malicious instructions within it. This context does not survive client reconnection and does not establish general shared memory, semantic retrieval or task isolation.
