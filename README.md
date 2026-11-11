@@ -16,6 +16,8 @@ Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech pat
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient; it does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
+For disposable local tests, `ASSISTAI_DB_PATH=:memory:` keeps the gateway's SQLite session events in memory for the process lifetime. The default demonstration still uses a local database file.
+
 A native timestamp-aware echo-cancellation client is under research as a comparator. Synthetic overlap tests showed variable preservation of the constructed near-end signal. A standalone low-volume WASAPI probe opened the physical devices, but did not test live barge-in or establish echo attenuation. The current browser filter has not solved speaker feedback.
 
 An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. A physical-device smoke test produced a response, but did not recognize the synthetic question. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; a separate idealized replay showed that longer onset requirements can delay or miss near speech.

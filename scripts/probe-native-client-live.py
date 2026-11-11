@@ -6,6 +6,8 @@ import os
 import sys
 from threading import Event
 import time
+from urllib.parse import urlsplit
+from urllib.request import ProxyHandler, build_opener
 import wave
 
 import numpy as np
@@ -95,6 +97,14 @@ class InjectingSoundDevice:
 async def main():
     url = os.environ.get('ASSISTAI_TEST_VOICE_URL')
     if not url: raise ValueError('Set ASSISTAI_TEST_VOICE_URL to an isolated local gateway')
+    address = urlsplit(url)
+    if address.scheme != 'ws' or address.hostname not in ('127.0.0.1', 'localhost', '::1') or address.username is not None:
+        raise ValueError('The physical probe requires a local loopback WebSocket URL')
+    opener = build_opener(ProxyHandler({}))
+    with opener.open(f'http://{address.netloc}/health', timeout=3) as response:
+        health = json.load(response)
+    if health.get('history_storage') != 'volatile':
+        raise RuntimeError('The physical probe requires a gateway with ASSISTAI_DB_PATH=:memory:')
     result = AggregateOutput()
     client.NativePlayback = CountingPlayback
     device = InjectingSoundDevice(load_fixture())

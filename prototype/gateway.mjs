@@ -31,13 +31,14 @@ const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission(
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
 if (lfmTranscriptUrl && !['ws:', 'wss:'].includes(new URL(lfmTranscriptUrl).protocol)) throw new Error('Transcript URL must use WebSocket');
-const dbPath = resolve(process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite');
+const configuredDbPath = process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite';
+const dbPath = configuredDbPath === ':memory:' ? ':memory:' : resolve(configuredDbPath);
 for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : []), ...(lfmRealtimeUrl ? [lfmRealtimeUrl] : []), ...(lfmTranscriptUrl ? [lfmTranscriptUrl] : [])]) {
   if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(address).hostname)) {
     throw new Error('Prototype providers must bind to a loopback address');
   }
 }
-mkdirSync(dirname(dbPath), { recursive: true });
+if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
 const db = new DatabaseSync(dbPath);
 db.exec('CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, turn_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)');
 const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
@@ -61,7 +62,7 @@ const aecFiles = new Map([
   ['/aec3/webrtcaec3-0.3.0.wasm', ['webrtcaec3-0.3.0.wasm', 'application/wasm']],
 ]);
 const server = http.createServer(async (req, res) => {
-  if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental' }));
+  if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental', history_storage: dbPath === ':memory:' ? 'volatile' : 'file' }));
   if (req.method === 'GET' && req.url === '/services') {
     let services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl });
     if (lfmRealtimeUrl) services = services.filter(service => !['Speech recognition', 'Speech synthesis'].includes(service.role)).map(service => service.role === 'Voice controller' ? { ...service, role: 'Speech-to-speech model' } : service);

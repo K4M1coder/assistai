@@ -6,6 +6,8 @@ The experimental voice gateway, including its opt-in LFM realtime path, does not
 
 The experimental Windows native client opens the default microphone and speaker only when explicitly run; its synthetic tests and format checks do not open physical devices. A separate physical AEC probe opened them and retained aggregate levels only, without saving captured audio. A physical gateway-client test used a separate local SQLite database for transcripts; automatic cleanup was blocked by the execution environment, so that test database remains in `.cache/physical-native-probe-20261111/events.sqlite`. The client only accepts loopback gateway URLs and does not add authentication, change gateway permissions or provide an OS sandbox. Experimental AEC loads a pinned local research dependency.
 
+An optional `ASSISTAI_DB_PATH=:memory:` setting keeps gateway SQLite events in a volatile process-local database. It is not authentication or secure erasure, and cannot rule out operating-system paging or data retained by other components. The physical probe requires a gateway that reports volatile storage before it opens devices; that unauthenticated report is a convenience check, not a security boundary.
+
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions.
 
 The optional native-mode transcription sidecar receives the same captured audio over loopback. Final transcripts and native assistant text are stored in the local SQLite event database and may be included in bounded context when the speech session resets. The database is not an authenticated or encrypted security boundary; transcripts can be inaccurate.

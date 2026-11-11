@@ -18,6 +18,8 @@ The opt-in AEC path requires `pywebrtc-audio` 0.2.0, `sounddevice` 0.5.3, and th
 
 A separate low-volume physical WASAPI probe, `scripts/probe-wasapi-aec-live.py`, opened the default devices and retained aggregate microphone levels only. It did not run the gateway client or test live interruption; see EXP-077 before interpreting its measurements.
 
+For isolated gateway tests, set `ASSISTAI_DB_PATH=:memory:` before starting the gateway. Session events then live in a process-local SQLite database until the gateway exits; `/health` reports `history_storage: volatile`. This does not guarantee that the operating system or other services never write related data to disk. The physical client probe `scripts/probe-native-client-live.py` refuses to open devices unless the loopback gateway reports volatile history. A database from the earlier EXP-078 run remains in `.cache/physical-native-probe-20261111/events.sqlite` because automated deletion was blocked.
+
 The Windows demonstration uses the repository's `.venv-voice` environment and `.cache/huggingface` model cache. Keep `HF_HUB_OFFLINE=1` for the existing Pocket TTS model; using the default cache path can make offline startup fail. The demonstration gateway uses port 18088. See the research log for the verified service configuration and its limits.
 
 Create a Python 3.11 or 3.12 environment, install the pinned direct dependencies in `requirements.txt`, then run `python scripts/setup-vosk-fr.py` from the repository root. This downloads the public Vosk French small model into `.cache/vosk`. After setup, the recognizer runs locally without network access. Set `ASSISTAI_VOSK_MODEL` to use a different Vosk model directory.
