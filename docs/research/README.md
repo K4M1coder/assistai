@@ -14,7 +14,7 @@ Keep the root [README](../../README.md), [architecture](../ARCHITECTURE.md), and
 
 ## Language requirements
 
-Code, identifiers, comments, documentation, and the initial UI are written in English. The UI should eventually support multiple display languages. Spoken language is a separate user setting: users must be able to select French for both speech recognition and speech generation, independently of the UI language. The first voice implementation must validate French recognition and generated speech with local models; the current demo does not yet provide this capability.
+Code, identifiers, comments, documentation, and the initial UI are written in English. The UI should eventually support multiple display languages. Spoken language is a separate user setting: users must be able to select French for both speech recognition and speech generation, independently of the UI language. The current cascade uses French recognition and generation, but language selection, broad French quality and live native-speech behavior remain incomplete or unverified.
 
 ## Evidence rules
 
@@ -36,6 +36,8 @@ Code, identifiers, comments, documentation, and the initial UI are written in En
 - [Windows Vulkan memory comparison](2026-11-10-vulkan-memory.md): measured load-mode and host-buffer experiments.
 - [Native duplex feasibility](2026-11-10-native-duplex.md): current candidates, language constraints and a B60 build check.
 
-## Initial decision
+## Initial decision (historical)
 
 The first useful prototype will use a streaming VAD/STT → agentic LLM → TTS pipeline with independent interruption handling. A unified speech-to-speech model remains a research candidate and comparator: it competes for VRAM with the code/vision model and its Arc B60 portability remains unverified. The agent interface should use structured text to control an existing coding harness reliably.
+
+Subsequent native LFM3-Audio trials ran synthetic speech and delegation on this B60, but have not established robust French conversation, real-room interruption or a hard memory budget. See the later experiments rather than treating the initial decision as the current conclusion. EXP-068 in the echo notebook adds a native timestamp-aware AEC comparator; physical-device behavior is still untested.
