@@ -16,7 +16,7 @@ Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech pat
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient; it does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
-The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs and indicates that an input transcript is not available.
+The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio.
 
 ## Getting started with the interface mockup
 

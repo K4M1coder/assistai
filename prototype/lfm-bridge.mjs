@@ -1,9 +1,11 @@
 import WebSocket from 'ws';
 import { LfmRealtimeSession } from './lfm-realtime-session.mjs';
+import { createNativeTranscript } from './native-transcript.mjs';
 
 // Opt-in research bridge. It does not provide OS isolation or a memory limit.
-export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFactory, workspaceContext = '', canNotify = () => false } = {}) {
+export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFactory, workspaceContext = '', canNotify = () => false, transcriptUrl } = {}) {
   const send = event => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(event)); };
+  const transcript = transcriptUrl ? createNativeTranscript({ url: transcriptUrl, send }) : null;
   const createSession = sessionFactory ?? (() => new LfmRealtimeSession(new WebSocket(url), {
     instructions: `${workspaceContext ? `Workspace context: ${workspaceContext}\n` : ''}Respond in French with function calls, and interleaved text and audio. Do not claim a task is complete until its result is known.\n\nList of tools:`,
     tools: [{ type:'function', name:'delegate_task', description:'Delegate a substantive task to a background agent', parameters:{type:'object',properties:{task:{type:'string'}},required:['task']} }],
@@ -52,6 +54,7 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     if(binary){
       if(!listening)return;
       const frame=Buffer.from(data);
+      transcript?.append(frame);
       if(['cancelling','cancel_on_create'].includes(current.state)){
         if(queuedBytes+frame.length>32000){fail('Interrupted input buffer full');return;}
         queued.push(frame);queuedBytes+=frame.length;return;
@@ -61,16 +64,17 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     }
     let event;try{event=JSON.parse(data.toString());}catch{return;}
     if(event.type==='interrupt'){
-      listening=false;clearQueued();
+      listening=false;clearQueued();transcript?.stop();
       if(current.cancel()){speech=false;send({type:'speech.cancelled',turn_id:turnId,reason:event.reason??'manual'});}
     }else if(event.type==='audio.start'){
       if(!['ready','cancelling','cancel_on_create'].includes(current.state)){fail('Realtime session is busy');return;}
-      turnId=makeTurnId();listening=true;clearQueued();
+      turnId=makeTurnId();listening=true;clearQueued();transcript?.start(turnId);
     }else if(event.type==='audio.end'&&listening){
+      transcript?.end();
       if(['cancelling','cancel_on_create'].includes(current.state)){ended=true;return;}
       listening=false;if(!current.endAudio())fail('No speech was captured');
     }else if(event.type==='audio.reset'){
-      listening=false;clearQueued();
+      if(listening)transcript?.stop();listening=false;clearQueued();
       // The server may already have prefetched input; a fresh session discards it.
       if(current.state==='collecting'){const old=current;current=null;old.close();makeSession();}
     }else if(event.type==='notification.speak'){
@@ -81,5 +85,5 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     }
     else if(event.type==='text'||event.type==='image')send({type:'error',message:'Text and image input are not available in the experimental speech mode.'});
   });
-  client.on('close',()=>{const old=current;current=null;old?.close();});
+  client.on('close',()=>{transcript?.stop();const old=current;current=null;old?.close();});
 }

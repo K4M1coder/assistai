@@ -19,6 +19,7 @@ const visionUrl = process.env.ASSISTAI_VISION_URL ?? 'http://127.0.0.1:18080/v1'
 const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
+const lfmTranscriptUrl = process.env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
 const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission({
   samplePath: process.env.ASSISTAI_BUDGET_SAMPLE_PATH,
@@ -28,8 +29,9 @@ const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission(
 }) : null;
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
+if (lfmTranscriptUrl && !['ws:', 'wss:'].includes(new URL(lfmTranscriptUrl).protocol)) throw new Error('Transcript URL must use WebSocket');
 const dbPath = resolve(process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite');
-for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : []), ...(lfmRealtimeUrl ? [lfmRealtimeUrl] : [])]) {
+for (const address of [asrUrl, llmUrl, visionUrl, ttsUrl, ...(opencodeUrl ? [opencodeUrl] : []), ...(lfmRealtimeUrl ? [lfmRealtimeUrl] : []), ...(lfmTranscriptUrl ? [lfmTranscriptUrl] : [])]) {
   if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(address).hostname)) {
     throw new Error('Prototype providers must bind to a loopback address');
   }
@@ -85,7 +87,7 @@ wss.on('connection', (client, req) => {
   let waitingForFinal = false;
   const runningTasks = new Map();
   const send = (value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   const tool = { type: 'function', function: { name: 'delegate_task', description: 'Delegate a substantive coding or research task to the local OpenCode agent in the background. Do not use for ordinary conversation.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'The complete task for the agent' } }, required: ['task'] } } };
   const requestJson = async (url, options = {}) => {
     const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10_000) });
@@ -151,7 +153,7 @@ wss.on('connection', (client, req) => {
     return { accepted: true, task_id: agentSession.id };
   };
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, canNotify: taskId => typeof taskId === 'string' && taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === taskId) });
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, canNotify: taskId => typeof taskId === 'string' && taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === taskId) });
     return;
   }
   const cancel = (reason = 'new_turn') => {

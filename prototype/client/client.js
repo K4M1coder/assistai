@@ -89,10 +89,12 @@ ws.onmessage = ({ data }) => {
     $('text').disabled = !textInputAvailable;
     $('send').disabled = !textInputAvailable;
     $('image').disabled = event.image_input !== true;
-    $('mode').textContent = event.mode === 'native-speech' ? 'Experimental native speech mode: speech input and output. Input transcription, text and image input are unavailable.' : 'Cascade mode: speech recognition, text controller and speech synthesis.';
+    $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
   else if (event.type === 'asr.ready') { asrReady = true; status('Ready. Start the microphone to speak French.'); }
   else if (event.type === 'asr.empty') { responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'transcript.empty') $('partial').textContent = '';
+  else if (event.type === 'transcript.unavailable') { $('partial').textContent = ''; log('Parallel transcription unavailable for this turn.'); }
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);

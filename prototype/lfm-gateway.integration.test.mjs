@@ -40,16 +40,22 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     });
   });
   const backendPort=await listen(backend);
+  const asrServer=http.createServer();const asrSockets=new WebSocketServer({server:asrServer});
+  asrSockets.on('connection',socket=>{
+    socket.send(JSON.stringify({type:'ready'}));
+    socket.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='end')socket.send(JSON.stringify({type:'final',text:'spoken fixture'}));});
+  });
+  const asrPort=await listen(asrServer);
   const reservation=http.createServer();const gatewayPort=await listen(reservation);await new Promise(resolve=>reservation.close(resolve));
   const root=process.cwd();const cache=path.resolve(root,'.cache');await mkdir(cache,{recursive:true});const temp=await mkdtemp(path.join(cache,'lfm-gateway-integration-'));
   const budgetPath=path.join(temp,'budget.json');
   await writeFile(budgetPath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:0,sharedBytes:0,availableRamBytes:10*1024**3}));
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite'),ASSISTAI_BUDGET_SAMPLE_PATH:budgetPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:'1',ASSISTAI_TASK_RAM_ESTIMATE_BYTES:'1'};
+  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_LFM_TRANSCRIPT_ASR_URL:`ws://127.0.0.1:${asrPort}/asr`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite'),ASSISTAI_BUDGET_SAMPLE_PATH:budgetPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:'1',ASSISTAI_TASK_RAM_ESTIMATE_BYTES:'1'};
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:root,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',x=>{stderr+=x});
-  t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});
+  t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();for(const c of asrSockets.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>asrSockets.close(r)),new Promise(r=>asrServer.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(`Gateway startup timeout: ${stderr}`)),5000);child.once('exit',code=>{clearTimeout(timer);reject(Error(`Gateway exited ${code}: ${stderr}`))});child.stdout.on('data',b=>{if(b.toString().includes('Experimental voice gateway')){clearTimeout(timer);resolve()}})});
-  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities;
+  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities,transcript;
   t.after(()=>client.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Gateway integration timed out')),12000);
@@ -59,13 +65,14 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       if(binary){if(notified)notificationAudio+=data.length;return;}
       const e=JSON.parse(data);
       if(e.type==='session.capabilities')capabilities=e;
+      else if(e.type==='user.text')transcript=e;
       else if(e.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
       else if(e.type==='task.completed'){completed=true;assert.equal(e.text,'BLUEBIRD');maybeNotify();}
       else if(e.type==='speech.end'){if(notified){clearTimeout(timer);return resolve();}initialEnd=true;maybeNotify();}
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
   });
-  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,input_transcript:false});assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
+  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,input_transcript:true});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
   await unlink(budgetPath);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
