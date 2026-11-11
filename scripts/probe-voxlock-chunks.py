@@ -1,4 +1,5 @@
 """Measure CPU extractor chunk latency on a synthetic two-speaker mixture."""
+import argparse
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -45,6 +46,10 @@ def load(path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--threads', type=int, default=1, choices=(1, 2, 4))
+    parser.add_argument('--repeats', type=int, default=1, choices=range(1, 11))
+    args = parser.parse_args()
     paths = {name:Path('.cache') / filename for name,filename in [('target','tse-target.wav'),('other','tse-interferer.wav'),('enrollment','tse-enroll.wav')]}
     target, other, enrollment = (load(paths[name]) for name in ('target','other','enrollment'))
     length = max(len(target), len(other))
@@ -52,8 +57,10 @@ def main():
     other *= np.sqrt(np.mean(target ** 2) / max(np.mean(other ** 2), 1e-12))
     mixture = target + other
     mixture *= min(1, 0.99 / np.max(np.abs(mixture)))
+    mixture = np.tile(mixture, args.repeats)
+    length = len(mixture)
     before = memory(); start = time.perf_counter()
-    model = VoxLock(model_dir=Path('.cache/voxlock/onnx/v2'), precision='int8', threads=1)
+    model = VoxLock(model_dir=Path('.cache/voxlock/onnx/v2'), precision='int8', threads=args.threads)
     load_ms = (time.perf_counter()-start)*1000
     start = time.perf_counter(); stream = model.stream(enrollment); enrollment_ms = (time.perf_counter()-start)*1000
     chunk_times = []; lag = 0.0; lags = []
@@ -65,12 +72,12 @@ def main():
         lag = max(0.0, lag + elapsed - len(chunk)/16); lags.append(lag)
     start=time.perf_counter(); tail=stream.flush(); flush_ms=(time.perf_counter()-start)*1000; output_samples += len(tail)
     wall = time.perf_counter()-wall_start; cpu = time.process_time()-cpu_start
-    print(json.dumps({'started_unix':started_at,'audio_ms':round(length/16),'chunks':len(chunk_times),
+    print(json.dumps({'started_unix':started_at,'threads':args.threads,'repeats':args.repeats,'audio_ms':round(length/16),'chunks':len(chunk_times),
         'model_load_ms':round(load_ms,2),'enrollment_ms':round(enrollment_ms,2),'wall_ms':round(wall*1000,2),
         'cpu_ms':round(cpu*1000,2),'rtf':round(wall/(length/16000),3),'chunk_ms_p50':round(float(np.percentile(chunk_times,50)),2),
         'chunk_ms_p95':round(float(np.percentile(chunk_times,95)),2),'chunk_ms_p99':round(float(np.percentile(chunk_times,99)),2),
         'chunk_ms_max':round(max(chunk_times),2),'simulated_lag_ms_p95':round(float(np.percentile(lags,95)),2),
-        'simulated_lag_ms_max':round(max(lags),2),'flush_ms':round(flush_ms,2),'output_samples':output_samples,
+        'simulated_lag_ms_max':round(max(lags),2),'simulated_lag_ms_final':round(lags[-1],2),'flush_ms':round(flush_ms,2),'output_samples':output_samples,
         'memory_before':before,'memory_after':memory(),
         'fixture_sha256':{name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in paths.items()},
         'note':'Synthetic offline chunk replay; lag is simulated, not a live microphone measurement.'}))
