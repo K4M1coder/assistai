@@ -26,6 +26,8 @@ A native audio-client comparator uses timestamp-aligned capture and playback in 
 
 The native Windows client displays the mode reported by the gateway. A simulated-device integration test exercises its native-speech gateway handshake, PCM input and playback using a mock realtime backend and a separate Vosk transcript. This does not validate the real native model or its audible output.
 
+Gateway service discovery identifies native speech inference and an optional parallel transcription service separately. The status endpoint queries the configured transcription sidecar, rather than assuming the cascade's default ASR server; this is health reporting rather than a transcript provenance or authentication guarantee.
+
 The Windows native client optionally feeds explicit local enrollment into a CPU target-speaker extractor. A dedicated worker permits one in-flight call, the capture queue is bounded, and output is reframed into 20 ms PCM. The opt-in path requires speaker-safe mode, discards frames captured during playback or from older playback epochs, and replaces and primes extractor state after gating. It has synthetic-device evidence only; an internal silence warm-up addressed an immediate-onset clipping example in one follow-up test. Physical performance, queue behavior under sustained load and complete cancellation guarantees remain unverified.
 
 A separate opt-in Windows command records an enrollment WAV from the default WASAPI microphone to a new local file. The command buffers capture before exclusive creation, rejects device overflow and does not manage subsequent file retention; its fake-device tests do not establish real-device performance or enrollment quality.

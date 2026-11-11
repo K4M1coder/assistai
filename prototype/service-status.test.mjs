@@ -18,3 +18,23 @@ test('reports models and service availability without exposing provider credenti
   assert.equal(services[3].available, false);
   assert.ok(!JSON.stringify(services).includes('secret'));
 });
+
+test('native mode reports only the configured parallel transcription engine', async () => {
+  const requested = [];
+  const fetcher = async url => {
+    requested.push(url);
+    if (url.includes(':18111/health')) return { ok: true, json: async () => ({ status: 'ready', engine: 'Vosk', model: 'french', language: 'fr' }) };
+    if (url.endsWith('/models')) return { ok: true, json: async () => ({ data: [{ id: 'speech.gguf', owned_by: 'llamacpp' }] }) };
+    throw Error('Unexpected request');
+  };
+  const config = { voiceUrl: 'http://127.0.0.1:18092/v1', asrUrl: 'ws://127.0.0.1:18082/asr', ttsUrl: 'http://127.0.0.1:18081', nativeSpeech: true };
+  const withTranscript = await getServiceStatus({ ...config, nativeTranscriptUrl: 'ws://127.0.0.1:18111/asr' }, fetcher);
+  assert.equal(withTranscript[0].role, 'Speech-to-speech model');
+  assert.equal(withTranscript[0].models[0].engine, 'llama.cpp');
+  assert.deepEqual(withTranscript[2], { role: 'Parallel transcription', server: 'http://127.0.0.1:18111/health', available: true, reported: 'ready', engine: 'Vosk', model: 'french', language: 'fr' });
+  assert.ok(!requested.some(url => url.includes(':18081') || url.includes(':18082')));
+  requested.length = 0;
+  const withoutTranscript = await getServiceStatus(config, fetcher);
+  assert.deepEqual(withoutTranscript.map(item => item.role), ['Speech-to-speech model', 'Agent model']);
+  assert.ok(!requested.some(url => url.includes(':18081') || url.includes(':18082')));
+});

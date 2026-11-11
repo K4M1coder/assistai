@@ -238,6 +238,10 @@ Hypothesis: a manual interruption from the native Windows client reaches an acti
 
 Reproduce with `$env:ASSISTAI_TEST_MANUAL_INTERRUPT='1'; node scripts/probe-native-client-mock-gateway.mjs` while Vosk is running. The optional environment variable is scoped to the current PowerShell process; remove it before the normal non-interruption test if using the same shell.
 
+## EXP-097: native service visibility
+
+The native gateway previously hid all ASR services in `/services`, even when a separate Vosk transcript sidecar was configured. Service discovery now reports that sidecar as `Parallel transcription`, using its configured address, and lists the native speech model separately. Without a transcript sidecar, no transcription service is listed. The native mode no longer queries the unused cascade TTS health endpoint for this list. Unit tests cover both configurations and the service address; a mock-native gateway integration test verifies the endpoint reports its simulated Vosk sidecar. These are service-health snapshots, not proof of transcription accuracy, live model inference, engine provenance for a particular turn, or a security boundary. The already-running cascade is not automatically restarted by this source change.
+
 A local integration test starts the actual opt-in gateway with simulated realtime and OpenCode servers. It submits PCM, simulates a delegate tool call, checks that the task reaches the harness, supplies a completed fixture result, and requests a spoken completion notification. The mock confirms that the notification request disables tools and that PCM audio arrives through the gateway. This exercises gateway wiring and event ordering, not real model inference, speech quality, a browser, or memory usage. All 36 prototype tests passed. The real-model notification test remains outstanding when sufficient headroom is available.
 
 ## EXP-056: synthetic real-model completion notification

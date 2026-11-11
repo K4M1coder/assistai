@@ -40,7 +40,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     });
   });
   const backendPort=await listen(backend);
-  const asrServer=http.createServer();const asrSockets=new WebSocketServer({server:asrServer});
+  const asrServer=http.createServer((req,res)=>{res.setHeader('content-type','application/json');res.end(JSON.stringify({status:'ready',engine:'Vosk',model:'fixture',language:'fr'}));});const asrSockets=new WebSocketServer({server:asrServer});
   asrSockets.on('connection',socket=>{
     socket.send(JSON.stringify({type:'ready'}));
     socket.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='end')socket.send(JSON.stringify({type:'final',text:'spoken fixture'}));});
@@ -55,6 +55,10 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   let stderr='';child.stderr.on('data',x=>{stderr+=x});
   t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();for(const c of asrSockets.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>asrSockets.close(r)),new Promise(r=>asrServer.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(`Gateway startup timeout: ${stderr}`)),5000);child.once('exit',code=>{clearTimeout(timer);reject(Error(`Gateway exited ${code}: ${stderr}`))});child.stdout.on('data',b=>{if(b.toString().includes('Experimental voice gateway')){clearTimeout(timer);resolve()}})});
+  const serviceStatus=await (await fetch(`http://127.0.0.1:${gatewayPort}/services`)).json();
+  const transcriptService=serviceStatus.services.find(service=>service.role==='Parallel transcription');
+  assert.equal(transcriptService?.engine,'Vosk');assert.equal(transcriptService?.model,'fixture');assert.equal(transcriptService?.available,true);
+  assert.ok(!serviceStatus.services.some(service=>service.role==='Speech synthesis'));
   const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities,transcript;
   t.after(()=>client.terminate());
   await new Promise((resolve,reject)=>{
