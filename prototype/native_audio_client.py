@@ -11,12 +11,27 @@ import subprocess
 from threading import Event
 import time
 from urllib.parse import urlsplit
+import wave
 
 import numpy as np
 from websockets.asyncio.client import connect
 
 from prototype.native_playback import NativePlayback
 from prototype.native_turn import NativeTurnDetector
+from prototype.speaker_extraction import ExtractionFramer, ExtractionWorker
+
+
+def _load_speaker_extractor(enrollment_path):
+    """Load an explicitly supplied local 16 kHz mono PCM16 enrollment file."""
+    with wave.open(str(enrollment_path), 'rb') as source:
+        if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
+            raise ValueError('Speaker enrollment must be mono 16 kHz PCM16 WAV')
+        if not 3 * 16000 <= source.getnframes() <= 30 * 16000:
+            raise ValueError('Speaker enrollment must be between 3 and 30 seconds')
+        samples = np.frombuffer(source.readframes(source.getnframes()), dtype='<i2').astype(np.float32) / 32768
+    from voxlock import VoxLock
+    model = VoxLock(model_dir=Path('.cache/voxlock/onnx/v2'), precision='int8', threads=2)
+    return lambda: ExtractionWorker(ExtractionFramer(model.stream(samples)))
 
 
 def _clock_offset(stream):
@@ -57,10 +72,12 @@ async def _keyboard_action(key, playback, detector, socket, speech_detector=None
     return None
 
 
-async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx'):
+async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx', speaker_enrollment=None):
     address = urlsplit(url)
     if address.scheme != 'ws' or address.hostname not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('The experimental client accepts only local loopback WebSocket URLs')
+    if speaker_enrollment is not None and aec:
+        raise ValueError('Experimental speaker extraction requires speaker-safe mode')
     import sounddevice as sd
 
     if sys.platform != 'win32':
@@ -69,6 +86,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
     if host is None or host['default_input_device'] < 0 or host['default_output_device'] < 0:
         raise RuntimeError('Default WASAPI input and output devices are required')
     echo = _load_echo_canceller() if aec else None
+    extractor_factory = await asyncio.to_thread(_load_speaker_extractor, speaker_enrollment) if speaker_enrollment is not None else None
     detector, playback = NativeTurnDetector(threshold=threshold), NativePlayback()
     if vad not in ('energy', 'silero'): raise ValueError('Unsupported voice detector')
     if vad == 'silero':
@@ -82,6 +100,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
     clocks = {'input': 0.0, 'output': 0.0}
     generation = None
     playback_started = 0.0
+    audio_epoch = 0
 
     def fail(message):
         if not failure.is_set(): failure_message.append(message)
@@ -107,7 +126,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                 if echo._failed: raise RuntimeError('Echo processing failed')
             if data:
                 if len(data) != 640: raise RuntimeError('Unexpected input frame size')
-                capture.put_nowait(data)
+                capture.put_nowait((audio_epoch, playback.active(), data) if extractor_factory else data)
         except Exception as error:
             fail(f'Input processing error: {error}')
             raise sd.CallbackAbort from error
@@ -129,33 +148,60 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
             stack.callback(input_stream.stop)
             output_stream.start()
             stack.callback(output_stream.stop)
-            print('Listening locally. Press I to interrupt, Q or Ctrl+C to stop. ' + ('Experimental echo cancellation enabled.' if aec else 'Speaker-safe mode enabled.') + f' VAD: {vad}.', flush=True)
+            print('Listening locally. Press I to interrupt, Q or Ctrl+C to stop. ' + ('Experimental echo cancellation enabled.' if aec else 'Speaker-safe mode enabled.') + f' VAD: {vad}.' + (' Experimental speaker extraction enabled.' if extractor_factory else ''), flush=True)
 
             async def send_audio():
                 nonlocal generation
-                while True:
-                    if failure.is_set(): raise RuntimeError(failure_message[0])
-                    try: frame = await asyncio.to_thread(capture.get, True, 0.1)
-                    except Empty: continue
-                    playing = playback.active()
-                    speech_active = None
-                    if speech_detector is not None:
-                        if playing and not aec:
-                            speech_detector.reset()
-                            speech_active = False
+                worker = None
+                worker_epoch = None
+                try:
+                    while True:
+                        if failure.is_set(): raise RuntimeError(failure_message[0])
+                        try: frame = await asyncio.to_thread(capture.get, True, 0.1)
+                        except Empty: continue
+                        playing = playback.active()
+                        if extractor_factory:
+                            epoch, captured_playing, frame = frame
+                            if epoch != audio_epoch or captured_playing or playing:
+                                if worker is not None:
+                                    await worker.close(); worker = None; worker_epoch = None
+                                for item in detector.feed(bytes(640), playback_active=True):
+                                    await socket.send(json.dumps(item))
+                                if speech_detector is not None: speech_detector.reset()
+                                continue
+                            if worker is None or worker_epoch != epoch:
+                                if worker is not None: await worker.close()
+                                worker = await asyncio.to_thread(extractor_factory)
+                                worker_epoch = epoch
+                            frames = await worker.feed(frame)
+                            if epoch != audio_epoch or playback.active():
+                                await worker.close(); worker = None; worker_epoch = None
+                                detector.reset()
+                                if speech_detector is not None: speech_detector.reset()
+                                continue
                         else:
-                            probability = speech_detector.feed(frame)
-                            speech_active = probability is not None and probability >= 0.5
-                    for item in detector.feed(frame, playback_active=playing, allow_barge_in=aec, speech_active=speech_active):
-                        if isinstance(item, bytes): await socket.send(item)
-                        else:
-                            if item['type'] == 'interrupt':
-                                playback.interrupt(); generation = None
-                                print(json.dumps({'type':'playback.interrupted','reason':item.get('reason'),'elapsed_ms':round((time.monotonic()-playback_started)*1000)}), flush=True)
-                            await socket.send(json.dumps(item))
+                            frames = [frame]
+                        for frame in frames:
+                            speech_active = None
+                            if speech_detector is not None:
+                                if playing and not aec:
+                                    speech_detector.reset()
+                                    speech_active = False
+                                else:
+                                    probability = speech_detector.feed(frame)
+                                    speech_active = probability is not None and probability >= 0.5
+                            for item in detector.feed(frame, playback_active=playing, allow_barge_in=aec, speech_active=speech_active):
+                                if isinstance(item, bytes): await socket.send(item)
+                                else:
+                                    if item['type'] == 'interrupt':
+                                        playback.interrupt(); generation = None
+                                        print(json.dumps({'type':'playback.interrupted','reason':item.get('reason'),'elapsed_ms':round((time.monotonic()-playback_started)*1000)}), flush=True)
+                                    await socket.send(json.dumps(item))
+                finally:
+                    if worker is not None: await worker.close()
 
             async def receive_audio():
-                nonlocal generation, playback_started
+                nonlocal generation, playback_started, audio_epoch
                 async for message in socket:
                     if isinstance(message, bytes):
                         if generation is not None:
@@ -170,6 +216,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                     kind = event.get('type')
                     if kind == 'speech.start':
                         if event.get('sample_rate') != 24000: raise RuntimeError('Unexpected gateway output rate')
+                        audio_epoch += 1
                         generation = playback.begin()
                         playback_started = time.monotonic()
                     elif kind == 'speech.end' and generation is not None:
@@ -182,12 +229,12 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                 raise RuntimeError('Gateway disconnected')
 
             async def keyboard():
-                nonlocal generation
+                nonlocal generation, audio_epoch
                 import msvcrt
                 while True:
                     if msvcrt.kbhit():
                         action = await _keyboard_action(msvcrt.getwch(), playback, detector, socket, speech_detector)
-                        if action == 'interrupt': generation = None
+                        if action == 'interrupt': generation = None; audio_epoch += 1
                         if action == 'quit': return
                     await asyncio.sleep(0.05)
 
@@ -209,8 +256,9 @@ def main():
     parser.add_argument('--aec', action='store_true', help='Enable experimental native echo cancellation and voice interruption')
     parser.add_argument('--vad', choices=('energy', 'silero'), default='energy', help='Optional CPU speech classifier, combined with the RMS threshold')
     parser.add_argument('--vad-model', default='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx')
+    parser.add_argument('--speaker-enrollment', help='Experimental: local mono 16 kHz PCM16 WAV of the intended speaker (3–30 seconds); speaker-safe only')
     args = parser.parse_args()
-    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec, vad=args.vad, vad_model=args.vad_model))
+    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec, vad=args.vad, vad_model=args.vad_model, speaker_enrollment=args.speaker_enrollment))
     except KeyboardInterrupt: print('\nStopped.')
 
 

@@ -8,6 +8,8 @@ The experimental Windows native client opens the default microphone and speaker 
 
 An optional `ASSISTAI_DB_PATH=:memory:` setting keeps gateway SQLite events in a volatile process-local database. It is not authentication or secure erasure, and cannot rule out operating-system paging or data retained by other components. The physical probe requires a gateway that reports volatile storage before it opens devices; that unauthenticated report is a convenience check, not a security boundary.
 
+The optional native speaker-extraction experiment reads an explicitly supplied local enrollment WAV into process memory. It does not create, copy or delete that file. Enrollment is not identity verification, authentication or access control; an incorrect enrollment can select another speaker. Normal operating-system paging and any other audio-processing services remain outside this guarantee.
+
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions. Its process-local estimates account for concurrent accepted tasks but do not control actual allocations, external processes or work still running after gateway restart.
 
 The optional speech-activity classifier is not speaker verification or an authorization control; background speakers and television dialogue may still activate it.

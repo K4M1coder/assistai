@@ -19,6 +19,7 @@ with wave.open(str(Path('.cache/reset-question.wav')), 'rb') as source:
     if source.getframerate() != 16000 or source.getnchannels() != 1 or source.getsampwidth() != 2:
         raise ValueError('Expected 16 kHz mono PCM16 fixture')
     audio = source.readframes(source.getnframes())
+audio = bytes(640 * int(os.environ.get('ASSISTAI_TEST_LEADING_SILENCE_FRAMES', '0'))) + audio
 audio += bytes((-len(audio)) % 640) + bytes(640 * 60)
 finished = Event()
 streams = []
@@ -123,7 +124,7 @@ async def main():
         sys.stdin = SimpleNamespace(isatty=lambda:True)
     captured = io.StringIO()
     with redirect_stdout(captured):
-        task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy')))
+        task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy'), speaker_enrollment=os.environ.get('ASSISTAI_TEST_SPEAKER_ENROLLMENT')))
         try:
             if not await asyncio.to_thread(finished.wait, 25): raise TimeoutError('No synthetic output')
             if task.done(): await task
@@ -132,10 +133,11 @@ async def main():
             await asyncio.gather(task, return_exceptions=True)
     messages = captured.getvalue()
     transcript_count = messages.count('"type": "user.text"')
+    transcripts = [json.loads(line).get('text') for line in messages.splitlines() if line.startswith('{') and '"type": "user.text"' in line]
     interruptions = messages.count('"type": "playback.interrupted"')
     interrupt_events = [json.loads(line) for line in messages.splitlines() if line.startswith('{') and '"type": "playback.interrupted"' in line]
     trace = {'frames':len(echo_rms), 'raw_rms_p95':round(float(np.percentile([x[0] for x in echo_rms],95)),4), 'clean_rms_p95':round(float(np.percentile([x[1] for x in echo_rms],95)),4), 'clean_frames_above_threshold':sum(x[1]>float(os.environ.get('ASSISTAI_TEST_THRESHOLD','0.01')) for x in echo_rms)} if echo_rms else None
-    print(json.dumps({'input_streams':sum(s.is_input for s in streams),'output_streams':sum(not s.is_input for s in streams),'streams_closed':all(s.closed for s in streams),'user_transcript_observed':'quel est le mot secret' in messages.lower(),'transcript_count':transcript_count,'interruptions':interruptions,'interruption_elapsed_ms':[event.get('elapsed_ms') for event in interrupt_events],'simulated_echo':simulate_echo,'manual_interrupt_sent':manual_requested,'aec_trace':trace,'output_nonzero_samples':output_nonzero,'physical_devices_opened':False}))
+    print(json.dumps({'input_streams':sum(s.is_input for s in streams),'output_streams':sum(not s.is_input for s in streams),'streams_closed':all(s.closed for s in streams),'user_transcript_observed':'quel est le mot secret' in messages.lower(),'transcript_count':transcript_count,'synthetic_transcripts':transcripts,'interruptions':interruptions,'interruption_elapsed_ms':[event.get('elapsed_ms') for event in interrupt_events],'simulated_echo':simulate_echo,'manual_interrupt_sent':manual_requested,'aec_trace':trace,'output_nonzero_samples':output_nonzero,'physical_devices_opened':False}, ensure_ascii=False))
     if not all(s.closed for s in streams) or 'quel est le mot secret' not in messages.lower() or output_nonzero <= 1000 or (simulate_echo and (transcript_count != 1 or interruptions)) or (simulate_manual and (not manual_requested or interruptions != 1)):
         raise RuntimeError('Synthetic device client probe failed')
 

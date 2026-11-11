@@ -22,6 +22,10 @@ class NativeAudioClientTests(unittest.TestCase):
         socket.send.assert_awaited_once_with('{"type": "interrupt", "reason": "manual"}')
         self.assertEqual(asyncio.run(_keyboard_action('q', playback, detector, socket)), 'quit')
 
+    def test_rejects_speaker_filter_with_aec_before_opening_devices(self):
+        with self.assertRaisesRegex(ValueError, 'speaker-safe'):
+            asyncio.run(run('ws://127.0.0.1:18088/voice', aec=True, speaker_enrollment='unused.wav'))
+
 
 if __name__ == '__main__':
     unittest.main()
