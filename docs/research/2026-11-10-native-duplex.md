@@ -222,6 +222,10 @@ In the delegation run, 51 samples showed adapter dedicated maximum 16,229,867,52
 
 Free physical RAM was 6,810,800 KiB with the current cascade active and 7,818,612 KiB after stopping its voice model, below the existing 8 GiB model-start preflight. The native audio-model trial was not started and the original voice controller was restored. No reserve was lowered.
 
+## EXP-085: user-reported physical Windows client test
+
+On 2026-11-11 the user reported that the experimental native Windows client understood their spoken French question and that pressing `I` interrupted speech. The requested invocation used the default gateway URL and default speaker-safe mode, without the experimental `--aec` option; the running demonstration gateway uses the speech cascade. This is a user report of one interaction, not a recorded or independently replayed measurement. The exact words, room noise, response, latency and number of attempts were not reported. It supports basic human-voice interaction and manual interruption in that test; it does not demonstrate automatic barge-in, native speech-to-speech inference, robust noisy-room recognition or a hard VRAM limit. Earlier synthetic-question physical tests remain part of the evidence.
+
 A local integration test starts the actual opt-in gateway with simulated realtime and OpenCode servers. It submits PCM, simulates a delegate tool call, checks that the task reaches the harness, supplies a completed fixture result, and requests a spoken completion notification. The mock confirms that the notification request disables tools and that PCM audio arrives through the gateway. This exercises gateway wiring and event ordering, not real model inference, speech quality, a browser, or memory usage. All 36 prototype tests passed. The real-model notification test remains outstanding when sufficient headroom is available.
 
 ## EXP-056: synthetic real-model completion notification

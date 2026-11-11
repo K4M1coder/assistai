@@ -20,9 +20,11 @@ For disposable local tests, `ASSISTAI_DB_PATH=:memory:` keeps the gateway's SQLi
 
 A native timestamp-aware echo-cancellation client is under research as a comparator. Synthetic overlap tests showed variable preservation of the constructed near-end signal. A standalone low-volume WASAPI probe opened the physical devices, but did not test live barge-in or establish echo attenuation. The current browser filter has not solved speaker feedback.
 
-An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. Physical-device smoke tests produced responses, but did not recognize the synthetic question at two thresholds. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; a separate idealized replay showed that longer onset requirements can delay or miss near speech.
+An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. In one user-reported test, it understood a spoken French question and the manual interruption key worked. Earlier physical-device smoke tests did not recognize a synthetic question at two thresholds. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; automatic voice interruption in a real room is not established.
 
 An optional CPU speech-activity classifier is available in the native client for research. It reduced early activation from synthetic white noise and tones in one comparison, but did not improve the white-noise transcript or distinguish another synthetic speaker. It has not been validated in the user's noisy room.
+
+CPU target-speaker extraction remains a research experiment: a short synthetic concurrent-work test showed limited processing headroom and simulated backlog. It is not integrated into the client. See the [noisy-room experiments](docs/research/2026-11-10-noisy-room.md).
 
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 
