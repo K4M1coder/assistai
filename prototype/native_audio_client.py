@@ -144,6 +144,8 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
         while True:
             event = json.loads(await asyncio.wait_for(socket.recv(), 15))
             if event.get('type') == 'asr.ready': break
+            if event.get('type') == 'session.capabilities':
+                print(json.dumps({'type': 'client.mode', 'mode': event.get('mode', 'unknown')}), flush=True)
             if event.get('type') == 'error': raise RuntimeError(event.get('message', 'Gateway error'))
         options = {'extra_settings': sd.WasapiSettings(auto_convert=True)}
         with ExitStack() as stack:
