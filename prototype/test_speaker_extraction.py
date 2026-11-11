@@ -1,8 +1,10 @@
+import asyncio
+import threading
 import unittest
 
 import numpy as np
 
-from prototype.speaker_extraction import ExtractionFramer
+from prototype.speaker_extraction import ExtractionFramer, ExtractionWorker
 
 
 class FakeStream:
@@ -44,6 +46,87 @@ class ExtractionFramerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             framer.feed(bytes(10))
         self.assertEqual(len(framer.feed(bytes(640))), 1)
+
+
+class ExtractionWorkerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_runs_off_loop_and_rejects_concurrent_input(self):
+        started, release = threading.Event(), threading.Event()
+
+        class BlockingFramer:
+            def feed(self, frame):
+                started.set()
+                if not release.wait(3):
+                    raise TimeoutError('Test worker did not receive release')
+                return [frame]
+
+        worker = ExtractionWorker(BlockingFramer())
+        task = asyncio.create_task(worker.feed(bytes(640)))
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 2))
+            with self.assertRaises(OverflowError):
+                await worker.feed(bytes(640))
+            release.set()
+            self.assertEqual(await task, [bytes(640)])
+        finally:
+            release.set()
+            await worker.close()
+
+    async def test_cancellation_discards_result_and_closes_stream(self):
+        started, release = threading.Event(), threading.Event()
+
+        class BlockingFramer:
+            def feed(self, frame):
+                started.set()
+                if not release.wait(3):
+                    raise TimeoutError('Test worker did not receive release')
+                return [frame]
+
+        worker = ExtractionWorker(BlockingFramer())
+        task = asyncio.create_task(worker.feed(bytes(640)))
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 2))
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            with self.assertRaisesRegex(RuntimeError, 'closed'):
+                await worker.feed(bytes(640))
+        finally:
+            release.set()
+            await worker.close()
+
+    async def test_worker_failure_closes_stream(self):
+        worker = ExtractionWorker(ExtractionFramer(FakeStream([np.array([np.nan])])))
+        try:
+            with self.assertRaises(ValueError):
+                await worker.feed(bytes(640))
+            with self.assertRaisesRegex(RuntimeError, 'closed'):
+                await worker.feed(bytes(640))
+        finally:
+            await worker.close()
+
+    async def test_close_during_inference_discards_result(self):
+        started, release = threading.Event(), threading.Event()
+
+        class BlockingFramer:
+            def feed(self, frame):
+                started.set()
+                if not release.wait(3):
+                    raise TimeoutError('Test worker did not receive release')
+                return [frame]
+
+        worker = ExtractionWorker(BlockingFramer())
+        task = asyncio.create_task(worker.feed(bytes(640)))
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 2))
+            closing = asyncio.create_task(worker.close())
+            await asyncio.sleep(0)
+            release.set()
+            with self.assertRaisesRegex(RuntimeError, 'closed'):
+                await task
+            await closing
+        finally:
+            release.set()
+            await worker.close()
 
 
 if __name__ == '__main__':

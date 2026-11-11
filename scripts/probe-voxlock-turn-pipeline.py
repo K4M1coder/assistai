@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 from voxlock import VoxLock
-from prototype.speaker_extraction import ExtractionFramer
+from prototype.speaker_extraction import ExtractionFramer, ExtractionWorker
 
 
 def load_script(name, filename):
@@ -22,7 +22,7 @@ probe = load_script('voxlock_probe', 'probe-voxlock.py')
 turns = load_script('vad_probe', 'probe-vad-asr-comparison.py')
 
 
-async def main(use_framer=False):
+async def main(use_framer=False, use_worker=False):
     target, target_hash = probe.audio('tse-target.wav')
     other, other_hash = probe.audio('tse-interferer.wav')
     enrollment, enrollment_hash = probe.audio('tse-enroll.wav')
@@ -38,11 +38,16 @@ async def main(use_framer=False):
     before = time.perf_counter()
     if use_framer:
         framer = ExtractionFramer(stream)
+        worker = ExtractionWorker(framer) if use_worker else None
         padded = np.pad(mixture, (0, (-len(mixture)) % 320))
         frames = []
-        for i in range(0, len(padded), 320):
-            pcm = (np.clip(padded[i:i + 320], -1, 32767 / 32768) * 32768).astype('<i2').tobytes()
-            frames.extend(framer.feed(pcm))
+        try:
+            for i in range(0, len(padded), 320):
+                pcm = (np.clip(padded[i:i + 320], -1, 32767 / 32768) * 32768).astype('<i2').tobytes()
+                frames.extend(await worker.feed(pcm) if worker else framer.feed(pcm))
+        finally:
+            if worker:
+                await worker.close()
         filtered = np.frombuffer(b''.join(frames), dtype='<i2').astype(np.float32) / 32768
     else:
         extracted = [stream.push(mixture[i:i + 320]) for i in range(0, len(mixture), 320)]
@@ -56,7 +61,7 @@ async def main(use_framer=False):
             transcripts = [await turns.recognize(item) for item in captured if item]
             results.append({'condition': label, 'detector': detector, 'starts_ms': starts,
                             'ends_ms': ends, 'turn_count': len(captured), 'transcripts': transcripts})
-    print(json.dumps({'framer': use_framer, 'fixture_sha256': {'target': target_hash, 'other': other_hash,
+    print(json.dumps({'framer': use_framer, 'worker': use_worker, 'fixture_sha256': {'target': target_hash, 'other': other_hash,
                                          'enrollment': enrollment_hash},
                       'input_samples': len(mixture), 'output_samples': len(filtered),
                       'audio_ms': round(len(mixture) / 16), 'stream_wall_ms': round(elapsed * 1000),
@@ -67,4 +72,6 @@ async def main(use_framer=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--framer', action='store_true', help='Exercise the bounded PCM framing adapter')
-    asyncio.run(main(parser.parse_args().framer))
+    parser.add_argument('--worker', action='store_true', help='Exercise the single-in-flight worker and framer')
+    args = parser.parse_args()
+    asyncio.run(main(args.framer or args.worker, args.worker))
