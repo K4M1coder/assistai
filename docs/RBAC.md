@@ -12,6 +12,8 @@ Native task notifications retrieve completed results only from the current gatew
 
 Reset context may also contain untrusted task results and approximate transcripts. Labeling them as data does not prevent prompt injection; the replacement speech session may use tools under the existing harness permissions.
 
+Real-model synthetic reset tests repeated an already completed task. Duplicate execution is not prevented after completion; the read-only fixture made the observed repeats low impact, but other harness permissions could make repeats consequential.
+
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
