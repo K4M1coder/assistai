@@ -14,7 +14,7 @@ Speaker-safe mode prevents voice interruption during playback; the Interrupt but
 
 Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech paths, synthetic French delegation through a read-only fixture, and explicit cancellation. An opt-in LFM realtime gateway path now exists, but the running demonstration still uses the cascade; the new path has synthetic and mock-server integration tests, including a real-model synthetic completion notification. The 24 GB budget, full-duplex interruption, French native speech quality, sustained workloads and no memory spill are not yet proven. See [native duplex experiments](docs/research/2026-11-10-native-duplex.md) and [local prototype details](prototype/README.md).
 
-An optional sampled resource check can reject new background tasks when measured headroom is insufficient; it does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
+An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
 For disposable local tests, `ASSISTAI_DB_PATH=:memory:` keeps the gateway's SQLite session events in memory for the process lifetime. The default demonstration still uses a local database file.
 

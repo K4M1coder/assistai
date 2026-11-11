@@ -16,7 +16,9 @@ flowchart LR
   G --> D[SQLite event history]
 ```
 
-The default gateway port is 18083; the currently running demonstration uses 18088. The service endpoint reports configured engines and models. Speaker-safe, hold-to-talk, manual interruption and a noise threshold exist; the experimental playback-reference filter has not solved speaker feedback reliably. The gateway is a local experiment, not an authenticated multi-user service or OS sandbox. An optional sampled resource check can reject new agent tasks, but is disabled by default and is not a hard runtime limit or allocation reservation.
+The default gateway port is 18083; the currently running demonstration uses 18088. The service endpoint reports configured engines and models. Speaker-safe, hold-to-talk, manual interruption and a noise threshold exist; the experimental playback-reference filter has not solved speaker feedback reliably. The gateway is a local experiment, not an authenticated multi-user service or OS sandbox. An optional sampled resource check can reject new agent tasks and conservatively accounts for estimated concurrent tasks across connections. It is disabled by default and is not a hard runtime limit or allocation reservation.
+
+Admission estimates are held until the harness reports a terminal result. An ambiguous submission, status failure or timeout keeps the estimate held for the lifetime of the gateway process; restarting the gateway loses this accounting even if external work continues. Estimates can double-count allocations already visible in telemetry, and multiple gateway processes do not coordinate. Model loading, transient spikes, paging and actual allocation remain outside this check.
 
 The gateway defaults to a local SQLite event file; `ASSISTAI_DB_PATH=:memory:` instead uses a process-local SQLite database that disappears on exit. `/health` reports `history_storage` as `file` or `volatile`. This does not control operating-system paging, logs, other processes or backups, and the unauthenticated health response is not a security proof.
 

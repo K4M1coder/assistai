@@ -115,9 +115,11 @@ wss.on('connection', (client, req) => {
     runningTasks.set(taskKey, reservation);
     const headers = { 'content-type': 'application/json' };
     let agentSession;
+    let releaseResource;
+    let promptAttempted = false;
     try {
       if (admitTask) {
-        try { await admitTask(); }
+        try { releaseResource = await admitTask(); }
         catch (error) {
           const event = { task, message: String(error) };
           record(session, turnId, 'task.rejected', event);
@@ -126,9 +128,11 @@ wss.on('connection', (client, req) => {
         }
       }
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
+      promptAttempted = true;
       await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: task }] }) });
       reservation.id = agentSession.id;
     } catch (error) {
+      if (!promptAttempted) releaseResource?.();
       runningTasks.delete(taskKey);
       throw error;
     }
@@ -136,6 +140,7 @@ wss.on('connection', (client, req) => {
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
     void (async () => {
+      let confirmedTerminal = false;
       try {
         for (let i = 0; i < 300; i++) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -144,8 +149,9 @@ wss.on('connection', (client, req) => {
           const last = [...messages].reverse().find(item => item.info?.role === 'assistant' && item.info?.time?.completed);
           if (!status[agentSession.id] && last) {
             const text = (last.parts ?? []).filter(part => part.type === 'text' && !part.synthetic).map(part => part.text).join('\n').trim();
-            if (last.info.error) throw new Error('Agent reported an error');
+            if (last.info.error) { confirmedTerminal = true; throw new Error('Agent reported an error'); }
             if (!text) continue;
+            confirmedTerminal = true;
             const result = { task_id: agentSession.id, text: text.slice(0, 8000) };
             if (completedTasks.size >= 100) completedTasks.delete(completedTasks.keys().next().value);
             completedTasks.set(taskKey, result);
@@ -160,6 +166,7 @@ wss.on('connection', (client, req) => {
         record(session, turnId, 'task.error', result);
         send({ type: 'task.error', ...result });
       } finally {
+        if (confirmedTerminal) releaseResource?.();
         runningTasks.delete(taskKey);
       }
     })();
