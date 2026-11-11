@@ -232,6 +232,12 @@ Hypothesis: the experimental Windows client can perform its audio handshake and 
 
 This establishes protocol wiring for that synthetic interaction, not real-model speech inference, intelligibility, live interruption, noisy-room behavior or memory compliance. The native response in this experiment was constructed test PCM, and the transcript was from the separate Vosk sidecar. Reproduce with `node scripts/probe-native-client-mock-gateway.mjs` while the local Vosk sidecar is running and the Windows research environment is installed.
 
+## EXP-096: manual interruption against a mock native backend
+
+Hypothesis: a manual interruption from the native Windows client reaches an active native gateway session, and late audio from that cancelled response is not played. The EXP-095 mock backend was extended to keep its response active, observe `response.cancel`, then deliberately emit another one-second PCM delta before acknowledging cancellation. With simulated input/output devices and the Vosk sidecar, one run observed one manual interruption, one backend cancellation and 1,280 nonzero samples on fake playback, below the test's 5,000-sample bound despite the injected late second of audio. The fake devices closed. The client-side `I` test does not measure exact cancellation latency, physical speaker output, microphone barge-in, or behavior of the actual LFM server.
+
+Reproduce with `$env:ASSISTAI_TEST_MANUAL_INTERRUPT='1'; node scripts/probe-native-client-mock-gateway.mjs` while Vosk is running. The optional environment variable is scoped to the current PowerShell process; remove it before the normal non-interruption test if using the same shell.
+
 A local integration test starts the actual opt-in gateway with simulated realtime and OpenCode servers. It submits PCM, simulates a delegate tool call, checks that the task reaches the harness, supplies a completed fixture result, and requests a spoken completion notification. The mock confirms that the notification request disables tools and that PCM audio arrives through the gateway. This exercises gateway wiring and event ordering, not real model inference, speech quality, a browser, or memory usage. All 36 prototype tests passed. The real-model notification test remains outstanding when sufficient headroom is available.
 
 ## EXP-056: synthetic real-model completion notification

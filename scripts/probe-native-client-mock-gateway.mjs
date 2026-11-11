@@ -17,19 +17,30 @@ async function close(server) { await new Promise(resolve => server.close(resolve
 const backend = http.createServer();
 const sockets = new WebSocketServer({ server: backend });
 let audioBytes = 0;
+let cancellationCount = 0;
+let lateAudioSent = false;
+const testInterrupt = process.env.ASSISTAI_TEST_MANUAL_INTERRUPT === '1';
 sockets.on('connection', socket => {
   socket.send(JSON.stringify({ type: 'session.created', session: { audio: { input: { format: { rate: 16000 } }, output: { format: { rate: 24000 } } } } }));
   socket.on('message', raw => {
     const event = JSON.parse(raw);
     if (event.type === 'session.update') socket.send(JSON.stringify({ type: 'session.updated' }));
     if (event.type === 'input_audio_buffer.append') audioBytes += Buffer.from(event.audio, 'base64').length;
+    if (event.type === 'response.cancel') {
+      cancellationCount++;
+      const pcm = Buffer.alloc(24000 * 2);
+      for (let i = 0; i < pcm.length; i += 2) pcm.writeInt16LE(2000, i);
+      socket.send(JSON.stringify({ type: 'response.output_audio.delta', response_id: 'synthetic-response', delta: pcm.toString('base64') }));
+      lateAudioSent = true;
+      socket.send(JSON.stringify({ type: 'response.done', response: { id: 'synthetic-response', status: 'cancelled', output: [] } }));
+    }
     if (event.type === 'response.create') {
       const id = 'synthetic-response';
       const pcm = Buffer.alloc(24000 * 2);
       for (let i = 0; i < pcm.length; i += 2) pcm.writeInt16LE(2000, i);
       socket.send(JSON.stringify({ type: 'response.created', response: { id } }));
       socket.send(JSON.stringify({ type: 'response.output_audio.delta', response_id: id, delta: pcm.toString('base64') }));
-      socket.send(JSON.stringify({ type: 'response.done', response: { id, status: 'completed', output: [] } }));
+      if (!testInterrupt) socket.send(JSON.stringify({ type: 'response.done', response: { id, status: 'completed', output: [] } }));
     }
   });
 });
@@ -70,7 +81,13 @@ try {
   assert.ok(audioBytes > 0, 'mock native model received no audio');
   assert.ok(result.output_nonzero_samples > 1000);
   assert.equal(result.physical_devices_opened, false);
-  console.log(JSON.stringify({ ...result, mock_model_received_audio_bytes: audioBytes, inference: 'mock' }));
+  if (testInterrupt) {
+    assert.equal(result.interruptions, 1);
+    assert.equal(cancellationCount, 1);
+    assert.equal(lateAudioSent, true);
+    assert.ok(result.output_nonzero_samples < 5000, 'Unexpected playback after simulated cancellation');
+  }
+  console.log(JSON.stringify({ ...result, mock_model_received_audio_bytes: audioBytes, mock_cancellations: cancellationCount, mock_late_audio_sent: lateAudioSent, inference: 'mock' }));
 } finally {
   gateway.kill();
   for (const client of sockets.clients) client.terminate();
