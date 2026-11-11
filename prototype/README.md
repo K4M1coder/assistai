@@ -8,6 +8,15 @@ These components are an early implementation, not the complete assistant. The Re
 
 For research, `--speaker-enrollment path/to/voice.wav` enables CPU target-speaker extraction with an explicit 3–30 second mono 16 kHz PCM16 WAV, after installing the VoxLock experiment dependencies and models described in the noisy-room research notes. It cannot be combined with `--aec`; speaker-safe playback and manual interruption remain in effect. The client reads but does not delete the enrollment file. This option is unvalidated with physical voices and may clip speech or select an unintended speaker; it is not authentication. An immediate-onset synthetic-device test lost most of the question before a 200 ms internal silence warm-up was added; one test afterward transcribed it correctly. Do not infer robust noise suppression or automatic voice interruption from this experiment.
 
+To record an enrollment sample explicitly on Windows, choose a quiet room and run the following from the repository root. Recording starts when the command says so; speak naturally for the requested duration. The file contains your voice and persists until you delete it yourself. Choose a different new path if it already exists. The command will not overwrite an existing file and does not check that the sample contains the intended speaker.
+
+```powershell
+.\.venv-voice\Scripts\python.exe -m prototype.enroll_speaker .cache/my-speaker-enrollment.wav --seconds 8
+.\.venv-voice\Scripts\python.exe -m prototype.native_audio_client --speaker-enrollment .cache/my-speaker-enrollment.wav
+```
+
+The enrollment command accesses the default microphone only when run, buffers the recording in memory and writes the WAV after capture. A capture overflow aborts before writing; an interruption or disk error during writing may leave a partial file. The chosen gateway and other services have their own storage behavior.
+
 On this research machine, with the cascade gateway running, the optional dependencies already reside in `.cache/pywebrtc-audio-research`. Run from the repository root in PowerShell:
 
 ```powershell

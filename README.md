@@ -26,6 +26,8 @@ An optional CPU speech-activity classifier is available in the native client for
 
 CPU target-speaker extraction is an opt-in experiment in the Windows native client, requiring an explicit local enrollment WAV. It is speaker-safe only and is not integrated into the browser client. A synthetic-device test initially clipped a question that began immediately; after a short extractor warm-up, one immediate-onset test transcribed it correctly. It can select the wrong person if enrolled incorrectly. Real-room quality, actual queue behavior and sustained concurrent resource use remain unverified. See the [noisy-room experiments](docs/research/2026-11-10-noisy-room.md).
 
+An explicitly invoked Windows command can record the enrollment WAV locally; see the [prototype instructions](prototype/README.md). The voice file persists until the user deletes it.
+
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.
