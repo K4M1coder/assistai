@@ -31,7 +31,15 @@ def _load_speaker_extractor(enrollment_path):
         samples = np.frombuffer(source.readframes(source.getnframes()), dtype='<i2').astype(np.float32) / 32768
     from voxlock import VoxLock
     model = VoxLock(model_dir=Path('.cache/voxlock/onnx/v2'), precision='int8', threads=2)
-    return lambda: ExtractionWorker(ExtractionFramer(model.stream(samples)))
+
+    def create_worker():
+        stream = model.stream(samples)
+        # Prime the state without sending artificial silence to the gateway.
+        for _ in range(10):
+            stream.push(np.zeros(320, dtype=np.float32))
+        return ExtractionWorker(ExtractionFramer(stream))
+
+    return create_worker
 
 
 def _clock_offset(stream):
