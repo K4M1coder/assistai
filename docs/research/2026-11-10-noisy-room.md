@@ -181,3 +181,19 @@ This is one repeated synthetic voice pair and one stationary three-tap path per 
 $env:PYTHONPATH=(Get-Location).Path
 .\.venv-voice\Scripts\python.exe scripts/probe-localvqe-delays.py
 ```
+
+## EXP-102: known reference offset in the 700 ms synthetic case
+
+Hypothesis: the EXP-101 false starts at a 700 ms echo delay are sensitive to the relative timing of the playback reference. `scripts/probe-localvqe-alignment.py` repeats the same synthetic three-tap 700 ms path and voice pair, shifting the supplied reference by a known, manually selected amount. This is an oracle-style test: it does not estimate the delay, access physical audio or model independent device clocks.
+
+| Reference shift | Echo-only false starts | First overlap start | Overlap transcript |
+| ---: | --- | ---: | --- |
+| 0 ms | 1.20 s, 7.08 s | 1.20 s | target plus two extra words |
+| 400 ms | none | 5.28 s | matches clean target |
+| 500 ms | none | 5.28 s | matches clean target |
+| 700 ms | none | 5.28 s | matches clean target |
+| 800 ms | 1.56 s, 6.48 s, 12.34 s | 1.56 s | target plus two extra words |
+
+The constructed near voice starts at 5.00 s. These are detector sample positions, not measured live delay. The 400–700 ms offsets helped this single fixed synthetic path, but the over-shifted reference failed; that does not establish a safe universal setting or a reliable estimator. Drift, changing acoustic paths, real double talk, startup transients, queue latency and actual device timestamps remain untested. The model is not enabled for voice interruption. Reproduce with the EXP-101 prerequisites and `.\.venv-voice\Scripts\python.exe scripts/probe-localvqe-alignment.py` with `PYTHONPATH` set to the repository root.
+
+An offline normalized cross-correlation helper in `prototype/reference_delay.py` was also applied to the first four seconds of the 700 ms echo-only case, before the synthetic near voice begins. It estimated 11,200 samples (700 ms) with correlation 0.881 and an alternative-peak ratio of 1.92, above its experimental acceptance thresholds. The replay table still uses manually chosen offsets; the estimate was not fed automatically into the canceller. Four unit tests cover delayed noise, silence, periodic ambiguity and invalid input. The method does not distinguish echo from other correlated audio and is not used in the product; one stationary calibration example does not establish reliability under noise, simultaneous speech, changing paths, drift or physical devices.
