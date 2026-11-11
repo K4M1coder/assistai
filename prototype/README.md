@@ -4,6 +4,20 @@ These components are an early implementation, not the complete assistant. The Re
 
 ## French speech recognition
 
+`native_pcm.py`, `native_playback.py` and `native_turn.py` provide experimental PCM conversion, buffering and energy-based turn handling. `native_audio_client.py` connects them to default Windows WASAPI input and output; a physical smoke test did not recognize its synthetic question. It opens the microphone and speaker when run. Speaker-safe is the default; in an interactive terminal press `I` to interrupt playback, or `Q` to quit. `--aec` opts into the pinned, separately installed AEC comparator and enables voice barge-in. AEC mode interrupted its own playback in synthetic loopback tests and is not ready for reliable speaker use. A separate idealized replay showed that longer onset detection can miss near speech. Only loopback gateway URLs are accepted. AEC failure stops the client rather than passing raw microphone audio.
+
+On this research machine, with the cascade gateway running, the optional dependencies already reside in `.cache/pywebrtc-audio-research`. Run from the repository root in PowerShell:
+
+```powershell
+$env:PYTHONPATH="$((Get-Location).Path);$((Resolve-Path .cache/pywebrtc-audio-research).Path)"
+.\.venv-voice\Scripts\python.exe -m prototype.native_audio_client
+# Experimental AEC and voice interruption: append --aec
+```
+
+The opt-in AEC path requires `pywebrtc-audio` 0.2.0, `sounddevice` 0.5.3, and the inspected source under `.cache/hf-speech-research` at commit `ebc09bf286edbe8739a59575709070f056d31e29`; other required Python dependencies are in the research environment. Run the component tests with `.venv-voice/Scripts/python.exe -m unittest prototype.test_native_pcm prototype.test_native_playback prototype.test_native_turn prototype.test_native_audio_client`. `scripts/probe-native-client-fake.py` exercises the client with synthetic devices and the real local gateway; set `ASSISTAI_TEST_AEC=1` to exercise the AEC path. Neither test uses physical devices or establishes real-room echo performance, end-to-end flow control or noise resistance.
+
+A separate low-volume physical WASAPI probe, `scripts/probe-wasapi-aec-live.py`, opened the default devices and retained aggregate microphone levels only. It did not run the gateway client or test live interruption; see EXP-077 before interpreting its measurements.
+
 The Windows demonstration uses the repository's `.venv-voice` environment and `.cache/huggingface` model cache. Keep `HF_HUB_OFFLINE=1` for the existing Pocket TTS model; using the default cache path can make offline startup fail. The demonstration gateway uses port 18088. See the research log for the verified service configuration and its limits.
 
 Create a Python 3.11 or 3.12 environment, install the pinned direct dependencies in `requirements.txt`, then run `python scripts/setup-vosk-fr.py` from the repository root. This downloads the public Vosk French small model into `.cache/vosk`. After setup, the recognizer runs locally without network access. Set `ASSISTAI_VOSK_MODEL` to use a different Vosk model directory.
