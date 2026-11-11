@@ -37,6 +37,12 @@ class NativeTurnTests(unittest.TestCase):
     def test_invalid_frame_rejected(self):
         with self.assertRaises(ValueError): NativeTurnDetector().feed(bytes(639))
 
+    def test_optional_classifier_can_gate_loud_non_speech(self):
+        detector = NativeTurnDetector()
+        for _ in range(5): self.assertEqual(detector.feed(self.voice, speech_active=False), [])
+        for _ in range(3): event = detector.feed(self.voice, speech_active=True)
+        self.assertEqual(event[0], {'type':'audio.start'})
+
 
 if __name__ == '__main__':
     unittest.main()

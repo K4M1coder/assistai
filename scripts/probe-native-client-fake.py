@@ -123,7 +123,7 @@ async def main():
         sys.stdin = SimpleNamespace(isatty=lambda:True)
     captured = io.StringIO()
     with redirect_stdout(captured):
-        task = asyncio.create_task(client.run('ws://127.0.0.1:18088/voice', threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1'))
+        task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy')))
         try:
             if not await asyncio.to_thread(finished.wait, 25): raise TimeoutError('No synthetic output')
             if task.done(): await task

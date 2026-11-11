@@ -22,6 +22,8 @@ A native timestamp-aware echo-cancellation client is under research as a compara
 
 An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. Physical-device smoke tests produced responses, but did not recognize the synthetic question at two thresholds. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; a separate idealized replay showed that longer onset requirements can delay or miss near speech.
 
+An optional CPU speech-activity classifier is available in the native client for research. It is not speaker identification and has not been validated in the user's noisy room.
+
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.

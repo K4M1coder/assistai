@@ -27,7 +27,7 @@ class NativeTurnDetector:
         self._quiet = 0
         self._pre_roll.clear()
 
-    def feed(self, pcm, *, playback_active=False, allow_barge_in=False):
+    def feed(self, pcm, *, playback_active=False, allow_barge_in=False, speech_active=None):
         """Return ordered gateway controls and PCM for one 20 ms 16 kHz frame."""
         if not isinstance(pcm, bytes) or len(pcm) != 640:
             raise ValueError('Expected one 20 ms mono 16 kHz PCM16 frame')
@@ -36,7 +36,7 @@ class NativeTurnDetector:
             self.reset()
             return events
         samples = np.frombuffer(pcm, dtype='<i2').astype(np.float32) / 32768
-        voiced = float(np.sqrt(np.mean(samples * samples))) > self.threshold
+        voiced = float(np.sqrt(np.mean(samples * samples))) > self.threshold and (speech_active is None or bool(speech_active))
         if not self._speaking:
             self._pre_roll.append(pcm)
             self._voiced = self._voiced + 1 if voiced else 0

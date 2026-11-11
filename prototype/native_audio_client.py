@@ -44,10 +44,11 @@ def _load_echo_canceller():
     return module.EchoCanceller(16000, 16000)
 
 
-async def _keyboard_action(key, playback, detector, socket):
+async def _keyboard_action(key, playback, detector, socket, speech_detector=None):
     if key.lower() == 'i':
         playback.interrupt()
         detector.reset()
+        if speech_detector is not None: speech_detector.reset()
         await socket.send(json.dumps({'type':'interrupt', 'reason':'manual'}))
         print(json.dumps({'type':'playback.interrupted', 'reason':'manual'}), flush=True)
         return 'interrupt'
@@ -56,7 +57,7 @@ async def _keyboard_action(key, playback, detector, socket):
     return None
 
 
-async def run(url, *, threshold=0.025, aec=False):
+async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx'):
     address = urlsplit(url)
     if address.scheme != 'ws' or address.hostname not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('The experimental client accepts only local loopback WebSocket URLs')
@@ -69,6 +70,12 @@ async def run(url, *, threshold=0.025, aec=False):
         raise RuntimeError('Default WASAPI input and output devices are required')
     echo = _load_echo_canceller() if aec else None
     detector, playback = NativeTurnDetector(threshold=threshold), NativePlayback()
+    if vad not in ('energy', 'silero'): raise ValueError('Unsupported voice detector')
+    if vad == 'silero':
+        from prototype.silero_vad import SileroSpeechDetector
+        speech_detector = SileroSpeechDetector(vad_model)
+    else:
+        speech_detector = None
     capture = Queue(maxsize=50)
     failure = Event()
     failure_message = []
@@ -122,7 +129,7 @@ async def run(url, *, threshold=0.025, aec=False):
             stack.callback(input_stream.stop)
             output_stream.start()
             stack.callback(output_stream.stop)
-            print('Listening locally. Press I to interrupt, Q or Ctrl+C to stop. ' + ('Experimental echo cancellation enabled.' if aec else 'Speaker-safe mode enabled.'), flush=True)
+            print('Listening locally. Press I to interrupt, Q or Ctrl+C to stop. ' + ('Experimental echo cancellation enabled.' if aec else 'Speaker-safe mode enabled.') + f' VAD: {vad}.', flush=True)
 
             async def send_audio():
                 nonlocal generation
@@ -130,7 +137,16 @@ async def run(url, *, threshold=0.025, aec=False):
                     if failure.is_set(): raise RuntimeError(failure_message[0])
                     try: frame = await asyncio.to_thread(capture.get, True, 0.1)
                     except Empty: continue
-                    for item in detector.feed(frame, playback_active=playback.active(), allow_barge_in=aec):
+                    playing = playback.active()
+                    speech_active = None
+                    if speech_detector is not None:
+                        if playing and not aec:
+                            speech_detector.reset()
+                            speech_active = False
+                        else:
+                            probability = speech_detector.feed(frame)
+                            speech_active = probability is not None and probability >= 0.5
+                    for item in detector.feed(frame, playback_active=playing, allow_barge_in=aec, speech_active=speech_active):
                         if isinstance(item, bytes): await socket.send(item)
                         else:
                             if item['type'] == 'interrupt':
@@ -170,7 +186,7 @@ async def run(url, *, threshold=0.025, aec=False):
                 import msvcrt
                 while True:
                     if msvcrt.kbhit():
-                        action = await _keyboard_action(msvcrt.getwch(), playback, detector, socket)
+                        action = await _keyboard_action(msvcrt.getwch(), playback, detector, socket, speech_detector)
                         if action == 'interrupt': generation = None
                         if action == 'quit': return
                     await asyncio.sleep(0.05)
@@ -191,8 +207,10 @@ def main():
     parser.add_argument('--url', default='ws://127.0.0.1:18088/voice')
     parser.add_argument('--threshold', type=float, default=0.025)
     parser.add_argument('--aec', action='store_true', help='Enable experimental native echo cancellation and voice interruption')
+    parser.add_argument('--vad', choices=('energy', 'silero'), default='energy', help='Optional CPU speech classifier, combined with the RMS threshold')
+    parser.add_argument('--vad-model', default='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx')
     args = parser.parse_args()
-    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec))
+    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec, vad=args.vad, vad_model=args.vad_model))
     except KeyboardInterrupt: print('\nStopped.')
 
 

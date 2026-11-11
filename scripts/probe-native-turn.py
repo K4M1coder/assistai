@@ -19,13 +19,21 @@ async def main():
     pcm += bytes((-len(pcm)) % 640) + bytes(640 * 40)
     url = os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice')
     detector, playback = NativeTurnDetector(threshold=0.01), NativePlayback()
+    if os.environ.get('ASSISTAI_TEST_VAD') == 'silero':
+        from prototype.silero_vad import SileroSpeechDetector
+        classifier = SileroSpeechDetector('.cache/silero-vad-research/silero_vad/data/silero_vad.onnx')
+    else:
+        classifier = None
     result = {'starts':0, 'ends':0, 'transcript':'', 'response':'', 'playback_nonzero_samples':0}
     generation = None
     finished = asyncio.Event()
     async with connect(url) as socket:
         async def feed():
             for offset in range(0, len(pcm), 640):
-                for event in detector.feed(pcm[offset:offset + 640]):
+                frame = pcm[offset:offset + 640]
+                probability = classifier.feed(frame) if classifier else None
+                speech_active = (probability is not None and probability >= 0.5) if classifier else None
+                for event in detector.feed(frame, speech_active=speech_active):
                     if isinstance(event, bytes): await socket.send(event)
                     else:
                         if event['type'] == 'audio.start': result['starts'] += 1
