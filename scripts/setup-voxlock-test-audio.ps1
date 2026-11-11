@@ -7,7 +7,8 @@ try {
     $examples = @(
         @{ voice = 'Microsoft Hortense Desktop'; file = 'tse-target.wav'; text = 'Bonjour, je voudrais préparer un voyage en train pour visiter plusieurs villes françaises pendant les vacances.' },
         @{ voice = 'Microsoft Paul'; file = 'tse-interferer.wav'; text = 'La télévision diffuse une émission et les invités discutent de musique et de leur journée dans le salon.' },
-        @{ voice = 'Microsoft Hortense Desktop'; file = 'tse-enroll.wav'; text = 'Voici un exemple de ma voix pour que mon assistant personnel puisse me reconnaître correctement dans une pièce.' }
+        @{ voice = 'Microsoft Hortense Desktop'; file = 'tse-enroll.wav'; text = 'Voici un exemple de ma voix pour que mon assistant personnel puisse me reconnaître correctement dans une pièce.' },
+        @{ voice = 'Microsoft Paul'; file = 'tse-other-enroll.wav'; text = 'Voici une autre voix qui parle dans cette pièce pour enregistrer un exemple distinct.' }
     )
     foreach ($example in $examples) {
         $voice.SetOutputToNull()
