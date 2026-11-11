@@ -12,6 +12,7 @@ import { getServiceStatus } from './service-status.mjs';
 import { attachLfmBridge } from './lfm-bridge.mjs';
 import { createTaskAdmission } from './task-admission.mjs';
 import { buildNativeContext } from './native-context.mjs';
+import { buildAgentPrompt } from './agent-context.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -128,7 +129,8 @@ wss.on('connection', (client, req) => {
       }
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
       promptAttempted = true;
-      await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: task }] }) });
+      const agentPrompt = buildAgentPrompt(task, nativeHistory.all(session).reverse());
+      await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: agentPrompt }] }) });
       reservation.id = agentSession.id;
     } catch (error) {
       if (!promptAttempted) releaseResource?.();
