@@ -14,6 +14,8 @@ When delegating, the gateway includes bounded recent events from the current con
 
 An independent, explicitly invoked Windows enrollment command can record the default microphone to a new user-chosen local WAV. It rejects existing paths and does not delete the file; the user controls its location and retention. Capture overflow aborts before writing, but a write error may leave a partial file. This command is not a security boundary, and a voice sample is sensitive personal data.
 
+The separate LocalVQE physical research probe opens default audio devices, retains captured audio in process memory for offline processing, and prints aggregate measurements. It does not intentionally write captured audio to a file; operating-system paging and unrelated processes are outside that claim.
+
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions. Its process-local estimates account for concurrent accepted tasks but do not control actual allocations, external processes or work still running after gateway restart.
 
 The optional speech-activity classifier is not speaker verification or an authorization control; background speakers and television dialogue may still activate it.

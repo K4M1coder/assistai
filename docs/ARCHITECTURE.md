@@ -36,6 +36,8 @@ The Windows native client optionally feeds explicit local enrollment into a CPU 
 
 A separate opt-in Windows command records an enrollment WAV from the default WASAPI microphone to a new local file. The command buffers capture before exclusive creation, rejects device overflow and does not manage subsequent file retention; its fake-device tests do not establish real-device performance or enrollment quality.
 
+A standalone LocalVQE physical probe uses timestamped WASAPI callbacks, estimates delay and processes a bounded in-memory capture offline. One uncontrolled test could not accept a delay estimate or demonstrate physical echo cancellation. This research path is separate from the live client and does not implement live audio alignment or interruption.
+
 An optional Silero ONNX CPU classifier combines speech probability with the native client's RMS threshold. It is off by default, keeps streaming state per client, and is a speech detector rather than a speaker identity or source-separation system. A synthetic comparison reduced early activation by white noise and tones but did not improve the white-noise transcript or distinguish another synthetic speaker. Gateway and noise trials so far use synthetic input.
 
 When admission rejects a task, the gateway emits a `task.rejected` event. In the cascade path it also speaks a fixed resource-related explanation, because a real controller test generated an incorrect file-access explanation when asked to interpret the tool error. The experimental native-speech path receives the tool failure and UI event but does not yet guarantee the spoken explanation.
