@@ -20,7 +20,7 @@ For disposable local tests, `ASSISTAI_DB_PATH=:memory:` keeps the gateway's SQLi
 
 A native timestamp-aware echo-cancellation client is under research as a comparator. Synthetic overlap tests showed variable preservation of the constructed near-end signal. A standalone low-volume WASAPI probe opened the physical devices, but did not test live barge-in or establish echo attenuation. The current browser filter has not solved speaker feedback.
 
-An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. A physical-device smoke test produced a response, but did not recognize the synthetic question. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; a separate idealized replay showed that longer onset requirements can delay or miss near speech.
+An experimental Windows native audio client connects the gateway to WASAPI with speaker-safe mode by default and a manual interruption key. Physical-device smoke tests produced responses, but did not recognize the synthetic question at two thresholds. Its opt-in AEC mode falsely interrupted itself in a synthetic loopback test; a separate idealized replay showed that longer onset requirements can delay or miss near speech.
 
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 
