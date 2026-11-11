@@ -20,7 +20,7 @@ The default gateway port is 18083; the currently running demonstration uses 1808
 
 When admission rejects a task, the gateway emits a `task.rejected` event. In the cascade path it also speaks a fixed resource-related explanation, because a real controller test generated an incorrect file-access explanation when asked to interpret the tool error. The experimental native-speech path receives the tool failure and UI event but does not yet guarantee the spoken explanation.
 
-On connection the gateway reports session capabilities. The browser uses them to label the cascade or native speech path and to disable text and image input in native mode. An optional CPU Vosk sidecar independently transcribes the same captured PCM for display; it is not the speech model's internal interpretation and is not persisted as shared conversation memory. This capability indication is not proof of live microphone or browser audio performance.
+On connection the gateway reports session capabilities. The browser uses them to label the cascade or native speech path and to disable text and image input in native mode. An optional CPU Vosk sidecar independently transcribes the same captured PCM for display; it is not the speech model's internal interpretation and is not persisted as shared conversation memory. One synthetic real-model delegation test exercised this combination; live microphone and browser audio performance remain unverified.
 
 ### Research-only speech-to-speech paths
 
