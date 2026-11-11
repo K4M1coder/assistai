@@ -1,6 +1,7 @@
 """Low-volume WASAPI echo probe; prints aggregates and does not save captured audio."""
 import importlib.util
 from contextlib import ExitStack
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -9,6 +10,7 @@ import time
 
 import numpy as np
 import sounddevice as sd
+from scipy.signal import correlate, correlation_lags
 
 from prototype.native_audio_client import _clock_offset
 from prototype.reference_delay import estimate_delay
@@ -28,7 +30,22 @@ def starts(samples):
                if isinstance(event, dict) and event.get('type') == 'audio.start')
 
 
-def main():
+def reconstruct(frames, origin, total, *, per_callback=True):
+    target = np.zeros(total, np.float32)
+    base = round((frames[0][0] - origin) * aec.RATE)
+    sequential = 0
+    for timestamp, samples in frames:
+        pos = round((timestamp - origin) * aec.RATE) if per_callback else base + sequential
+        sequential += len(samples)
+        src = max(0, -pos); dst = max(0, pos)
+        count = min(len(samples) - src, total - dst)
+        if count > 0: target[dst:dst + count] = samples[src:src + count].astype(np.float32) / 32768
+    return target
+
+
+def main(output_peak=.04):
+    if not 0 < output_peak <= .08:
+        raise ValueError('Output peak must be greater than zero and at most 0.08')
     if hashlib.sha256(aec.MODEL.read_bytes()).hexdigest() != aec.EXPECTED:
         raise RuntimeError('Unexpected LocalVQE model digest')
     lib = aec.library()
@@ -42,7 +59,7 @@ def main():
     if not peak: raise ValueError('Synthetic fixture is silent')
     total = 9 * aec.RATE
     played = np.zeros(total, np.float32)
-    played[:8 * aec.RATE] = np.resize(fixture / peak * .04, 8 * aec.RATE)
+    played[:8 * aec.RATE] = np.resize(fixture / peak * output_peak, 8 * aec.RATE)
     capture, render, failures = [], [], []
     done, lock = Event(), Lock()
     clocks = {'input': 0.0, 'output': 0.0}
@@ -93,16 +110,31 @@ def main():
     if failures: raise RuntimeError(failures[0])
     if not capture or not render: raise RuntimeError('Missing device data')
     # Map each callback independently onto the capture clock; gaps stay zero.
-    mic = np.zeros(total, np.float32)
-    ref = np.zeros(total, np.float32)
     first = capture[0][0]
-    for frames, target in ((capture, mic), (render, ref)):
-        for timestamp, samples in frames:
-            pos = round((timestamp - first) * aec.RATE)
-            src = max(0, -pos); dst = max(0, pos)
-            count = min(len(samples) - src, total - dst)
-            if count > 0: target[dst:dst + count] = samples[src:src + count].astype(np.float32) / 32768
+    mic = reconstruct(capture, first, total)
+    ref = reconstruct(render, first, total)
     delay = estimate_delay(ref[:7 * aec.RATE], mic[:7 * aec.RATE])
+    continuous_mic = reconstruct(capture, first, total, per_callback=False)
+    continuous_ref = reconstruct(render, first, total, per_callback=False)
+    continuous_delay = estimate_delay(continuous_ref[:7 * aec.RATE], continuous_mic[:7 * aec.RATE])
+    calibration_mic, calibration_ref = mic[:7 * aec.RATE], ref[:7 * aec.RATE]
+    cross = correlate(calibration_mic, calibration_ref, mode='full', method='fft')
+    lags = correlation_lags(len(calibration_mic), len(calibration_ref), mode='full')
+    selected = np.abs(lags) <= aec.RATE
+    signed_lags, scores = lags[selected], np.abs(cross[selected])
+    strongest = int(np.argmax(scores))
+    signed_lag_ms = float(signed_lags[strongest] * 1000 / aec.RATE)
+    signed_correlation = float(scores[strongest] / (np.linalg.norm(calibration_mic) * np.linalg.norm(calibration_ref) + 1e-12))
+
+    def timing_stats(frames):
+        first_timestamp = frames[0][0]
+        total_samples = 0
+        deviations = []
+        for timestamp, data in frames:
+            deviations.append((timestamp - first_timestamp - total_samples / aec.RATE) * 1000)
+            total_samples += len(data)
+        return {'callback_count': len(frames), 'offset_p95_abs_ms': round(float(np.percentile(np.abs(deviations), 95)), 3),
+                'last_offset_ms': round(deviations[-1], 3)}
     offset = delay['delay_samples'] if delay['accepted'] else 0
     aligned = np.zeros_like(ref)
     if offset: aligned[offset:] = ref[:-offset]
@@ -110,10 +142,16 @@ def main():
     length = (len(mic) // aec.HOP) * aec.HOP
     cleaned, times = aec.run(lib, mic[:length], aligned[:length])
     span = slice(2 * aec.RATE, 7 * aec.RATE)
-    print(json.dumps({'duration_seconds': 9, 'output_peak_fraction': .04,
+    print(json.dumps({'duration_seconds': 9, 'output_peak_fraction': output_peak,
                       'calibration_accepted': delay['accepted'],
                       'estimated_delay_ms': round(offset * 1000 / aec.RATE, 2) if delay['accepted'] else None,
                       'correlation': round(delay['correlation'], 3), 'peak_ratio': round(delay['peak_ratio'], 3),
+                      'continuous_calibration_accepted': continuous_delay['accepted'],
+                      'continuous_delay_ms': round(continuous_delay['delay_samples'] * 1000 / aec.RATE, 2) if continuous_delay['accepted'] else None,
+                      'continuous_correlation': round(continuous_delay['correlation'], 3),
+                      'continuous_peak_ratio': round(continuous_delay['peak_ratio'], 3),
+                      'signed_peak_lag_ms': round(signed_lag_ms, 2), 'signed_peak_correlation': round(signed_correlation, 3),
+                      'input_timing': timing_stats(capture), 'output_timing': timing_stats(render),
                       'raw_rms': round(float(np.sqrt(np.mean(mic[span] ** 2))), 6),
                       'clean_rms': round(float(np.sqrt(np.mean(cleaned[span] ** 2))), 6),
                       'raw_turn_starts': starts(mic[span]), 'clean_turn_starts': starts(cleaned[span]),
@@ -122,4 +160,7 @@ def main():
                       'note': 'Uncontrolled room and aggregate levels; not isolated echo attenuation or a live interruption test.'}))
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--peak', type=float, default=.04, help='Playback peak fraction; maximum 0.08')
+    main(parser.parse_args().peak)
