@@ -11,6 +11,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { getServiceStatus } from './service-status.mjs';
 import { attachLfmBridge } from './lfm-bridge.mjs';
 import { createTaskAdmission } from './task-admission.mjs';
+import { buildNativeContext } from './native-context.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -42,6 +43,7 @@ db.exec('CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, session_id TEXT
 const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
 const history = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text') ORDER BY rowid DESC LIMIT 20");
 const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const nativeHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text', 'task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const record = (session, turn, kind, payload) => insert.run(randomUUID(), session, turn, kind, JSON.stringify(payload), new Date().toISOString());
 const clientRoot = fileURLToPath(new URL('./client/', import.meta.url));
 const aecRoot = fileURLToPath(new URL('../node_modules/@ennuicastr/webrtcaec3.js/dist/', import.meta.url));
@@ -153,7 +155,10 @@ wss.on('connection', (client, req) => {
     return { accepted: true, task_id: agentSession.id };
   };
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, getCompletedTask: taskId => {
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext,
+      recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
+      getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),
+      getCompletedTask: taskId => {
       if (typeof taskId !== 'string') return null;
       const row = taskHistory.all(session).find(item => item.kind === 'task.completed' && JSON.parse(item.payload).task_id === taskId);
       return row ? JSON.parse(row.payload).text : null;

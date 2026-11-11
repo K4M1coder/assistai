@@ -11,7 +11,7 @@ async function listen(server) { server.listen(0, '127.0.0.1'); await once(server
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
 
 test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
-  const calls=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult='';
+  const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult='';
   const agent=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST' && req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
@@ -26,7 +26,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     socket.send(JSON.stringify({type:'session.created',session:{audio:{input:{format:{rate:16000}},output:{format:{rate:24000}}}}}));
     socket.on('message',raw=>{
       const e=JSON.parse(raw);
-      if(e.type==='session.update')socket.send(JSON.stringify({type:'session.updated'}));
+      if(e.type==='session.update'){sessionInstructions.push(e.session.instructions);socket.send(JSON.stringify({type:'session.updated'}));}
       if(e.type==='conversation.item.create' && e.item?.role==='user') notificationPrompt=e.item.content[0].text;
       if(e.type==='conversation.item.create' && e.item?.type==='function_call_output') rejectedToolResult=e.item.output;
       if(e.type!=='response.create')return;
@@ -87,4 +87,14 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   });
   assert.equal(calls.length,1);
   assert.equal(JSON.parse(rejectedToolResult).accepted,false);
+  client.removeAllListeners('message');
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Session reset timed out')),5000);
+    client.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='asr.ready'){clearTimeout(timer);resolve();}});
+    client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.reset'}));
+  });
+  assert.equal(sessionInstructions.length,2);
+  assert.match(sessionInstructions[1],/spoken fixture/);
+  assert.match(sessionInstructions[1],/approximate parallel transcript/);
+  assert.match(sessionInstructions[1],/BLUEBIRD/);
 });

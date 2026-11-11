@@ -6,9 +6,11 @@ The experimental voice gateway, including its opt-in LFM realtime path, does not
 
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions.
 
-The optional native-mode transcription sidecar receives the same captured audio over loopback. It does not provide authentication or a security boundary and its displayed transcript is not persisted as shared conversation memory.
+The optional native-mode transcription sidecar receives the same captured audio over loopback. Final transcripts and native assistant text are stored in the local SQLite event database and may be included in bounded context when the speech session resets. The database is not an authenticated or encrypted security boundary; transcripts can be inaccurate.
 
 Native task notifications retrieve completed results only from the current gateway session and disable tool calls for the notification response. Result text remains untrusted model input; these restrictions do not provide authentication, sandboxing or complete prompt-injection protection.
+
+Reset context may also contain untrusted task results and approximate transcripts. Labeling them as data does not prevent prompt injection; the replacement speech session may use tools under the existing harness permissions.
 
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 

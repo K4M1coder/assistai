@@ -20,6 +20,8 @@ The client identifies the active voice mode. In experimental native speech mode 
 
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.
 
+Native speech-session resets can restore a bounded recent context from the gateway's local session events. This recovery has mock integration coverage and does not yet provide persistent memory across client reconnections.
+
 ## Getting started with the interface mockup
 
 Requirements: Node.js 22+ and npm. The existing `bun.lock` was created by an incompatible lockfile version on the tested machine; use the npm lockfile for reproducible installation.
