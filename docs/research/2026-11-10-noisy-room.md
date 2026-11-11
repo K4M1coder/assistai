@@ -161,3 +161,23 @@ cmake --build .cache/localvqe-research/build --target localvqe_shared -j 2
 ```
 
 The pinned build expects CMake, Ninja, a C++ compiler and its runtime DLLs; it builds multiple CPU variants on x86. Model and source are research dependencies stored in `.cache`, not shipped binaries.
+
+## EXP-101: synthetic multipath and interruption gate
+
+Hypothesis: the CPU LocalVQE candidate can suppress playback enough for the existing energy detector to avoid false speech starts while preserving a different overlapping voice across plausible delays. `scripts/probe-localvqe-delays.py` uses two different Windows-generated synthetic French voices: repeated far-end speech and a near-end utterance starting at 5 s. A fixed three-tap digital echo has gains 0.25, 0.12 and 0.06 at offsets 0, 23 and 71 ms from the selected base delay. For each delay, separate 15 s echo-only and overlap streams run through fresh one-thread 16 kHz LocalVQE instances; the existing 2.5% energy turn detector then examines filtered output. Vosk transcribes the overlap window. No microphone, speaker or user audio is used.
+
+| Base delay | Echo-only attenuation, final 3 s | Echo-only false starts | Overlap turn starts | Overlap Vosk transcript |
+| ---: | ---: | --- | --- | --- |
+| 40 ms | 66.30 dB | none | 5.28 s | matches clean near voice |
+| 150 ms | 56.20 dB | none | 5.28 s | matches clean near voice |
+| 350 ms | 62.12 dB | none | 5.28 s | matches clean near voice |
+| 700 ms | 53.35 dB | 1.20 s, 7.08 s | 1.20 s | target phrase plus two extra words |
+
+The near utterance begins at 5.00 s in the constructed signal; detector timestamps are output-sample positions, not live interruption latency. At 700 ms the overlap gate fired before the near utterance, so a live system using this gate could still interrupt itself. Across cases, overlap-to-near waveform correlation within ±100 ms ranged from 0.910 to 0.981; output-to-near norm ratio ranged from 0.956 to 1.068. There were no clipped mixed-input samples. One-thread hop p95 ranged from 2.188 to 2.357 ms on this non-isolated machine. ASR and these simple waveform measures are imperfect proxies for intelligibility and echo quality.
+
+This is one repeated synthetic voice pair and one stationary three-tap path per delay, not real reverberation, a changing room, independent device clocks, music, real microphone speech or a population benchmark. The high final-window attenuation does not prevent early false triggers, as the 700 ms case demonstrates. The model is not enabled in the client; live use requires alignment, overflow behavior, real-device validation and a fallback. Reproduce after EXP-100 setup, EXP-013 synthetic voice setup, and starting the Vosk sidecar:
+
+```powershell
+$env:PYTHONPATH=(Get-Location).Path
+.\.venv-voice\Scripts\python.exe scripts/probe-localvqe-delays.py
+```
