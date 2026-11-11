@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { getServiceStatus } from './service-status.mjs';
 import { attachLfmBridge } from './lfm-bridge.mjs';
+import { createTaskAdmission } from './task-admission.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -19,6 +20,12 @@ const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
+const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission({
+  samplePath: process.env.ASSISTAI_BUDGET_SAMPLE_PATH,
+  baselineSharedBytes: Number(process.env.ASSISTAI_BUDGET_BASELINE_SHARED_BYTES ?? NaN),
+  requestedVramBytes: Number(process.env.ASSISTAI_TASK_VRAM_ESTIMATE_BYTES ?? NaN),
+  requestedRamBytes: Number(process.env.ASSISTAI_TASK_RAM_ESTIMATE_BYTES ?? NaN),
+}) : null;
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
 const dbPath = resolve(process.env.ASSISTAI_DB_PATH ?? '.cache/assistant/events.sqlite');
@@ -95,6 +102,7 @@ wss.on('connection', (client, req) => {
     const headers = { 'content-type': 'application/json' };
     let agentSession;
     try {
+      if (admitTask) await admitTask();
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
       await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: task }] }) });
       reservation.id = agentSession.id;

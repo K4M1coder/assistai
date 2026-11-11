@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdir, mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
 
@@ -41,7 +41,9 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   const backendPort=await listen(backend);
   const reservation=http.createServer();const gatewayPort=await listen(reservation);await new Promise(resolve=>reservation.close(resolve));
   const root=process.cwd();const cache=path.resolve(root,'.cache');await mkdir(cache,{recursive:true});const temp=await mkdtemp(path.join(cache,'lfm-gateway-integration-'));
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite')};
+  const budgetPath=path.join(temp,'budget.json');
+  await writeFile(budgetPath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:0,sharedBytes:0,availableRamBytes:10*1024**3}));
+  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_DB_PATH:path.join(temp,'events.sqlite'),ASSISTAI_BUDGET_SAMPLE_PATH:budgetPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:'1',ASSISTAI_TASK_RAM_ESTIMATE_BYTES:'1'};
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:root,env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',x=>{stderr+=x});
   t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});

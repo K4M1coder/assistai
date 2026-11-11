@@ -16,7 +16,7 @@ flowchart LR
   G --> D[SQLite event history]
 ```
 
-The default gateway port is 18083; the currently running demonstration uses 18088. The service endpoint reports configured engines and models. Speaker-safe, hold-to-talk, manual interruption and a noise threshold exist; the experimental playback-reference filter has not solved speaker feedback reliably. The gateway is a local experiment, not an authenticated multi-user service or OS sandbox. `resource-budget.mjs` provides an isolated policy but is not wired in as a hard runtime limit.
+The default gateway port is 18083; the currently running demonstration uses 18088. The service endpoint reports configured engines and models. Speaker-safe, hold-to-talk, manual interruption and a noise threshold exist; the experimental playback-reference filter has not solved speaker feedback reliably. The gateway is a local experiment, not an authenticated multi-user service or OS sandbox. An optional sampled resource check can reject new agent tasks, but is disabled by default and is not a hard runtime limit or allocation reservation.
 
 ### Research-only speech-to-speech paths
 
