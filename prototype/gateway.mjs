@@ -153,7 +153,11 @@ wss.on('connection', (client, req) => {
     return { accepted: true, task_id: agentSession.id };
   };
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, canNotify: taskId => typeof taskId === 'string' && taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === taskId) });
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, getCompletedTask: taskId => {
+      if (typeof taskId !== 'string') return null;
+      const row = taskHistory.all(session).find(item => item.kind === 'task.completed' && JSON.parse(item.payload).task_id === taskId);
+      return row ? JSON.parse(row.payload).text : null;
+    } });
     return;
   }
   const cancel = (reason = 'new_turn') => {

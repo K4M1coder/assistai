@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import WebSocket from 'ws';
 const wav=await readFile('.cache/lfm3-fixture-french.wav');const p=wav.indexOf('data');if(p<0||wav.readUInt32LE(24)!==16000)throw Error('Expected 16 kHz WAV');
 const pcm=wav.subarray(p+8,p+8+wav.readUInt32LE(p+4));
-const ws=new WebSocket('ws://127.0.0.1:18093/voice');let ready=false,started=false,completed=false,audio=0,nonzero=0,speech=false,text='',transcript='',partials=0,failure=null,taskId=null,initialEnded=false,notificationStarted=false,notificationBytes=0,notificationNonzero=0;
+const ws=new WebSocket('ws://127.0.0.1:18093/voice');let ready=false,started=false,completed=false,audio=0,nonzero=0,speech=false,text='',notificationText='',transcript='',partials=0,failure=null,taskId=null,initialEnded=false,notificationStarted=false,notificationBytes=0,notificationNonzero=0;
 const timer=setTimeout(()=>{failure='timeout';ws.close()},120000);
 ws.on('message',async(data,binary)=>{
  if(binary){audio+=data.length;if(notificationStarted)notificationBytes+=data.length;for(let i=0;i+1<data.length;i+=2)if(data.readInt16LE(i)!==0){nonzero++;if(notificationStarted)notificationNonzero++;}return;}
@@ -15,7 +15,7 @@ ws.on('message',async(data,binary)=>{
  else if(e.type==='notification.started')notificationStarted=true;
  else if(e.type==='notification.rejected'){failure='Notification rejected';ws.close();}
  else if(e.type==='speech.end'){if(notificationStarted){if(notificationBytes>0)ws.close();else {failure='Notification contained no audio';ws.close();}}else{initialEnded=true;if(completed)ws.send(JSON.stringify({type:'notification.speak',task_id:taskId}));}}
- else if(e.type==='assistant.text')text+=e.text;
+ else if(e.type==='assistant.text'){text+=e.text;if(notificationStarted)notificationText+=e.text;}
  else if(e.type==='user.text'&&e.source==='parallel-asr')transcript=e.text;
  else if(e.type==='asr.partial')partials++;
  else if(e.type==='transcript.unavailable'){failure='Parallel transcript unavailable';ws.close();}
@@ -23,4 +23,4 @@ ws.on('message',async(data,binary)=>{
 
 });
 ws.on('error',e=>{failure=e.message});
-ws.on('close',()=>{clearTimeout(timer);console.log(JSON.stringify({ready,started,completed,speech,audio_bytes:audio,nonzero_samples:nonzero,text,transcript,partials,notificationStarted,notificationBytes,notificationNonzero,failure}));if(!ready||!started||!completed||!speech||!audio||!nonzero||!notificationStarted||!notificationBytes||!notificationNonzero||(process.env.ASSISTAI_EXPECT_TRANSCRIPT==='1'&&!transcript)||failure)process.exitCode=1});
+ws.on('close',()=>{clearTimeout(timer);console.log(JSON.stringify({ready,started,completed,speech,audio_bytes:audio,nonzero_samples:nonzero,text,notificationText,transcript,partials,notificationStarted,notificationBytes,notificationNonzero,failure}));if(!ready||!started||!completed||!speech||!audio||!nonzero||!notificationStarted||!notificationBytes||!notificationNonzero||(process.env.ASSISTAI_EXPECT_RESULT_SPOKEN==='1'&&!/BLUEBIRD/i.test(notificationText))||(process.env.ASSISTAI_EXPECT_TRANSCRIPT==='1'&&!transcript)||failure)process.exitCode=1});

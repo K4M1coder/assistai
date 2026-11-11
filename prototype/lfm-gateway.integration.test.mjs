@@ -72,7 +72,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
   });
-  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,input_transcript:true});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
+  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,input_transcript:true});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/BLUEBIRD/);assert.equal(requestNumber,3);
   await unlink(budgetPath);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
