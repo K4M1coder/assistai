@@ -14,6 +14,7 @@
 <body>
   <h1>Local Voice Prototype</h1>
   <p>Spoken language: French. This experimental client uses local services.</p>
+  <p id="mode">Detecting voice mode...</p>
   <details open><summary>Local inference services</summary><ul id="services"><li>Checking services…</li></ul><button id="refresh-services" type="button">Refresh</button></details>
   <button id="start">Start microphone</button><button id="stop" disabled>Stop microphone</button><button id="interrupt">Interrupt</button>
   <fieldset><legend>Microphone options</legend>
@@ -31,7 +32,7 @@
   <p id="status" class="status" role="status">Connecting…</p>
   <p id="partial" aria-live="polite"></p>
   <div id="log" aria-live="polite"></div>
-  <form id="form"><label for="text">Text input</label><input id="text" autocomplete="off"><label for="image">Optional image (PNG or JPEG, up to 1 MiB)</label><input id="image" type="file" accept="image/png,image/jpeg"><button>Send</button></form>
+  <form id="form"><label for="text">Text input</label><input id="text" autocomplete="off"><label for="image">Optional image (PNG or JPEG, up to 1 MiB)</label><input id="image" type="file" accept="image/png,image/jpeg"><button id="send">Send</button></form>
   <script type="module" src="/client.js"></script>
 </body>
 </html>

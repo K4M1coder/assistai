@@ -85,6 +85,7 @@ wss.on('connection', (client, req) => {
   let waitingForFinal = false;
   const runningTasks = new Map();
   const send = (value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl });
   const tool = { type: 'function', function: { name: 'delegate_task', description: 'Delegate a substantive coding or research task to the local OpenCode agent in the background. Do not use for ordinary conversation.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'The complete task for the agent' } }, required: ['task'] } } };
   const requestJson = async (url, options = {}) => {
     const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10_000) });

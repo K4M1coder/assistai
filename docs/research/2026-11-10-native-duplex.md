@@ -247,3 +247,7 @@ An optional gateway check now evaluates a recent resource snapshot and positive 
 ## EXP-060: task admission rejection and spoken explanation
 
 An isolated cascade gateway with a deliberately missing sample rejected a real text-driven delegation before creating a task. In the initial run, the voice controller incorrectly attributed the rejection to a missing or inaccessible fixture. The gateway now emits a visible `task.rejected` event and uses a fixed French resource-related explanation for this failure in cascade mode. A repeat returned that explanation, no task-start event and 240,000 bytes of speech audio. Audio was not listened to; the native speech path still depends on the model to interpret the tool error. A mock native gateway test also checks that a missing sample rejects the task and no second OpenCode request is made. This does not enforce a hard memory limit or validate speech recognition.
+
+## EXP-061: explicit client capabilities
+
+The gateway now declares voice mode and input capabilities on connection. The browser disables unavailable text and image controls in native mode and discloses that the native path emits no input transcript. A mock native-gateway integration test observed the native capability event, and a WebSocket connection to the restored real cascade observed the cascade flags. All 38 prototype tests passed. Browser-control access was unavailable, so visual rendering, live microphone capture and native browser behavior were not verified.

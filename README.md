@@ -16,6 +16,8 @@ Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech pat
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient; it does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
+The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs and indicates that an input transcript is not available.
+
 ## Getting started with the interface mockup
 
 Requirements: Node.js 22+ and npm. The existing `bun.lock` was created by an incompatible lockfile version on the tested machine; use the npm lockfile for reproducible installation.

@@ -24,6 +24,7 @@ let captureContext, playbackContext, stream, captureNode, echoBridge, referenceN
 let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
+let textInputAvailable = true;
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null;
 const pendingNotifications = [];
@@ -83,7 +84,14 @@ ws.onerror = () => status('Gateway connection failed.');
 ws.onmessage = ({ data }) => {
   if (data instanceof ArrayBuffer) { play(data, outputRate); return; }
   const event = JSON.parse(data);
-  if (event.type === 'asr.ready') { asrReady = true; status('Ready. Start the microphone to speak French.'); }
+  if (event.type === 'session.capabilities') {
+    textInputAvailable = event.text_input === true;
+    $('text').disabled = !textInputAvailable;
+    $('send').disabled = !textInputAvailable;
+    $('image').disabled = event.image_input !== true;
+    $('mode').textContent = event.mode === 'native-speech' ? 'Experimental native speech mode: speech input and output. Input transcription, text and image input are unavailable.' : 'Cascade mode: speech recognition, text controller and speech synthesis.';
+  }
+  else if (event.type === 'asr.ready') { asrReady = true; status('Ready. Start the microphone to speak French.'); }
   else if (event.type === 'asr.empty') { responsePending = false; announceWhenIdle(); }
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
@@ -135,6 +143,7 @@ $('talk').onblur = finishPushToTalk;
 window.addEventListener('blur', finishPushToTalk);
 $('form').onsubmit = async event => {
   event.preventDefault();
+  if (!textInputAvailable) { status('Text and image input are unavailable in native speech mode.'); return; }
   const text = $('text').value.trim(), file = $('image').files?.[0];
   if (!text) return;
   if (file && (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 1024 * 1024)) { status('Choose a PNG or JPEG image under 1 MiB.'); return; }

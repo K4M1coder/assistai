@@ -49,7 +49,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   let stderr='';child.stderr.on('data',x=>{stderr+=x});
   t.after(async()=>{child.kill();for(const c of wss.clients)c.terminate();await Promise.all([new Promise(r=>wss.close(r)),new Promise(r=>backend.close(r)),new Promise(r=>agent.close(r))]);});
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(`Gateway startup timeout: ${stderr}`)),5000);child.once('exit',code=>{clearTimeout(timer);reject(Error(`Gateway exited ${code}: ${stderr}`))});child.stdout.on('data',b=>{if(b.toString().includes('Experimental voice gateway')){clearTimeout(timer);resolve()}})});
-  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0;
+  const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities;
   t.after(()=>client.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Gateway integration timed out')),12000);
@@ -58,13 +58,14 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     client.on('message',(data,binary)=>{
       if(binary){if(notified)notificationAudio+=data.length;return;}
       const e=JSON.parse(data);
-      if(e.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
+      if(e.type==='session.capabilities')capabilities=e;
+      else if(e.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
       else if(e.type==='task.completed'){completed=true;assert.equal(e.text,'BLUEBIRD');maybeNotify();}
       else if(e.type==='speech.end'){if(notified){clearTimeout(timer);return resolve();}initialEnd=true;maybeNotify();}
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
   });
-  assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
+  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,input_transcript:false});assert.deepEqual(calls,['Read fixture.txt and report the secret word']);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/terminee/);assert.equal(requestNumber,3);
   await unlink(budgetPath);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
