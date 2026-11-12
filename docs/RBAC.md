@@ -18,6 +18,8 @@ When delegating, the gateway includes bounded recent session events in the OpenC
 
 A user-selected image can be sent with a spoken question in the cascade path. The gateway sends it to the configured loopback vision service; gateway event history records the question, not the image bytes. This does not constrain what the vision service itself retains, and the gateway remains unauthenticated.
 
+The synthetic spoken-image probe sends a generated red image and synthetic French audio to a separate session on the running loopback demo. The probe saves timing and resource observations, not image or audio files; the demo keeps its own volatile text events for the session.
+
 Playback-gap diagnostics stay in the local browser's conversation log; they do not record audio or create an authorization boundary.
 
 The local synthetic TTS pacing probe sends fixed, non-personal phrases to a loopback service and keeps only timing and aggregate resource logs under `.cache`; it does not open a microphone or speaker.

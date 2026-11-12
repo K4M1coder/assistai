@@ -18,7 +18,7 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is enabled in the updated port 18089 demonstration; the older port 18088 gateway does not use it.
 
-The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. This path currently has mock integration coverage, not a live voice-and-image test. Spoken output removes common markup and replaces code and links with short cues; the complete original result stays in the conversation.
+The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
 
 The browser reports detected playback gaps over 30 ms in the conversation log. This can help distinguish delivery interruptions from pronunciation problems, but does not identify their cause or measure audio quality.
 
