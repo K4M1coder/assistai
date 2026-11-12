@@ -18,6 +18,8 @@ When delegating, the gateway includes bounded recent session events in the OpenC
 
 A user-selected image can be sent with a spoken question in the cascade path. The gateway sends it to the configured loopback vision service; gateway event history records the question, not the image bytes. This does not constrain what the vision service itself retains, and the gateway remains unauthenticated.
 
+Playback-gap diagnostics stay in the local browser's conversation log; they do not record audio or create an authorization boundary.
+
 The resume key is stored in browser local storage and sent to the loopback gateway as a WebSocket subprotocol. The gateway stores a derived session identifier alongside unencrypted events, not the key itself, and rejects two concurrent connections using the same identifier. A task completion or error is sent to the currently connected holder of the same session key, if present. Scripts able to read that browser origin's local storage, local processes, and anyone with access to the SQLite database remain outside this protection. Stopping resume removes the browser key but leaves stored history; the prototype has no per-session deletion or key-recovery UI. Running-task tracking survives same-process reconnects only; notification queues are not restored and the bounded duplicate safeguards cannot guarantee idempotency.
 
 The same bearer capability also exposes a bounded snapshot of recent task events, including task text and results, to a reconnecting client. The browser renders the snapshot as text. This increases the importance of protecting the key and the local history; it is not a user identity check.

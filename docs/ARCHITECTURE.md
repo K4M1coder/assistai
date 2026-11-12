@@ -6,6 +6,8 @@ The browser client in `prototype/client` connects to the loopback gateway in `pr
 
 In cascade mode, a selected image can accompany the final transcript of the next spoken question if the gateway advertises this capability. A mock gateway integration verifies pairing; the native speech bridge does not support it. Image bytes are sent to the configured local vision endpoint and are not placed in gateway event history. The text displayed in the conversation remains original; a separate speech projection removes common markup and substitutes cues for code and links before Pocket TTS. This is heuristic and can omit content from speech.
 
+The browser detects when an audio chunk arrives more than 30 ms after the previously scheduled playback end during the same speech stream. It logs the count and longest observed gap when that stream ends. This client-clock diagnostic does not attribute gaps to synthesis, network, browser scheduling or the audio device and cannot detect pronunciation errors.
+
 ```mermaid
 flowchart LR
   U[Browser voice client] <-->|PCM and events| G[Local gateway]

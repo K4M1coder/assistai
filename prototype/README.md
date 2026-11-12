@@ -71,6 +71,8 @@ The experimental browser client has been exercised with a live microphone, but s
 
 When the cascade gateway advertises `spoken_image_input`, an image selected and loaded in the browser is attached to the next completed spoken question. It is cleared after sending; if no speech is recognized, select it again. An older gateway or native speech mode does not accept this feature. Mock integration tests verify transcript-image pairing, but real microphone, browser file selection and image understanding remain unverified. Before TTS, common Markdown, HTML, code blocks, URLs and emoji are converted or removed by a heuristic; the full original answer remains visible and the speech may omit details. See EXP-138.
 
+For diagnosing choppy playback, the client logs the number and longest duration of gaps over 30 ms between scheduled chunks within a speech stream. This uses the browser audio clock and is not a measurement of microphone input, pronunciation or actual device output. It has mock-clock coverage; browser and device behavior still need validation. See EXP-139.
+
 The client defaults to **speaker-safe mode**: it pauses microphone input while generated speech is playing to prevent acoustic feedback. Use the Interrupt button to stop the assistant and reopen the microphone. Uncheck the setting to experiment with automatic spoken interruptions; echo and false interruptions are not yet solved in that mode.
 
 On Windows, `scripts/measure-windows-memory.ps1 -ModelPid <pid>` samples dedicated and shared GPU allocations, model process memory, available physical RAM and global page-file use. Establish a baseline before starting services and compare it with sustained audio, vision and agent workloads. This is monitoring, not an automatic memory limiter.

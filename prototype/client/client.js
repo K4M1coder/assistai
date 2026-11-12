@@ -69,6 +69,7 @@ let ws, reconnectAttempts = 0;
 let captureContext, playbackContext, stream, captureNode, echoBridge, referenceNode;
 let speechOpen = false, activeSpeechTurn = null, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
+let speechHasAudio = false, playbackGapCount = 0, playbackGapMaxMs = 0;
 let asrReady = false;
 let textInputAvailable = true;
 let spokenImageAvailable = false, preparedImage = null, imageVersion = 0, spokenImageSent = false;
@@ -140,6 +141,11 @@ function play(data, rate) {
   const source = playbackContext.createBufferSource();
   source.buffer = buffer; source.connect(playbackContext.destination);
   if (referenceNode && captureContext === playbackContext) source.connect(referenceNode, 0, 1);
+  if (speechHasAudio && playbackContext.currentTime - playbackTime > 0.03) {
+    playbackGapCount++;
+    playbackGapMaxMs = Math.max(playbackGapMaxMs, (playbackContext.currentTime - playbackTime) * 1000);
+  }
+  speechHasAudio = true;
   playbackTime = Math.max(playbackTime, playbackContext.currentTime + 0.04);
   source.start(playbackTime); playbackTime += buffer.duration;
   playbackSources.add(source); source.onended = () => { playbackSources.delete(source); announceWhenIdle(); };
@@ -189,8 +195,8 @@ function handleSocketMessage({ data }) {
     }
   }
   else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
-  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
+  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'speech.cancelled') { if (currentNotification) pendingNotifications.unshift(currentNotification); currentNotification = null; stopPlayback(); }
 }
 function connectGateway() {

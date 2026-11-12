@@ -12,12 +12,15 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   class Socket { static OPEN = 1; readyState = 1; send(data) { sent.push(data); } }
   class Context {
     destination = {};
+    currentTime = 0;
     audioWorklet = { addModule: async () => {} };
     async resume() {};
     async close() {};
     createBiquadFilter() { return { frequency: {}, connect(node) { return node; } }; }
     createMediaStreamSource() { return { connect(node) { return node; } }; }
     createGain() { return { gain: {}, connect(node) { return node; } }; }
+    createBuffer(channels, length, rate) { return { duration: length / rate, getChannelData: () => new Float32Array(length) }; }
+    createBufferSource() { return { connect() {}, start() {}, stop() {} }; }
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
   class Reader { readAsDataURL() { this.result = 'data:image/png;base64,iVBORw0KGgo='; this.onload(); } }
@@ -67,6 +70,8 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   elements.image.files = [{ type:'image/png', size:8 }]; elements.image.onchange();
   elements.talk.onpointerdown({ button: 0, pointerId: 1, preventDefault() {} }); elements.talk.onpointerup();
   assert.equal(JSON.parse(sent.at(-1)).image, 'data:image/png;base64,iVBORw0KGgo=');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'gap-test', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); playbackContext.currentTime = 0.25; ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end', turn_id:'gap-test'})})", context);
+  assert.match(elements.log.textContent, /Playback detected 1 gap/);
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {
