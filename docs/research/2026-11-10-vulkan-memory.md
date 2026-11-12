@@ -29,4 +29,10 @@ The updated gateway can optionally read a sampler file using `ASSISTAI_RESOURCE_
 
 The browser-control host was unavailable, so the existing Comet desktop application was controlled using the computer-use workflow. A new local test tab opened `http://127.0.0.1:18088/` without opening the microphone or submitting a user turn. The page identified cascade mode, LFM3-1.7B Q8 and Gemma 4 12B Q4 via llama.cpp, Vosk French ASR and the Pocket TTS API. It showed session resume unavailable and resource status unavailable; the active gateway process had not been restarted and did not expose the new endpoints. The gateway serves current client files separately from its older running server code. The test tab was closed afterward; the pre-existing demo connection was not intentionally interrupted.
 
+## EXP-124: regression suite and live demo status
+
+The current local workspace passed 60 Node tests sequentially and 41 Python unit tests. The Python microphone-enrollment tests used fake devices, despite their simulated console messages. The tests include mock providers, simulated browser state and audio processing; they do not establish physical audio quality, true native full-duplex operation or a hard VRAM ceiling.
+
+The browser-control host was unavailable again, so the Windows computer-use workflow opened a temporary Comet tab to the existing `http://127.0.0.1:18088/` demo. It displayed cascade mode, the two llama.cpp model names, Vosk and Kyutai Pocket TTS, and session resume unavailable. The gateway is still the older running process and does not expose the latest resume and resource functionality. The temporary tab was closed; no microphone or model turn was started. This inspection confirms visible status only, not audio or reconnect behavior.
+
 This observation confirms only the displayed service status and disabled/unavailable UI state for the existing gateway. It does not validate the new resource endpoint, session resume in a real browser, audio quality, GPU residency, or a 24 GB hard limit.
