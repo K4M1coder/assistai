@@ -61,7 +61,9 @@ try {
   $agent = Start-Owned $opencode @('serve','--hostname','127.0.0.1','--port','18090') $workspacePath 'agent'
   $env:ASSISTAI_GATEWAY_PORT='18091'; $env:ASSISTAI_OPENCODE_URL='http://127.0.0.1:18090'; $env:ASSISTAI_LFM_REALTIME_URL=''
   $env:ASSISTAI_DB_PATH=':memory:'; $env:ASSISTAI_BUDGET_SAMPLE_PATH=$samplePath; $env:ASSISTAI_BUDGET_BASELINE_SHARED_BYTES='0'
-  $env:ASSISTAI_TASK_VRAM_ESTIMATE_BYTES=[string](128MB); $env:ASSISTAI_TASK_RAM_ESTIMATE_BYTES=[string](128MB)
+  # Conservative advisory estimates; they do not reserve memory or prove residency.
+  $env:ASSISTAI_TASK_VRAM_ESTIMATE_BYTES=[string](512MB)
+  $env:ASSISTAI_TASK_RAM_ESTIMATE_BYTES=[string]$(if ($SpokenInput) { 3GB } else { 2GB })
   $gateway = Start-Owned $node @((Join-Path $root 'prototype/gateway.mjs')) $root 'gateway'
   $deadline = [DateTime]::UtcNow.AddSeconds(20)
   do {

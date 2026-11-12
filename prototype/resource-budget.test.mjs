@@ -26,3 +26,10 @@ test('fails closed if telemetry is missing or the next allocation would consume 
   assert.equal(evaluateBudget(baseline, {}, { ...DEFAULT_BUDGET, maxDedicatedBytes: NaN }).allowed, false);
   assert.equal(evaluateBudget(baseline, {}, { ...DEFAULT_BUDGET, dedicatedReserveBytes: 25 * GiB }).allowed, false);
 });
+
+test('the spoken-trial estimate rejects the previously observed low-headroom baseline', () => {
+  const observed = { dedicatedBytes: 16066531328, sharedBytes: 184504320, baselineSharedBytes: 0, availableRamBytes: 9017307136 };
+  const decision = evaluateBudget(observed, { vramBytes: 512 * MiB, ramBytes: 3 * GiB });
+  assert.equal(decision.allowed, false);
+  assert.match(decision.reasons.join(' '), /system RAM/);
+});
