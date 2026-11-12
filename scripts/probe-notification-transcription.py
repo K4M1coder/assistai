@@ -26,7 +26,8 @@ def contains_marker(transcript, marker):
     return marker in transcript.lower().split()
 
 
-async def run(marker):
+async def run(marker, markup=False):
+    result_text = f'## Résultat\n**Le résultat est {marker}.**\n```python\nprint("ignored")\n```' if markup else f'Le résultat est {marker}.'
     with tempfile.TemporaryDirectory(prefix='notification-probe-', dir=ROOT / '.cache') as directory:
         database = str(Path(directory) / 'events.sqlite')
         with socket.socket() as reserve:
@@ -55,7 +56,7 @@ async def run(marker):
             try:
                 db.execute('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)',
                            (uuid.uuid4().hex, session, 'synthetic', 'task.completed',
-                            json.dumps({'task_id':'synthetic-task', 'text':f'Le résultat est {marker}.'}), '2026-11-12T00:00:00Z'))
+                            json.dumps({'task_id':'synthetic-task', 'text':result_text}), '2026-11-12T00:00:00Z'))
                 db.commit()
             finally:
                 db.close()
@@ -92,7 +93,7 @@ async def run(marker):
                     if event.get('type') == 'final': break
             transcript = ' '.join(parts)
             matched = contains_marker(transcript, marker)
-            print(json.dumps({'synthetic_result':f'Le résultat est {marker}.', 'asr_transcript':transcript,
+            print(json.dumps({'synthetic_result':result_text, 'asr_transcript':transcript,
                               'marker_recognized':matched, 'notification_audio_bytes':len(audio), 'sample_rate':rate,
                               'physical_audio_devices_opened':False, 'audio_saved':False}, ensure_ascii=False), flush=True)
             if not matched: raise RuntimeError('Synthetic marker was not recognized by the local ASR')
@@ -106,4 +107,6 @@ async def run(marker):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--marker', choices=('mangue', 'rouge'), default='mangue')
-    asyncio.run(run(parser.parse_args().marker))
+    parser.add_argument('--markup', action='store_true')
+    args = parser.parse_args()
+    asyncio.run(run(args.marker, args.markup))

@@ -4,6 +4,8 @@
 
 The browser client in `prototype/client` connects to the loopback gateway in `prototype/gateway.mjs`. Its current voice path is microphone PCM -> Vosk French ASR -> LFM3 text controller -> Pocket TTS -> browser audio. A separate Gemma vision/agent model serves image requests and an OpenCode harness can run background tasks. Gateway conversation and task events are stored in SQLite under `.cache/assistant` or the configured database path. Provider URLs are constrained to loopback by the gateway.
 
+In cascade mode, a selected image can accompany the final transcript of the next spoken question if the gateway advertises this capability. A mock gateway integration verifies pairing; the native speech bridge does not support it. Image bytes are sent to the configured local vision endpoint and are not placed in gateway event history. The text displayed in the conversation remains original; a separate speech projection removes common markup and substitutes cues for code and links before Pocket TTS. This is heuristic and can omit content from speech.
+
 ```mermaid
 flowchart LR
   U[Browser voice client] <-->|PCM and events| G[Local gateway]

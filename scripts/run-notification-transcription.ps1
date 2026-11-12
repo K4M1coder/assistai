@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds = 90, [ValidateSet('mangue','rouge')][string]$Marker='mangue')
+param([int]$TimeoutSeconds = 90, [ValidateSet('mangue','rouge')][string]$Marker='mangue', [switch]$Markup)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $adapter = 'luid_0x00000000_0x00013269_phys_0'
@@ -14,7 +14,9 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $root ".cache/notification-transcription-$stamp"
 $python=Join-Path $root '.venv-voice/Scripts/python.exe'
 $env:PYTHONIOENCODING='utf-8'
-$p=Start-Process -FilePath $python -ArgumentList @((Join-Path $root 'scripts/probe-notification-transcription.py'),'--marker',$Marker) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+$probeArgs=@((Join-Path $root 'scripts/probe-notification-transcription.py'),'--marker',$Marker)
+if($Markup){$probeArgs+='--markup'}
+$p=Start-Process -FilePath $python -ArgumentList $probeArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 $null=$p.Handle
 $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds); $reason='timeout'
 try {

@@ -71,6 +71,25 @@ let speechOpen = false, activeSpeechTurn = null, speaking = false, voiceFrames =
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
 let textInputAvailable = true;
+let spokenImageAvailable = false, preparedImage = null, imageVersion = 0, spokenImageSent = false;
+$('image').onchange = () => {
+  const file = $('image').files?.[0], version = ++imageVersion;
+  preparedImage = null;
+  if (!file) return;
+  if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 1024 * 1024) { status('Choose a PNG or JPEG image under 1 MiB.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => { if (version === imageVersion) { preparedImage = reader.result; status(spokenImageAvailable ? 'Image ready for your next text or spoken question.' : 'Image ready for a text question.'); } };
+  reader.onerror = () => { if (version === imageVersion) status('Could not read the selected image.'); };
+  reader.readAsDataURL(file);
+};
+function finishAudio() {
+  const selected = $('image').files?.[0];
+  const image = spokenImageAvailable && selected && preparedImage ? preparedImage : undefined;
+  if (selected && !image) status('The selected image was not sent with this spoken question.');
+  spokenImageSent = Boolean(image);
+  if (image) { $('image').value = ''; preparedImage = null; imageVersion++; }
+  send(JSON.stringify(image ? { type: 'audio.end', image } : { type: 'audio.end' }));
+}
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null;
 const pendingNotifications = [];
@@ -91,7 +110,7 @@ function finishPushToTalk() {
   pushToTalkActive = false;
   $('talk').textContent = 'Hold to talk';
   responsePending = true;
-  send(JSON.stringify({ type: 'audio.end' }));
+  finishAudio();
 }
 function stopPlayback() {
   speechOpen = false;
@@ -131,17 +150,18 @@ function handleSocketMessage({ data }) {
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
     textInputAvailable = event.text_input === true;
+    spokenImageAvailable = event.spoken_image_input === true;
     $('text').disabled = !textInputAvailable;
     $('send').disabled = !textInputAvailable;
     $('image').disabled = event.image_input !== true;
     $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
   else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
-  else if (event.type === 'asr.empty') { responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'asr.empty') { if (spokenImageSent) log('No speech was recognized. Select the image again to retry.'); spokenImageSent = false; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'transcript.empty') $('partial').textContent = '';
   else if (event.type === 'transcript.unavailable') { $('partial').textContent = ''; log('Parallel transcription unavailable for this turn.'); }
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
-  else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
+  else if (event.type === 'user.text') { spokenImageSent = false; $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
   else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
     log('Recent task history (past events; started does not confirm current status):');
@@ -182,7 +202,7 @@ function connectGateway() {
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; stopPlayback();
+    asrReady = false; spokenImageAvailable = false; stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
@@ -244,7 +264,7 @@ $('form').onsubmit = async event => {
   if (ws.readyState !== WebSocket.OPEN) { status('Disconnected. Your message has not been sent.'); return; }
   interrupt(); responsePending = true;
   send(JSON.stringify(file ? { type: 'image', text, image } : { type: 'text', text }));
-  $('text').value = ''; $('image').value = '';
+  $('text').value = ''; $('image').value = ''; preparedImage = null; imageVersion++;
 };
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
@@ -283,7 +303,7 @@ $('start').onclick = async () => {
       if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); send(JSON.stringify({ type: 'audio.start' })); }
       if (speaking) {
         silenceFrames = voice ? 0 : silenceFrames + 1;
-        if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; send(JSON.stringify({ type: 'audio.end' })); }
+        if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; finishAudio(); }
       }
       send(data);
     };
@@ -324,7 +344,7 @@ $('start').onclick = async () => {
 };
 $('stop').onclick = async () => {
   finishPushToTalk();
-  if (speaking) send(JSON.stringify({ type: 'audio.end' }));
+  if (speaking) finishAudio();
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   captureNode?.disconnect(); stream?.getTracks().forEach(track => track.stop());
   echoBridge?.close(); echoBridge = undefined; referenceNode = undefined;

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'send', 'mode', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
@@ -20,8 +20,9 @@ test('speaker-safe and held push-to-talk can work together', async () => {
     createGain() { return { gain: {}, connect(node) { return node; } }; }
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
+  class Reader { readAsDataURL() { this.result = 'data:image/png;base64,iVBORw0KGgo='; this.onload(); } }
   const stream = { active: true, getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: true }) }], getTracks: () => [] };
-  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, setInterval() {}, setTimeout: (fn, delay) => timers.push({ fn, delay }), Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
+  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, FileReader: Reader, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, setInterval() {}, setTimeout: (fn, delay) => timers.push({ fn, delay }), Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
   vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.task_history', events:[{kind:'task.completed',text:'offline result'}]})})", context);
   assert.match(elements.log.textContent, /Previous task completed: offline result/);
@@ -62,6 +63,10 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), false);
   assert.equal(elements.status.textContent, 'TTS failed');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.capabilities', mode:'cascade', text_input:true, image_input:true, spoken_image_input:true})})", context);
+  elements.image.files = [{ type:'image/png', size:8 }]; elements.image.onchange();
+  elements.talk.onpointerdown({ button: 0, pointerId: 1, preventDefault() {} }); elements.talk.onpointerup();
+  assert.equal(JSON.parse(sent.at(-1)).image, 'data:image/png;base64,iVBORw0KGgo=');
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {

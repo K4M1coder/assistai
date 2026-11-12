@@ -17,6 +17,15 @@ import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
 import { resumeSessionId } from './session-resume.mjs';
 import { createResourceStatus } from './resource-status.mjs';
+import { speechText } from './speech-text.mjs';
+
+function validImage(image) {
+  const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
+  const bytes = match ? Buffer.from(match[2], 'base64') : Buffer.alloc(0);
+  return Boolean(match && bytes.length <= 1024 * 1024 && (match[1] === 'png'
+    ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    : bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255));
+}
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -118,6 +127,7 @@ wss.on('connection', (client, req) => {
   let active;
   let segments = [];
   let waitingForFinal = false;
+  let spokenImage = null;
   let taskState = resumedSession && activeTaskSessions.get(session);
   if (!taskState) {
     taskState = { running: new Map(), completed: resumedSession && lfmRealtimeUrl ? restoreCompletedTasks(completedTaskHistory.all(session).reverse()) : new Map() };
@@ -134,7 +144,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -253,7 +263,7 @@ wss.on('connection', (client, req) => {
   };
   const streamSpeech = async (text, turn) => {
     const form = new FormData();
-    form.set('text', text);
+    form.set('text', speechText(text) || 'La réponse est affichée.');
     const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: turn.controller.signal });
     if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
     let header = Buffer.alloc(0), started = false, audioBytes = 0;
@@ -355,7 +365,9 @@ wss.on('connection', (client, req) => {
         if (event.text) segments.push(event.text);
         const text = segments.join(' ').trim();
         segments = [];
-        if (text) void respond(text);
+        const image = spokenImage; spokenImage = null;
+        if (text && image) void respondToImage(text, image);
+        else if (text) void respond(text);
         else send({ type: 'asr.empty' });
       }
     } catch { send({ type: 'error', message: 'Invalid ASR response' }); }
@@ -379,12 +391,12 @@ wss.on('connection', (client, req) => {
       return;
     }
     if (event.type === 'audio.reset' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { segments = []; asr.send(JSON.stringify({ type: 'reset' })); return; }
-    if (event.type === 'audio.end' && !waitingForFinal && asr.readyState === WebSocket.OPEN) { waitingForFinal = true; asr.send(JSON.stringify({ type: 'end' })); return; }
+    if (event.type === 'audio.end' && !waitingForFinal && asr.readyState === WebSocket.OPEN) {
+      if (event.image !== undefined && !validImage(event.image)) { segments = []; asr.send(JSON.stringify({ type: 'reset' })); send({ type: 'error', message: 'Choose a valid PNG or JPEG image under 1 MiB.' }); return; }
+      spokenImage = event.image ?? null; waitingForFinal = true; asr.send(JSON.stringify({ type: 'end' })); return;
+    }
     if (event.type === 'image') {
-      const match = typeof event.image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(event.image);
-      const bytes = match ? Buffer.from(match[2], 'base64') : Buffer.alloc(0);
-      const signature = match && (match[1] === 'png' ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255);
-      if (!signature || bytes.length > 1024 * 1024 || typeof event.text !== 'string' || !event.text.trim() || event.text.trim().length > 4000) { send({ type: 'error', message: 'Choose a PNG or JPEG image under 1 MiB and provide a question.' }); return; }
+      if (!validImage(event.image) || typeof event.text !== 'string' || !event.text.trim() || event.text.trim().length > 4000) { send({ type: 'error', message: 'Choose a PNG or JPEG image under 1 MiB and provide a question.' }); return; }
       void respondToImage(event.text.trim(), event.image);
       return;
     }
