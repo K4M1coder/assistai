@@ -56,7 +56,7 @@ On connection the gateway reports session capabilities. The browser uses them to
 
 Native task notifications retrieve only a completed task from the current gateway session, then provide at most 300 characters of its result as data to the voice model with tool calls disabled for that response. The full result is displayed separately. This bounded prompt is not a prompt-injection boundary, and generated speech can omit or distort the result.
 
-Cascade task notifications retrieve a completed event from the same session and send a normalized excerpt of at most 300 Unicode characters directly to TTS. The notification is labeled as an excerpt and the full result remains in the client. Mock-service tests cover the TTS request and rejection of another session's task ID; audible delivery and synthesis accuracy are unverified.
+Cascade task notifications retrieve a completed event from the same session and send a normalized excerpt of at most 300 Unicode characters directly to TTS. The notification is labeled as an excerpt and the full result remains in the client. Mock-service tests cover the TTS request and rejection of another session's task ID. One real-agent synthetic text run produced notification audio after completing a fixture task; audible delivery and synthesis accuracy are unverified.
 
 The cascade gateway validates its expected mono PCM16 WAV stream and treats empty or odd-byte PCM output as an error. A turn-scoped speech error clears browser playback for that turn; unrelated errors do not stop the current audio. This detects malformed or empty streams, not semantically truncated speech or arbitrary WAV variants.
 

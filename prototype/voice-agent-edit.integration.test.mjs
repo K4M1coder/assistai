@@ -20,6 +20,12 @@ test('coding probe checks delegated fixture and concurrent response using mock g
     socket.on('message', async (data, binary) => {
       if (binary) return;
       const event = JSON.parse(data.toString());
+      if (event.type === 'notification.speak') {
+        socket.send(JSON.stringify({type:'notification.started',task_id:event.task_id}));
+        socket.send(Buffer.from([1, 0, 2, 0]), {binary:true});
+        socket.send(JSON.stringify({type:'speech.end',turn_id:'notification-turn'}));
+        return;
+      }
       if (event.type !== 'text') return;
       if (first) {
         first = false;
@@ -28,9 +34,10 @@ test('coding probe checks delegated fixture and concurrent response using mock g
       } else {
         socket.send(JSON.stringify({ type: 'assistant.text', turn_id: 'followup-turn', text: 'Bonjour' }));
         socket.send(Buffer.from([1, 0, 2, 0]), { binary: true });
+        socket.send(JSON.stringify({type:'speech.end',turn_id:'followup-turn'}));
         await new Promise(resolve => setTimeout(resolve, 20));
         await writeFile(fixture, 'def add(a, b):\n    return a + b\n');
-        socket.send(JSON.stringify({ type: 'task.completed', text: 'Updated' }));
+        socket.send(JSON.stringify({ type: 'task.completed', task_id:'task-1', text: 'Updated' }));
       }
     });
   });
@@ -42,7 +49,7 @@ test('coding probe checks delegated fixture and concurrent response using mock g
     await unlink(fixture); await rmdir(directory);
   });
   const child = spawn(process.execPath, ['scripts/probe-voice-agent-edit.mjs'], {
-    env: { ...process.env, ASSISTAI_PROBE_WORKSPACE: directory,
+    env: { ...process.env, ASSISTAI_PROBE_WORKSPACE: directory, ASSISTAI_PROBE_NOTIFICATION:'1',
       ASSISTAI_TEST_VOICE_URL: `ws://127.0.0.1:${server.address().port}/voice` },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
@@ -55,5 +62,7 @@ test('coding probe checks delegated fixture and concurrent response using mock g
   assert.equal(result.followup_before_completion, true);
   assert.equal(result.static_fixture_check_exit, 0);
   assert.equal(result.task_count, 1);
+  assert.equal(result.notification_started, true);
+  assert.equal(result.notification_audio_bytes, 4);
   assert.match(error, /"event":"task.started"/);
 });

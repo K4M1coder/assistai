@@ -19,13 +19,35 @@ if (path.dirname(file) !== workspace) throw Error('Fixture must be inside the se
 assert.match(await readFile(file, 'utf8'), /return\s+a\s*-\s*b/, 'Fixture must start with the known subtraction bug');
 
 const socket = new WebSocket(gatewayUrl);
+const checkNotification = process.env.ASSISTAI_PROBE_NOTIFICATION === '1';
 const startedAt = performance.now();
 const timer = setTimeout(() => { console.error('Timed out waiting for edit task'); process.exitCode = 1; socket.terminate(); }, 120000);
 let sent = false, taskCount = 0, taskStart = null, taskEnd = null, followup = null, audioBytes = 0, task = '', taskTurn = null;
+let followupFinished = false, completed = null, notificationRequested = false, notificationStarted = false, notificationAudioBytes = 0;
+function requestNotificationWhenReady() {
+  if (checkNotification && completed && followupFinished && !notificationRequested) {
+    notificationRequested = true;
+    socket.send(JSON.stringify({ type: 'notification.speak', task_id: completed.task_id }));
+  }
+}
+function finish() {
+  clearTimeout(timer);
+  socket.close();
+  const check = spawnSync(process.env.ASSISTAI_PYTHON ?? '.venv-voice/Scripts/python.exe',
+    ['-I', 'scripts/verify-add-fixture.py', file], { encoding: 'utf8', timeout: 5000 });
+  const result = { task_count: taskCount, task_start_ms: taskStart, task_end_ms: taskEnd,
+    followup_ms: followup, followup_before_completion: followup !== null && followup < taskEnd,
+    task_mentions_fixture: /calculator\.py/i.test(task), audio_bytes: audioBytes,
+    notification_requested: checkNotification, notification_started: notificationStarted, notification_audio_bytes: notificationAudioBytes,
+    static_fixture_check_exit: check.status, static_fixture_check_error: check.stderr.trim(),
+    note: 'Synthetic text and a disposable fixture; static arithmetic check is not an OS sandbox or a general coding benchmark.' };
+  console.log(JSON.stringify(result));
+  if (taskCount !== 1 || !result.task_mentions_fixture || !result.followup_before_completion || audioBytes === 0 || check.status !== 0 || (checkNotification && (!notificationStarted || !notificationAudioBytes))) process.exitCode = 1;
+}
 socket.on('message', async (data, binary) => {
-  if (binary) { audioBytes += data.length; return; }
+  if (binary) { audioBytes += data.length; if (notificationStarted) notificationAudioBytes += data.length; return; }
   const event = JSON.parse(data.toString());
-  if (['asr.ready', 'task.started', 'task.completed', 'task.error', 'task.rejected', 'assistant.text', 'error'].includes(event.type)) {
+  if (['asr.ready', 'task.started', 'task.completed', 'task.error', 'task.rejected', 'assistant.text', 'notification.started', 'notification.rejected', 'speech.end', 'error'].includes(event.type)) {
     console.error(JSON.stringify({ event: event.type, elapsed_ms: Math.round(performance.now() - startedAt), turn_id: event.turn_id ?? null }));
   }
   if (event.type === 'asr.ready' && !sent) {
@@ -38,18 +60,14 @@ socket.on('message', async (data, binary) => {
     followup = Math.round(performance.now() - startedAt);
   } else if (event.type === 'task.completed') {
     taskEnd = Math.round(performance.now() - startedAt);
-    clearTimeout(timer);
-    socket.close();
-    const check = spawnSync(process.env.ASSISTAI_PYTHON ?? '.venv-voice/Scripts/python.exe',
-      ['-I', 'scripts/verify-add-fixture.py', file], { encoding: 'utf8', timeout: 5000 });
-    const result = { task_count: taskCount, task_start_ms: taskStart, task_end_ms: taskEnd,
-      followup_ms: followup, followup_before_completion: followup !== null && followup < taskEnd,
-      task_mentions_fixture: /calculator\.py/i.test(task), audio_bytes: audioBytes,
-      static_fixture_check_exit: check.status, static_fixture_check_error: check.stderr.trim(),
-      note: 'Synthetic text and a disposable fixture; static arithmetic check is not an OS sandbox or a general coding benchmark.' };
-    console.log(JSON.stringify(result));
-    if (taskCount !== 1 || !result.task_mentions_fixture || !result.followup_before_completion || audioBytes === 0 || check.status !== 0) process.exitCode = 1;
-  } else if (event.type === 'error' || event.type === 'task.error') {
+    completed = event;
+    if (!checkNotification) finish(); else requestNotificationWhenReady();
+  } else if (event.type === 'notification.started') {
+    notificationStarted = true;
+  } else if (event.type === 'speech.end') {
+    if (notificationStarted) finish();
+    else if (followup !== null && event.turn_id && event.turn_id !== taskTurn) { followupFinished = true; requestNotificationWhenReady(); }
+  } else if (event.type === 'error' || event.type === 'task.error' || event.type === 'task.rejected' || event.type === 'notification.rejected') {
     clearTimeout(timer); console.error(JSON.stringify({ type: event.type, message: event.message }));
     process.exitCode = 1; socket.close();
   }

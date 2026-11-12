@@ -2,9 +2,11 @@ param(
   [Parameter(Mandatory=$true)][string]$Workspace,
   [int]$TimeoutSeconds = 120,
   [switch]$PreflightOnly,
-  [switch]$SpokenInput
+  [switch]$SpokenInput,
+  [switch]$Notification
 )
 $ErrorActionPreference = 'Stop'
+if ($SpokenInput -and $Notification) { throw 'Notification probing is currently supported only for text input' }
 $root = Split-Path -Parent $PSScriptRoot
 $workspacePath = (Resolve-Path -LiteralPath $Workspace).Path
 $cachePath = (Resolve-Path -LiteralPath (Join-Path $root '.cache')).Path
@@ -73,6 +75,7 @@ try {
   } until ($healthy -or [DateTime]::UtcNow -gt $deadline)
   if (!$healthy) { throw 'Gateway startup timeout' }
   $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL='ws://127.0.0.1:18091/voice'
+  $env:ASSISTAI_PROBE_NOTIFICATION=if($Notification){'1'}else{'0'}
   if ($SpokenInput) {
     $python = Join-Path $root '.venv-voice/Scripts/python.exe'
     $probe = Start-Owned $python @((Join-Path $root 'scripts/probe-spoken-agent-edit.py')) $root 'probe'
