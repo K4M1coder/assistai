@@ -1,5 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$Workspace,
+  [ValidateRange(1024,65535)][int]$AgentPort = 18090,
+  [ValidateRange(1024,65535)][int]$GatewayPort = 18091,
   [int]$TimeoutSeconds = 120,
   [switch]$PreflightOnly,
   [switch]$SpokenInput,
@@ -11,9 +13,10 @@ $workspacePath = (Resolve-Path -LiteralPath $Workspace).Path
 $cachePath = (Resolve-Path -LiteralPath (Join-Path $root '.cache')).Path
 if (!$workspacePath.StartsWith($cachePath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Workspace must be inside .cache' }
 foreach ($file in @('calculator.py','opencode.json')) { if (!(Test-Path -LiteralPath (Join-Path $workspacePath $file))) { throw "Missing fixture: $file" } }
-if (Get-NetTCPConnection -LocalPort 18090,18091 -State Listen -ErrorAction SilentlyContinue) { throw 'Trial ports are already in use' }
+if ($AgentPort -eq $GatewayPort) { throw 'Trial ports must be different' }
+if (Get-NetTCPConnection -LocalPort @($AgentPort,$GatewayPort) -State Listen -ErrorAction SilentlyContinue) { throw 'Trial ports are already in use' }
 $adapter = 'luid_0x00000000_0x00013269_phys_0'
-$trackedIds = @((Get-NetTCPConnection -LocalPort 18080,18081,18082,18084,18085,18088 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique)
+$trackedIds = @((Get-NetTCPConnection -LocalPort 18080,18081,18082,18084,18085,18088,18089,18090,18091 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique)
 $children = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 function Sample-Resources {
   $samples = @((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
@@ -59,8 +62,8 @@ try {
   Save-Sample $initial
   $opencode = Join-Path $root 'node_modules/opencode-ai/bin/opencode.exe'
   $node = (Get-Command node.exe).Source
-  $agent = Start-Owned $opencode @('serve','--hostname','127.0.0.1','--port','18090') $workspacePath 'agent'
-  $env:ASSISTAI_GATEWAY_PORT='18091'; $env:ASSISTAI_OPENCODE_URL='http://127.0.0.1:18090'; $env:ASSISTAI_LFM_REALTIME_URL=''
+  $agent = Start-Owned $opencode @('serve','--hostname','127.0.0.1','--port',[string]$AgentPort) $workspacePath 'agent'
+  $env:ASSISTAI_GATEWAY_PORT=[string]$GatewayPort; $env:ASSISTAI_OPENCODE_URL="http://127.0.0.1:$AgentPort"; $env:ASSISTAI_LFM_REALTIME_URL=''
   $env:ASSISTAI_DB_PATH=':memory:'; $env:ASSISTAI_BUDGET_SAMPLE_PATH=$samplePath; $env:ASSISTAI_BUDGET_BASELINE_SHARED_BYTES='0'
   # Conservative advisory estimates; they do not reserve memory or prove residency.
   $env:ASSISTAI_TASK_VRAM_ESTIMATE_BYTES=[string](512MB)
@@ -70,10 +73,10 @@ try {
   do {
     $sample = Sample-Resources; Save-Sample $sample; Assert-Resources $sample 6GB
     if ($agent.HasExited -or $gateway.HasExited) { throw 'Trial service exited during startup' }
-    try { $healthy = (Invoke-RestMethod -Uri 'http://127.0.0.1:18091/health' -TimeoutSec 2).status -eq 'running' } catch { $healthy = $false }
+    try { $healthy = (Invoke-RestMethod -Uri "http://127.0.0.1:$GatewayPort/health" -TimeoutSec 2).status -eq 'running' } catch { $healthy = $false }
   } until ($healthy -or [DateTime]::UtcNow -gt $deadline)
   if (!$healthy) { throw 'Gateway startup timeout' }
-  $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL='ws://127.0.0.1:18091/voice'
+  $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL="ws://127.0.0.1:$GatewayPort/voice"
   $env:ASSISTAI_PROBE_NOTIFICATION=if($Notification){'1'}else{'0'}
   if ($SpokenInput) {
     $python = Join-Path $root '.venv-voice/Scripts/python.exe'

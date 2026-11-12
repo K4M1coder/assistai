@@ -40,6 +40,8 @@ Gateway service discovery identifies native speech inference and an optional par
 
 An experimental coding probe targets a separately configured disposable workspace and validates a narrow arithmetic fixture without executing generated code. One guarded real cascade run delegated and completed the fix while producing a separate follow-up response and audio; an earlier run was stopped below the RAM reserve. Input was synthetic text, the audio was not listened to, and these results do not establish general coding quality or an OS sandbox.
 
+The Windows trial accepts explicit distinct agent and gateway ports, checks they are free, and tracks its own processes. This permits a trial alongside existing demo listeners when resource preflight succeeds; port separation does not isolate memory or grant filesystem confinement.
+
 A synthetic French audio variant reached ASR, task delegation and a distinct follow-up response, but was stopped below the RAM reserve before the fixture was fixed. The recorded events did not preserve the transcription for that interrupted run. This is not a completed spoken coding test.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.
