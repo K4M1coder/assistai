@@ -30,6 +30,8 @@ In a synthetic spoken follow-up, the cascade recalled one colour after reconnect
 
 For resumable sessions, the updated browser displays a bounded recent task-event history on reconnect, including recorded offline completions. Mock tests cover session separation and file-backed restart; this does not replay missed spoken notifications.
 
+The updated cascade gateway can speak a short excerpt of a completed agent result. This notification path has mock-service coverage; it is not yet active in the older running demo or verified by listening.
+
 The updated browser also retries ordinary gateway disconnects and preserves unsent text. If the microphone was enabled, it resumes sending when recognition is ready. Reconnect behavior currently has simulated-browser and mock-service evidence only.
 
 In one short synthetic run with the cascade, an agent task and CPU speaker extraction, sampled dedicated GPU use peaked at 14.86 GiB. Sampling cannot prove a 24 GB hard ceiling or rule out RAM or disk spill; see the [measurement limitations](docs/research/2026-11-10-noisy-room.md#exp-094-concurrent-extractor-and-system-memory-sampling).

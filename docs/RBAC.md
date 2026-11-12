@@ -32,13 +32,15 @@ The optional native-mode transcription sidecar receives the same captured audio 
 
 Native task notifications retrieve completed results only from the current gateway session and disable tool calls for the notification response. Result text remains untrusted model input; these restrictions do not provide authentication, sandboxing or complete prompt-injection protection.
 
+Cascade notifications can speak a bounded excerpt of a completed result from the same gateway session. That sends task-result text to the configured local TTS service and makes it audible on the selected output device. Same-session scoping is not user authentication, and output may contain sensitive task data.
+
 Reset context may also contain untrusted task results and approximate transcripts. Labeling them as data does not prevent prompt injection; the replacement speech session may use tools under the existing harness permissions.
 
 Real-model synthetic reset tests repeated an already completed task. After a native reset, exact normalized requests can now reuse a session-local completed result unless the model sets a rerun flag; a single regression succeeded. A mock-service test covers reconstruction after reconnect from bounded same-session history. Different wording, in-flight work, incomplete history, cache eviction or an incorrect model-selected rerun flag can still repeat work. Reuse can also return stale information. This is not an authorization or idempotency guarantee; broader harness permissions could make repeated work consequential.
 
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 
-The prepared voice-to-agent coding probe requires an explicitly selected `.cache` workspace and a separately configured gateway and harness. Its static arithmetic checker avoids executing the generated fixture but does not confine the harness. The real end-to-end edit has not yet been run; the current demo's read-only fixture remains unchanged.
+The prepared voice-to-agent coding probe requires an explicitly selected `.cache` workspace and a separately configured gateway and harness. Its static arithmetic checker avoids executing the generated fixture but does not confine the harness. One synthetic text-driven real-agent edit passed; a synthetic spoken-input attempt stopped below the RAM reserve before completion. The current demo's read-only fixture remains unchanged.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
 

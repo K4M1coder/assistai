@@ -65,8 +65,13 @@ test('opt-in session resume isolates clients and restores bounded history after 
   });
   const llmPort = await listen(llm);
   const wav = Buffer.alloc(48); wav.write('RIFF', 0); wav.write('WAVE', 8); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt16LE(16, 34); wav.write('data', 36);
-  let ttsBytes = wav.length;
-  const tts = http.createServer((req, res) => { req.resume(); res.end(wav.subarray(0, ttsBytes)); });
+  let ttsBytes = wav.length, lastTtsText = '';
+  const tts = http.createServer(async (req, res) => {
+    const parts = []; for await (const part of req) parts.push(part);
+    const form = await new Response(Buffer.concat(parts), { headers: { 'content-type': req.headers['content-type'] } }).formData();
+    lastTtsText = form.get('text');
+    res.end(wav.subarray(0, ttsBytes));
+  });
   const ttsPort = await listen(tts);
   const asr = http.createServer(); const sockets = new WebSocketServer({ server: asr });
   sockets.on('connection', socket => socket.send(JSON.stringify({ type: 'ready' })));
@@ -111,11 +116,29 @@ test('opt-in session resume isolates clients and restores bounded history after 
   writer.close();
   const resumed = await connect(port, tokenA);
   assert.ok(resumed.taskHistory.some(event => event.kind === 'task.completed' && event.text === 'OFFLINE RESULT'));
+  await new Promise((resolve, reject) => {
+    let started = false;
+    const timer = setTimeout(() => reject(Error('Notification timed out')), 5000);
+    const handler = (data, binary) => {
+      if (binary) return; const event = JSON.parse(data.toString());
+      if (event.type === 'notification.started') started = true;
+      if (event.type === 'speech.end' && started) { clearTimeout(timer); resumed.off('message', handler); resolve(); }
+      if (event.type === 'notification.rejected' || event.type === 'error') { clearTimeout(timer); reject(Error(JSON.stringify(event))); }
+    };
+    resumed.on('message', handler);
+    resumed.send(JSON.stringify({type:'notification.speak',task_id:'offline-task'}));
+  });
+  assert.match(lastTtsText, /OFFLINE RESULT/);
   await turn(resumed, 'follow-up');
   assert.ok(prompts.at(-1).some(message => message.content === marker));
   resumed.close(); await once(resumed, 'close');
   const b = await connect(port, tokenB);
   assert.equal(b.taskHistory, undefined);
+  const rejected = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error('Cross-session notification was not rejected')), 5000);
+    b.on('message',(data,binary)=>{if(!binary && JSON.parse(data.toString()).type === 'notification.rejected'){clearTimeout(timer);resolve();}});
+  });
+  b.send(JSON.stringify({type:'notification.speak',task_id:'offline-task'})); await rejected;
   await turn(b, 'different session');
   assert.ok(!prompts.at(-1).some(message => message.content === marker));
   b.close(); await once(b, 'close');

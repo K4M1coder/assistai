@@ -11,6 +11,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { getServiceStatus } from './service-status.mjs';
 import { attachLfmBridge } from './lfm-bridge.mjs';
 import { normalizeTask, restoreCompletedTasks } from './completed-task-cache.mjs';
+import { formatTaskNotification } from './task-notification.mjs';
 import { createTaskAdmission } from './task-admission.mjs';
 import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
@@ -364,12 +365,12 @@ wss.on('connection', (client, req) => {
     try { event = JSON.parse(data.toString()); } catch { client.close(1003, 'Invalid JSON'); return; }
     if (event.type === 'interrupt') { cancel(event.reason === 'voice_activity' ? 'voice_activity' : 'manual'); return; }
     if (event.type === 'notification.speak' && typeof event.task_id === 'string') {
-      const exists = taskHistory.all(session).some(row => row.kind === 'task.completed' && JSON.parse(row.payload).task_id === event.task_id);
-      if (!exists || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id }); return; }
+      const completed = taskHistory.all(session).filter(row => row.kind === 'task.completed').map(row => JSON.parse(row.payload)).find(payload => payload.task_id === event.task_id);
+      if (!completed || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id }); return; }
       const turn = { id: randomUUID(), controller: new AbortController() };
       active = turn;
       send({ type: 'notification.started', task_id: event.task_id, turn_id: turn.id });
-      void streamSpeech('La tâche en arrière-plan est terminée. Le résultat est affiché.', turn).catch(error => {
+      void streamSpeech(formatTaskNotification(completed.text), turn).catch(error => {
         if (active === turn) { active = undefined; send({ type: 'error', turn_id: turn.id, message: String(error) }); }
       });
       return;
