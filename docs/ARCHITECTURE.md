@@ -48,7 +48,7 @@ A later guarded synthetic spoken coding run recorded a distorted filename and lo
 
 A separate guarded ASR probe prepares fixed synthetic French cases for operation direction, negation and a filename without launching an agent. Its metrics include word error and token order but do not establish semantic equivalence or live-microphone accuracy. Its first preflight did not meet the 8 GiB RAM threshold.
 
-The gateway can request OpenCode cancellation for an active task ID belonging to the current session. A positive abort response is reported only as a request, not verified termination; the normal status poll remains responsible for terminal events and resource-estimate release. The browser exposes the latest task only. Mock integration covers session scoping and retention after uncertain status; there is no live-agent cancellation validation or rollback.
+The gateway can request OpenCode cancellation for an active task ID belonging to the current session. A positive abort response is reported only as a request, not verified termination; the normal status poll remains responsible for terminal events and resource-estimate release. The browser tracks concurrently started tasks and targets the most recent one without an outstanding cancellation request. Mock integration covers session scoping and retention after uncertain status; there is no live-agent cancellation validation or rollback.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.
 

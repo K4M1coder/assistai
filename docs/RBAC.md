@@ -64,6 +64,8 @@ The synthetic ASR coding probe sends fixed phrases only to loopback speech servi
 
 The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
 
+The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.

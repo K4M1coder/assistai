@@ -80,6 +80,12 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   elements['stop-task'].onclick();
   assert.deepEqual(JSON.parse(sent.at(-1)), {type:'task.cancel',task_id:'agent-1'});
   assert.equal(elements['stop-task'].disabled, true);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.started',task_id:'agent-2',task:'second'})}); ws.onmessage({data: JSON.stringify({type:'task.started',task_id:'agent-3',task:'third'})}); ws.onmessage({data: JSON.stringify({type:'task.completed',task_id:'agent-3',text:'done'})})", context);
+  assert.equal(elements['stop-task'].disabled, false);
+  elements['stop-task'].onclick();
+  assert.deepEqual(JSON.parse(sent.at(-1)), {type:'task.cancel',task_id:'agent-2'});
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.cancel_rejected',task_id:'agent-2',message:'retry'})})", context);
+  assert.equal(elements['stop-task'].disabled, false);
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {

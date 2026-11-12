@@ -93,11 +93,15 @@ function finishAudio() {
 }
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null;
-let latestTaskId = null, taskCancelAvailable = false;
+let taskCancelAvailable = false;
+const activeTaskIds = new Set(), cancellationRequested = new Set();
+function latestCancellableTask() { return [...activeTaskIds].reverse().find(id => !cancellationRequested.has(id)); }
+function refreshTaskButton() { $('stop-task').disabled = !taskCancelAvailable || !latestCancellableTask(); }
 $('stop-task').onclick = () => {
-  if (!latestTaskId || ws.readyState !== WebSocket.OPEN) return;
-  send(JSON.stringify({ type: 'task.cancel', task_id: latestTaskId }));
-  $('stop-task').disabled = true;
+  const taskId = latestCancellableTask();
+  if (!taskId || ws.readyState !== WebSocket.OPEN) return;
+  cancellationRequested.add(taskId); refreshTaskButton();
+  send(JSON.stringify({ type: 'task.cancel', task_id: taskId }));
 };
 const pendingNotifications = [];
 let notificationRetries = 0;
@@ -167,6 +171,7 @@ function handleSocketMessage({ data }) {
     textInputAvailable = event.text_input === true;
     spokenImageAvailable = event.spoken_image_input === true;
     taskCancelAvailable = event.task_cancel === true;
+    refreshTaskButton();
     $('text').disabled = !textInputAvailable;
     $('send').disabled = !textInputAvailable;
     $('image').disabled = event.image_input !== true;
@@ -187,11 +192,11 @@ function handleSocketMessage({ data }) {
       else if (item.kind === 'task.error') log(`Previous task error: ${item.text}`);
     }
   }
-  else if (event.type === 'task.started') { latestTaskId = event.task_id; $('stop-task').disabled = !latestTaskId || !taskCancelAvailable; log(`Agent started: ${event.task}`); }
+  else if (event.type === 'task.started') { if (event.task_id) activeTaskIds.add(event.task_id); refreshTaskButton(); log(`Agent started: ${event.task}`); }
   else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
-  else if (event.type === 'task.completed') { if (event.task_id === latestTaskId) { latestTaskId = null; $('stop-task').disabled = true; } log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
-  else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected' && event.task_id === latestTaskId) $('stop-task').disabled = false; }
+  else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
+  else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
   else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; notificationPending = false; responsePending = true; }
   else if (event.type === 'notification.rejected') {
     if (!notificationPending || pendingNotifications[0] !== event.task_id) return;
@@ -205,7 +210,7 @@ function handleSocketMessage({ data }) {
       announceWhenIdle();
     }
   }
-  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error' && event.task_id === latestTaskId) { latestTaskId = null; $('stop-task').disabled = true; } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
+  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
   else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'speech.cancelled') { if (currentNotification) pendingNotifications.unshift(currentNotification); currentNotification = null; stopPlayback(); }
@@ -219,7 +224,7 @@ function connectGateway() {
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; spokenImageAvailable = false; taskCancelAvailable = false; latestTaskId = null; $('stop-task').disabled = true; stopPlayback();
+    asrReady = false; spokenImageAvailable = false; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
