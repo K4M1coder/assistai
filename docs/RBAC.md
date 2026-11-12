@@ -34,6 +34,8 @@ Native task notifications retrieve completed results only from the current gatew
 
 Cascade notifications can speak a bounded excerpt of a completed result from the same gateway session. That sends task-result text to the configured local TTS service and makes it audible on the selected output device. Same-session scoping is not user authentication, and output may contain sensitive task data.
 
+The port 18089 Windows demo launcher uses the existing read-only OpenCode fixture and volatile gateway history; enabling session resume in the browser does not make that memory durable across gateway restarts. The local gateway and OpenCode server remain unauthenticated local services. Advisory resource admission and session capabilities are not RBAC or a sandbox.
+
 Reset context may also contain untrusted task results and approximate transcripts. Labeling them as data does not prevent prompt injection; the replacement speech session may use tools under the existing harness permissions.
 
 Real-model synthetic reset tests repeated an already completed task. After a native reset, exact normalized requests can now reuse a session-local completed result unless the model sets a rerun flag; a single regression succeeded. A mock-service test covers reconstruction after reconnect from bounded same-session history. Different wording, in-flight work, incomplete history, cache eviction or an incorrect model-selected rerun flag can still repeat work. Reuse can also return stale information. This is not an authorization or idempotency guarantee; broader harness permissions could make repeated work consequential.
