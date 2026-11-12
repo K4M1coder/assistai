@@ -48,7 +48,7 @@ try {
       }
     } else {
       $probe.Refresh()
-      if($probe.HasExited){$reason=if($probe.ExitCode -eq 0){'probe returned zero; inspect output for correctness'}else{"probe failed: $($probe.ExitCode)"};break}
+      if($probe.HasExited){$reason=if($probe.ExitCode -eq 0){'tool-call probe passed'}else{"probe failed: $($probe.ExitCode)"};break}
     }
   }
   if($reason -eq 'not started'){throw 'Trial timed out'}
@@ -57,4 +57,4 @@ finally {
   foreach($p in @($probe,$server)){if($null -ne $p){$p.Refresh();if(!$p.HasExited){Stop-Process -Id $p.Id -Force;$p.WaitForExit()}}}
 }
 @{ reason=$reason; checkpoints=$Checkpoints; baseline=$baseline; samples="$prefix.samples.jsonl"; serverStderr="$prefix.server.stderr"; probeStdout="$prefix.probe.stdout" } | ConvertTo-Json -Compress -Depth 5
-if($reason -ne 'probe returned zero; inspect output for correctness'){exit 1}
+if($reason -ne 'tool-call probe passed'){exit 1}
