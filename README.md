@@ -18,6 +18,8 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is enabled in the updated port 18089 demonstration; the older port 18088 gateway does not use it.
 
+When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
+
 The updated gateway displays sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The older port 18088 gateway does not expose this endpoint.
 
 When a new agent task is dispatched, the gateway includes a bounded selection of recent conversation and task events as untrusted background. In one synthetic test the real local agent returned a random code supplied only in an earlier session message; the voice controller was mocked. An opt-in session-resume experiment can restore recent history after browser reloads, and after gateway restart when using file-backed history. A real cascade controller recalled a synthetic code after reconnecting in one explicit-endpoint test. This is not a complete shared memory or prompt-injection boundary. The updated port 18089 demo uses volatile history; the older gateway does not support resume.

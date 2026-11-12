@@ -28,13 +28,16 @@ const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
 const lfmTranscriptUrl = process.env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
 const sessionResumeEnabled = process.env.ASSISTAI_ENABLE_SESSION_RESUME === '1';
-const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission({
+const admissionConfig = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? {
   samplePath: process.env.ASSISTAI_BUDGET_SAMPLE_PATH,
   baselineSharedBytes: Number(process.env.ASSISTAI_BUDGET_BASELINE_SHARED_BYTES ?? NaN),
   requestedVramBytes: Number(process.env.ASSISTAI_TASK_VRAM_ESTIMATE_BYTES ?? NaN),
   requestedRamBytes: Number(process.env.ASSISTAI_TASK_RAM_ESTIMATE_BYTES ?? NaN),
-}) : null;
-const getResources = createResourceStatus({ samplePath: process.env.ASSISTAI_RESOURCE_STATUS_PATH || process.env.ASSISTAI_BUDGET_SAMPLE_PATH, admissionEnabled: Boolean(admitTask) });
+} : null;
+const admitTask = admissionConfig ? createTaskAdmission(admissionConfig) : null;
+const resourceSamplePath = process.env.ASSISTAI_RESOURCE_STATUS_PATH || process.env.ASSISTAI_BUDGET_SAMPLE_PATH;
+const getResources = createResourceStatus({ samplePath: resourceSamplePath, admissionEnabled: Boolean(admitTask),
+  taskEstimate: resourceSamplePath === admissionConfig?.samplePath ? admissionConfig : undefined });
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
 if (lfmTranscriptUrl && !['ws:', 'wss:'].includes(new URL(lfmTranscriptUrl).protocol)) throw new Error('Transcript URL must use WebSocket');

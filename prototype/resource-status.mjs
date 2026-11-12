@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { DEFAULT_BUDGET } from './resource-budget.mjs';
+import { DEFAULT_BUDGET, evaluateBudget } from './resource-budget.mjs';
 
 // Snapshot reporting only. It cannot enforce limits or attribute allocations.
-export function createResourceStatus({ samplePath, admissionEnabled = false, maxAgeMs = 5000, read = readFile, now = Date.now } = {}) {
+export function createResourceStatus({ samplePath, admissionEnabled = false, taskEstimate, maxAgeMs = 5000, read = readFile, now = Date.now } = {}) {
   return async () => {
     const base = { admission: admissionEnabled ? 'advisory' : 'disabled', hard_limit_enforced: false };
     if (!samplePath) return { ...base, status: 'unavailable', reason: 'Resource sampling is not configured' };
@@ -16,9 +16,16 @@ export function createResourceStatus({ samplePath, admissionEnabled = false, max
       const reasons = [];
       if (sample.availableRamBytes < DEFAULT_BUDGET.minAvailableRamBytes) reasons.push('Available system RAM is below the 6 GiB reserve');
       if (sample.dedicatedBytes > DEFAULT_BUDGET.maxDedicatedBytes - DEFAULT_BUDGET.dedicatedReserveBytes) reasons.push('Dedicated GPU use exceeds the 22 GiB planning threshold');
+      let singleTaskEstimate;
+      if (admissionEnabled && taskEstimate) {
+        const decision = evaluateBudget({ ...sample, baselineSharedBytes: taskEstimate.baselineSharedBytes },
+          { vramBytes: taskEstimate.requestedVramBytes, ramBytes: taskEstimate.requestedRamBytes }, DEFAULT_BUDGET);
+        singleTaskEstimate = { status: decision.allowed ? 'headroom_observed' : 'insufficient', reasons: decision.reasons };
+      }
       return { ...base, status: reasons.length ? 'low' : 'observed', observed_at: sample.observedAt,
         dedicated_bytes: sample.dedicatedBytes, shared_bytes: sample.sharedBytes,
-        available_ram_bytes: sample.availableRamBytes, reasons };
+        available_ram_bytes: sample.availableRamBytes, reasons,
+        ...(singleTaskEstimate ? { single_task_estimate: singleTaskEstimate } : {}) };
     } catch { return { ...base, status: 'unavailable', reason: 'Resource sample is missing or invalid' }; }
   };
 }

@@ -46,6 +46,8 @@ The Windows native client optionally feeds explicit local enrollment into a CPU 
 
 An optional `/resources` status endpoint reads a separately configured recent sampler file and exposes sampled whole-adapter dedicated/shared GPU use and available system RAM to the browser. It reports low-reserve, stale and unavailable states and distinguishes disabled from advisory task admission. This is read-only telemetry: it neither reserves memory nor proves model residency, prevents paging, or enforces a hard GPU budget.
 
+If reporting and admission read the same sample, the endpoint also evaluates the configured estimate for one task against that snapshot. It excludes process-local active task estimates and can differ from the subsequent admission decision; a changed sample or concurrent work can also change the result. A separate reporting sample produces no projection.
+
 A separate opt-in Windows command records an enrollment WAV from the default WASAPI microphone to a new local file. The command buffers capture before exclusive creation, rejects device overflow and does not manage subsequent file retention; its fake-device tests do not establish real-device performance or enrollment quality.
 
 A standalone LocalVQE physical probe uses timestamped WASAPI callbacks, estimates delay and processes a bounded in-memory capture offline. One uncontrolled test could not accept a delay estimate or demonstrate physical echo cancellation. This research path is separate from the live client and does not implement live audio alignment or interruption.

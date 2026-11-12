@@ -6,6 +6,8 @@ The experimental voice gateway, including its opt-in LFM realtime path, does not
 
 When configured, the read-only resource endpoint exposes aggregate memory telemetry to clients that can reach the local gateway; it does not expose the sampler file path or apply a permission check. Resource reporting and advisory admission are not access-control or hard resource-isolation boundaries.
 
+The optional one-task headroom projection is also unauthenticated telemetry, not an allocation or permission to execute a task.
+
 The experimental Windows native client opens the default microphone and speaker only when explicitly run; its synthetic tests and format checks do not open physical devices. A separate physical AEC probe opened them and retained aggregate levels only, without saving captured audio. A physical gateway-client test used a separate local SQLite database for transcripts; automatic cleanup was blocked by the execution environment, so that test database remains in `.cache/physical-native-probe-20261111/events.sqlite`. The client only accepts loopback gateway URLs and does not add authentication, change gateway permissions or provide an OS sandbox. Experimental AEC loads a pinned local research dependency.
 
 An optional `ASSISTAI_DB_PATH=:memory:` setting keeps gateway SQLite events in a volatile process-local database. It is not authentication or secure erasure, and cannot rule out operating-system paging or data retained by other components. The physical probe requires a gateway that reports volatile storage before it opens devices; that unauthenticated report is a convenience check, not a security boundary.

@@ -25,6 +25,21 @@ test('reports fresh snapshot as observed without promising future headroom', asy
   assert.equal(status.hard_limit_enforced, false);
 });
 
+test('projects one task using the admission budget without counting active reservations', async () => {
+  const taskEstimate = { baselineSharedBytes: 0, requestedVramBytes: 0.5 * GiB, requestedRamBytes: 3 * GiB };
+  const make = current => createResourceStatus({ samplePath: 'sample', admissionEnabled: true, taskEstimate,
+    read: async () => JSON.stringify(current), now: clock })();
+  const tight = await make({ ...sample, availableRamBytes: 8.9 * GiB });
+  assert.equal(tight.status, 'observed');
+  assert.equal(tight.single_task_estimate.status, 'insufficient');
+  assert.match(tight.single_task_estimate.reasons.join(' '), /RAM/);
+  const room = await make({ ...sample, availableRamBytes: 10 * GiB });
+  assert.equal(room.single_task_estimate.status, 'headroom_observed');
+  const shared = await make({ ...sample, availableRamBytes: 10 * GiB, sharedBytes: 257 * 1024 ** 2 });
+  assert.equal(shared.single_task_estimate.status, 'insufficient');
+  assert.match(shared.single_task_estimate.reasons.join(' '), /Shared GPU/);
+});
+
 test('rejects stale, missing and malformed samples', async () => {
   assert.equal((await createResourceStatus({ samplePath: 'sample', read: async () => JSON.stringify(sample), now: () => clock() + 6000 })()).status, 'stale');
   assert.equal((await createResourceStatus({ samplePath: 'sample', read: async () => '{' })()).status, 'unavailable');
