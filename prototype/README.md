@@ -75,6 +75,8 @@ For diagnosing choppy playback, the client logs the number and longest duration 
 
 The browser now preserves adjacent chunk scheduling while audio is queued, adding a 40 ms lead only at stream start or after an underrun. `scripts/run-tts-pacing.ps1` measures synthetic local TTS delivery against an approximate virtual queue with sampled B60 resource guards. It does not open audio devices, measure browser behavior or assess intelligibility. See EXP-140.
 
+The cascade removes explicit `<think>` and `<analysis>` blocks from model answers before display, event history and TTS; notification speech also removes such sections from task results. A malformed opening block is dropped through the end, potentially omitting the answer. Other or unmarked reasoning formats may still appear. Direct native-model speech is not covered. The mock gateway test checks the text presented to the user and sent to TTS; live behavior requires a restarted gateway and user verification. See EXP-141.
+
 The client defaults to **speaker-safe mode**: it pauses microphone input while generated speech is playing to prevent acoustic feedback. Use the Interrupt button to stop the assistant and reopen the microphone. Uncheck the setting to experiment with automatic spoken interruptions; echo and false interruptions are not yet solved in that mode.
 
 On Windows, `scripts/measure-windows-memory.ps1 -ModelPid <pid>` samples dedicated and shared GPU allocations, model process memory, available physical RAM and global page-file use. Establish a baseline before starting services and compare it with sustained audio, vision and agent workloads. This is monitoring, not an automatic memory limiter.

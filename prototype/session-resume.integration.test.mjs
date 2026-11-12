@@ -61,7 +61,7 @@ test('opt-in session resume isolates clients and restores bounded history after 
   const llm = http.createServer(async (req, res) => {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     prompts.push(JSON.parse(Buffer.concat(chunks).toString()).messages);
-    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'OK' } }] }));
+    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '<think>PRIVATE REASONING</think>OK' } }] }));
   });
   const llmPort = await listen(llm);
   const wav = Buffer.alloc(48); wav.write('RIFF', 0); wav.write('WAVE', 8); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt16LE(16, 34); wav.write('data', 36);
@@ -105,7 +105,11 @@ test('opt-in session resume isolates clients and restores bounded history after 
     });
   }
   ttsBytes = wav.length;
+  let visibleResponse;
+  a.on('message', (data, binary) => { if (!binary) { const event = JSON.parse(data.toString()); if (event.type === 'assistant.text') visibleResponse = event.text; } });
   await turn(a, marker);
+  assert.equal(visibleResponse, 'OK');
+  assert.equal(lastTtsText, 'OK');
   const duplicate = new WebSocket(`ws://127.0.0.1:${port}/voice`, ['assistai-v1', `resume.${tokenA}`]);
   const [duplicateCode] = await once(duplicate, 'close');
   assert.equal(duplicateCode, 1008);

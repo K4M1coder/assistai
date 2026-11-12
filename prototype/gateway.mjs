@@ -17,7 +17,7 @@ import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
 import { resumeSessionId } from './session-resume.mjs';
 import { createResourceStatus } from './resource-status.mjs';
-import { speechText } from './speech-text.mjs';
+import { speechText, visibleAnswer } from './speech-text.mjs';
 
 function validImage(image) {
   const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
@@ -327,7 +327,7 @@ wss.on('connection', (client, req) => {
         if (active !== turn) return;
         message = resourceRejected ? { content: 'La t\u00e2che a \u00e9t\u00e9 refus\u00e9e car les ressources disponibles ne peuvent pas \u00eatre v\u00e9rifi\u00e9es ou sont insuffisantes.' } : await complete(false);
       }
-      const answer = message?.content?.trim();
+      const answer = visibleAnswer(message?.content);
       if (!answer) throw new Error('LLM returned no spoken text');
       if (active !== turn) return;
       record(session, turn.id, 'assistant.text', { text: answer });
@@ -346,7 +346,7 @@ wss.on('connection', (client, req) => {
     try {
       const response = await fetch(`${visionUrl}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: turn.controller.signal, body: JSON.stringify({ model: 'local', messages: [{ role: 'system', content: 'Answer the user in concise French. Describe only what you can see.' }, { role: 'user', content: [{ type: 'text', text }, { type: 'image_url', image_url: { url: image } }] }], max_tokens: 160, temperature: 0.2, chat_template_kwargs: { enable_thinking: false } }) });
       if (!response.ok) throw Error(`Vision model HTTP ${response.status}`);
-      const answer = (await response.json()).choices?.[0]?.message?.content?.trim();
+      const answer = visibleAnswer((await response.json()).choices?.[0]?.message?.content);
       if (!answer) throw Error('Vision model returned no answer');
       if (active !== turn) return;
       record(session, turn.id, 'assistant.text', { text: answer });

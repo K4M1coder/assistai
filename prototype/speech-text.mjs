@@ -1,7 +1,16 @@
-// Produce a speech-friendly projection; the original answer remains visible in the UI.
-export function speechText(input) {
+// Strip explicit reasoning blocks, including an unfinished block, before showing or voicing model output.
+export function visibleAnswer(input) {
   if (typeof input !== 'string') return '';
-  return input
+  let text = input.replace(/<(think|analysis)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/gi, ' ');
+  // Some backends omit the opening marker when a prompt already contains it.
+  text = text.replace(/^[\s\S]*?<\/(?:think|analysis)\s*>/i, ' ');
+  text = text.replace(/<(?:think|analysis)(?:\s[^>]*)?(?:>|$)[\s\S]*$/i, ' ');
+  return text.trim();
+}
+
+// Produce a speech-friendly projection; the original visible answer remains in the UI.
+export function speechText(input) {
+  return visibleAnswer(input)
     .replace(/```[\s\S]*?(?:```|$)/g, ' Code affiché. ')
     .replace(/`[^`\n]+`/g, ' code affiché ')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')

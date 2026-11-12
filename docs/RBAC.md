@@ -22,6 +22,8 @@ Playback-gap diagnostics stay in the local browser's conversation log; they do n
 
 The local synthetic TTS pacing probe sends fixed, non-personal phrases to a loopback service and keeps only timing and aggregate resource logs under `.cache`; it does not open a microphone or speaker.
 
+Filtering explicit reasoning markers from cascade output is a presentation safeguard, not a confidentiality or prompt-injection boundary. Untagged content and formats not recognized by the filter can still be displayed or spoken; stored task results may retain their original content.
+
 The resume key is stored in browser local storage and sent to the loopback gateway as a WebSocket subprotocol. The gateway stores a derived session identifier alongside unencrypted events, not the key itself, and rejects two concurrent connections using the same identifier. A task completion or error is sent to the currently connected holder of the same session key, if present. Scripts able to read that browser origin's local storage, local processes, and anyone with access to the SQLite database remain outside this protection. Stopping resume removes the browser key but leaves stored history; the prototype has no per-session deletion or key-recovery UI. Running-task tracking survives same-process reconnects only; notification queues are not restored and the bounded duplicate safeguards cannot guarantee idempotency.
 
 The same bearer capability also exposes a bounded snapshot of recent task events, including task text and results, to a reconnecting client. The browser renders the snapshot as text. This increases the importance of protecting the key and the local history; it is not a user identity check.

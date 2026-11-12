@@ -24,6 +24,8 @@ The browser reports detected playback gaps over 30 ms in the conversation log. T
 
 Playback scheduling now keeps consecutive audio chunks adjacent while a queue remains, avoiding a previously possible artificial pause. This correction has a mock-clock regression test; its effect on live speech remains to be heard.
 
+The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path.
+
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
 The updated gateway displays sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The older port 18088 gateway does not expose this endpoint.
