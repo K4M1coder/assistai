@@ -68,6 +68,8 @@ The browser's concurrent-task list is a local view of events received on its cur
 
 Retaining an uncertain task ID permits a same-session abort request and reduces duplicate submission of exactly matching requests. It does not authenticate the user, prevent differently worded duplicates, guarantee cancellation or survive a gateway restart.
 
+Bounded status retries do not change task permissions or prove that cancellation took effect. The resource estimate remains held until the gateway observes a terminal result.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.

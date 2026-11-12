@@ -216,12 +216,31 @@ wss.on('connection', (client, req) => {
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
     void (async () => {
-      let confirmedTerminal = false;
+      let confirmedTerminal = false, pollFailures = 0;
       try {
         for (let i = 0; i < 300; i++) {
           await new Promise(resolve => setTimeout(resolve, 2000));
-          const status = await requestJson(`${opencodeUrl}/session/status`);
-          const messages = await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/message`);
+          let status, messages;
+          try {
+            status = await requestJson(`${opencodeUrl}/session/status`);
+            messages = await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/message`);
+            if (!status || typeof status !== 'object' || Array.isArray(status) || !Array.isArray(messages)) throw new Error('Invalid agent status response');
+          } catch (error) {
+            pollFailures++;
+            if (!reservation.uncertain) {
+              reservation.uncertain = true;
+              const result = { task_id: agentSession.id, message: 'Agent status unavailable; retrying. The task may still be running.' };
+              record(session, turnId, 'task.uncertain', result);
+              sendTask({ type: 'task.uncertain', ...result });
+            }
+            if (pollFailures >= 3) throw error;
+            continue;
+          }
+          pollFailures = 0;
+          if (reservation.uncertain) {
+            reservation.uncertain = false;
+            sendTask({ type: 'task.status_restored', task_id: agentSession.id, message: 'Agent status monitoring resumed.' });
+          }
           const last = [...messages].reverse().find(item => item.info?.role === 'assistant' && item.info?.time?.completed);
           if (!status[agentSession.id] && last) {
             const text = (last.parts ?? []).filter(part => part.type === 'text' && !part.synthetic).map(part => part.text).join('\n').trim();
@@ -239,10 +258,9 @@ wss.on('connection', (client, req) => {
         throw new Error('Agent task status timed out');
       } catch (error) {
         if (!confirmedTerminal) reservation.uncertain = true;
-        const result = { task_id: agentSession.id, message: String(error) };
+        const result = { task_id: agentSession.id, message: confirmedTerminal ? String(error) : `Agent status remains uncertain: ${String(error)}` };
         const kind = confirmedTerminal ? 'task.error' : 'task.uncertain';
-        record(session, turnId, kind, result);
-        sendTask({ type: kind, ...result });
+        record(session, turnId, kind, result); sendTask({ type: kind, ...result });
       } finally {
         if (confirmedTerminal) releaseResource?.();
         if (confirmedTerminal) runningTasks.delete(taskKey);
