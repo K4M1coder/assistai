@@ -42,6 +42,8 @@ An experimental coding probe targets a separately configured disposable workspac
 
 The Windows trial accepts explicit distinct agent and gateway ports, checks they are free, and tracks its own processes. This permits a trial alongside existing demo listeners when resource preflight succeeds; port separation does not isolate memory or grant filesystem confinement.
 
+After the stopped spoken-coding trial, the idle agent model retained significant process working set. An attempt to erase its idle prompt cache was rejected by the installed server because slot actions were not enabled at startup. No automatic recovery or model restart is implemented; the resource monitor remains advisory.
+
 A synthetic French audio variant reached ASR, task delegation and a distinct follow-up response, but was stopped below the RAM reserve before the fixture was fixed. The recorded events did not preserve the transcription for that interrupted run. This is not a completed spoken coding test.
 
 A later guarded synthetic spoken coding run recorded a distorted filename and lost operation distinction in the transcript; the controller delegated the opposite operation. The watchdog stopped the trial below the RAM reserve, with the fixture unchanged. This failure shows the current voice-to-harness path is not dependable for coding, and resource headroom remains inadequate for sustained combined operation.

@@ -70,6 +70,8 @@ Retaining an uncertain task ID permits a same-session abort request and reduces 
 
 Bounded status retries do not change task permissions or prove that cancellation took effect. The resource estimate remains held until the gateway observes a terminal result.
 
+The rejected idle-cache experiment attempted to clear model inference cache, not gateway conversation history or OpenCode task data. The installed server refused the operation, and no cache-clearing or restart permission is implied for other processes.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
