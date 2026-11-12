@@ -66,6 +66,8 @@ The Kyutai STT inventory reads explicitly selected local model metadata and file
 
 The research-only CrispASR setup downloads a pinned public release archive, verifies its size and SHA-256, checks archive members and extracts to a new `.cache` directory. The installed executable was run only for version and capability listing; no model, microphone or server was opened. The checksum verifies the pinned bytes, not their safety or model provenance.
 
+The optional ASR comparison writes only generated synthetic speech to a temporary `.cache` WAV for the file-oriented CLI and removes it on normal exit. A forced termination can leave that synthetic temporary file behind. It runs the candidate with an explicit local model path and CPU flag; the prepared comparison did not pass preflight and has not loaded the model.
+
 The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
 
 The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.

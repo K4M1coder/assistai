@@ -36,6 +36,8 @@ An existing quantized Kyutai French/English STT candidate has been inventoried w
 
 A pinned Windows CPU research runtime, CrispASR, has since been verified to start and lists Kyutai and FastConformer backends. An existing 117 MB French FastConformer checkpoint is a candidate for guarded comparison; no model inference, accuracy, memory or real-time performance has been verified with it.
 
+The ASR coding probe can now compare Vosk and this candidate on identical synthetic audio. Its first comparison attempt failed the RAM preflight, so no comparative results are available.
+
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
 An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
