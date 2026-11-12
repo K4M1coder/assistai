@@ -62,6 +62,8 @@ In a later spoken coding trial, recognition and controller interpretation change
 
 The synthetic ASR coding probe sends fixed phrases only to loopback speech services and does not delegate tasks. Its word and token metrics are diagnostic, not a permission check or proof that an operation is safe to execute.
 
+The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.

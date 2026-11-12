@@ -144,7 +144,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -242,6 +242,17 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
+  client.on('message', (data, binary) => {
+    if (binary) return;
+    let event; try { event = JSON.parse(data.toString()); } catch { return; }
+    if (event.type !== 'task.cancel') return;
+    const owned = typeof event.task_id === 'string' && [...runningTasks.values()].some(task => task.id === event.task_id);
+    if (!owned || !opencodeUrl) { send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Task is not running in this session.' }); return; }
+    void requestJson(`${opencodeUrl}/session/${encodeURIComponent(event.task_id)}/abort`, { method: 'POST' })
+      .then(accepted => send({ type: accepted === true ? 'task.cancel_requested' : 'task.cancel_rejected', task_id: event.task_id,
+        message: accepted === true ? 'Cancellation requested; the task may already have made changes.' : 'The agent did not accept cancellation.' }))
+      .catch(() => send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Could not request cancellation; task status is uncertain.' }));
+  });
   if (lfmRealtimeUrl) {
     attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),

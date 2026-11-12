@@ -10,11 +10,12 @@ import WebSocket, { WebSocketServer } from 'ws';
 async function listen(server) { server.listen(0,'127.0.0.1'); await once(server,'listening'); return server.address().port; }
 
 test('gateway admission counts separate clients and retains uncertain tasks', {timeout:12000}, async t => {
-  let agentSessions=0;
+  let agentSessions=0, aborts=0;
   const agent=http.createServer((req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST'&&req.url==='/session'){agentSessions++;return res.end(JSON.stringify({id:'busy-task'}));}
     if(req.method==='POST'&&req.url==='/session/busy-task/prompt_async'){res.statusCode=204;return res.end();}
+    if(req.method==='POST'&&req.url==='/session/busy-task/abort'){aborts++;return res.end('true');}
     if(req.url==='/session/status'){res.statusCode=500;return res.end('{}');}
     if(req.url==='/session/busy-task/message')return res.end('[]');
     res.statusCode=404;res.end('{}');
@@ -71,6 +72,19 @@ test('gateway admission counts separate clients and retains uncertain tasks', {t
   });
   const rejected=await request('task.rejected');
   assert.match(rejected.message,/budget/);
+  async function cancel(client, expected) {
+    const result = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(Error('Cancellation response timed out')), 1500);
+      client.on('message', function handler(data, binary) { if (binary) return; const event=JSON.parse(data);
+        if (event.type === expected) { clearTimeout(timer); client.off('message', handler); resolve(event); } });
+    });
+    client.send(JSON.stringify({type:'task.cancel', task_id:'busy-task'}));
+    return result;
+  }
+  assert.match((await cancel(clients[1], 'task.cancel_rejected')).message, /not running/);
+  assert.equal(aborts,0);
+  assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /may already have made changes/);
+  assert.equal(aborts,1);
   await uncertain;
   const afterError=await request('task.rejected');
   assert.match(afterError.message,/budget/);

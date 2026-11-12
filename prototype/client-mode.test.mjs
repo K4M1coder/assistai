@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'send', 'mode', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'stop-task', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'send', 'mode', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
@@ -75,10 +75,15 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext("playbackContext.currentTime = 1; ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'continuous-test', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); playbackContext.currentTime = 1.045; ws.onmessage({data: new ArrayBuffer(480)})", context);
   assert.ok(Math.abs(playbackStarts.at(-2) - 1.04) < 0.000001);
   assert.ok(Math.abs(playbackStarts.at(-1) - 1.05) < 0.000001, 'queued audio must not gain a 35 ms gap');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.capabilities', mode:'cascade', text_input:true, image_input:true, task_cancel:true})}); ws.onmessage({data: JSON.stringify({type:'task.started',task_id:'agent-1',task:'example'})})", context);
+  assert.equal(elements['stop-task'].disabled, false);
+  elements['stop-task'].onclick();
+  assert.deepEqual(JSON.parse(sent.at(-1)), {type:'task.cancel',task_id:'agent-1'});
+  assert.equal(elements['stop-task'].disabled, true);
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'stop-task', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const storage = new Map();
   let reloads = 0, selectedProtocols;
   function start() {
@@ -114,7 +119,7 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
 });
 
 test('a dropped connection retries and preserves unsent text', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'stop-task', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false }]));
   elements.text.value = 'keep this message';
   const sockets = [], timers = [];

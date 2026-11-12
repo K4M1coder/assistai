@@ -32,6 +32,8 @@ A later synthetic spoken coding attempt misrecognized the filename and operation
 
 A guarded synthetic ASR probe is prepared to compare recognition of operation direction, negation and a filename. Its first attempt did not meet the RAM preflight; no benchmark result is available yet.
 
+An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
+
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
 The updated gateway displays sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The older port 18088 gateway does not expose this endpoint.
