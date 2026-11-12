@@ -74,6 +74,7 @@ let textInputAvailable = true;
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null;
 const pendingNotifications = [];
+let notificationRetries = 0;
 let detectionThreshold = Number($('noise-threshold').value) / 100;
 $('noise-threshold').oninput = event => {
   detectionThreshold = Number(event.target.value) / 100;
@@ -154,8 +155,19 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
   else if (event.type === 'task.completed') { log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
-  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); currentNotification = event.task_id; notificationPending = false; responsePending = true; }
-  else if (event.type === 'notification.rejected') { notificationPending = false; }
+  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; notificationPending = false; responsePending = true; }
+  else if (event.type === 'notification.rejected') {
+    if (!notificationPending || pendingNotifications[0] !== event.task_id) return;
+    notificationPending = false;
+    if (event.reason === 'busy' && notificationRetries < 3) {
+      notificationRetries++;
+      setTimeout(() => { if (pendingNotifications[0] === event.task_id) announceWhenIdle(); }, 500);
+    } else {
+      pendingNotifications.shift(); notificationRetries = 0;
+      log('Could not speak the completed task notification; its result remains in the conversation.');
+      announceWhenIdle();
+    }
+  }
   else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
   else if (event.type === 'speech.end') { speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }

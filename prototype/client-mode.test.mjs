@@ -8,7 +8,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
-  const sent = [];
+  const sent = [], timers = [];
   class Socket { static OPEN = 1; readyState = 1; send(data) { sent.push(data); } }
   class Context {
     destination = {};
@@ -21,7 +21,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
   const stream = { active: true, getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: true }) }], getTracks: () => [] };
-  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, setInterval() {}, Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
+  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, setInterval() {}, setTimeout: (fn, delay) => timers.push({ fn, delay }), Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
   vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.task_history', events:[{kind:'task.completed',text:'offline result'}]})})", context);
   assert.match(elements.log.textContent, /Previous task completed: offline result/);
@@ -47,6 +47,16 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})})", context);
   assert.ok(sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
+  const requests = () => sent.filter(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak').length;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.rejected', task_id:'task-1', reason:'busy'})})", context);
+    assert.equal(timers.at(-1).delay, 500);
+    timers.shift().fn();
+    assert.equal(requests(), attempt + 2);
+  }
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.rejected', task_id:'task-1', reason:'busy'})})", context);
+  assert.match(elements.log.textContent, /Could not speak/);
+  assert.equal(timers.length, 0);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), true);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);

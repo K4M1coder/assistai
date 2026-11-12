@@ -50,6 +50,8 @@ Adding notification verification to the spoken probe does not alter the fixture 
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
 
+Notification rejection reasons expose whether a requested task result is available in the current session or the voice path is busy; they do not authenticate clients or authorize task execution.
+
 ## React mockup permissions
 
 The prototype implements role-based permissions with per-user overrides. The demo enables every capability for every role by default, which is incompatible with least privilege and must not be reused as a production default.

@@ -369,7 +369,7 @@ wss.on('connection', (client, req) => {
     if (event.type === 'interrupt') { cancel(event.reason === 'voice_activity' ? 'voice_activity' : 'manual'); return; }
     if (event.type === 'notification.speak' && typeof event.task_id === 'string') {
       const completed = taskHistory.all(session).filter(row => row.kind === 'task.completed').map(row => JSON.parse(row.payload)).find(payload => payload.task_id === event.task_id);
-      if (!completed || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id }); return; }
+      if (!completed || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id, reason: completed ? 'busy' : 'unavailable' }); return; }
       const turn = { id: randomUUID(), controller: new AbortController() };
       active = turn;
       send({ type: 'notification.started', task_id: event.task_id, turn_id: turn.id });
