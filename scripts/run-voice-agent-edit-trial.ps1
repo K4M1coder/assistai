@@ -1,7 +1,8 @@
 param(
   [Parameter(Mandatory=$true)][string]$Workspace,
   [int]$TimeoutSeconds = 120,
-  [switch]$PreflightOnly
+  [switch]$PreflightOnly,
+  [switch]$SpokenInput
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -32,12 +33,13 @@ function Assert-Resources($sample, [long]$minimumRam) {
   if ($sample.sharedBytes -gt 256MB) { throw 'Shared GPU usage above conservative absolute threshold' }
 }
 $initial = Sample-Resources
+$preflightReserve = if ($SpokenInput) { 10GB } else { 8GB }
 if ($PreflightOnly) {
   $initial | ConvertTo-Json -Compress -Depth 5
-  Assert-Resources $initial 8GB
+  Assert-Resources $initial $preflightReserve
   return
 }
-Assert-Resources $initial 8GB
+Assert-Resources $initial $preflightReserve
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix = Join-Path $root ".cache/voice-agent-edit-$stamp"
 $samplePath = "$prefix.sample.json"
@@ -69,7 +71,12 @@ try {
   } until ($healthy -or [DateTime]::UtcNow -gt $deadline)
   if (!$healthy) { throw 'Gateway startup timeout' }
   $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL='ws://127.0.0.1:18091/voice'
-  $probe = Start-Owned $node @((Join-Path $root 'scripts/probe-voice-agent-edit.mjs')) $root 'probe'
+  if ($SpokenInput) {
+    $python = Join-Path $root '.venv-voice/Scripts/python.exe'
+    $probe = Start-Owned $python @((Join-Path $root 'scripts/probe-spoken-agent-edit.py')) $root 'probe'
+  } else {
+    $probe = Start-Owned $node @((Join-Path $root 'scripts/probe-voice-agent-edit.mjs')) $root 'probe'
+  }
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     $sample = Sample-Resources; Save-Sample $sample; Assert-Resources $sample 6GB

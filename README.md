@@ -24,6 +24,8 @@ When a new agent task is dispatched, the gateway includes a bounded selection of
 
 A disposable-workspace probe for delegating a coding fix through the real cascade controller completed in one guarded synthetic text run: one agent task fixed a simple addition function, a separate follow-up received a text response before completion, and audio bytes were produced. An earlier run was stopped below the RAM reserve. Neither run tests a physical microphone, audible speech quality, general coding ability or native speech-to-speech.
 
+A subsequent synthetic French speech version reached task delegation and a separate follow-up response, but the watchdog stopped it below the RAM reserve before the edit completed. See the [experiment record](docs/research/2026-11-10-native-duplex.md#exp-126-synthetic-spoken-coding-request-stopped-at-ram-reserve).
+
 In a synthetic spoken follow-up, the cascade recalled one colour after reconnecting, while separate secret-word trials failed through recognition or model behavior. No physical microphone or audible playback was tested in those runs.
 
 For resumable sessions, the updated browser displays a bounded recent task-event history on reconnect, including recorded offline completions. Mock tests cover session separation and file-backed restart; this does not replay missed spoken notifications.
