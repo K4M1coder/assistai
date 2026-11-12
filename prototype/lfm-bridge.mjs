@@ -45,7 +45,7 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
           if(typeof args.task!=='string'||!args.task.trim()||args.task.length>4000)throw Error('Invalid task');
           if(args.rerun !== undefined && typeof args.rerun !== 'boolean')throw Error('Invalid rerun flag');
           const launched=await launchTask(args.task,turnId,{reuseCompleted:restored,rerun:args.rerun===true});
-          result={accepted:Boolean(launched.accepted), ...(launched.already_running ? {already_running:true} : {}), ...(launched.already_completed ? {already_completed:true,result:launched.result} : {})};
+          result={accepted:Boolean(launched.accepted), ...(launched.error ? {error:launched.error} : {}), ...(launched.already_running ? {already_running:true} : {}), ...(launched.already_completed ? {already_completed:true,result:launched.result} : {})};
         } catch(error){result={accepted:false,error:String(error)};}
         if(current===session)session.submitToolResult(call.callId,JSON.stringify(result));
       })();

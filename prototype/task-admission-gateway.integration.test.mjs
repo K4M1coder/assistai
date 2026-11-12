@@ -68,7 +68,7 @@ test('gateway admission counts separate clients and retains uncertain tasks', {t
   await request('task.started');
   const uncertain=new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Expected agent status failure')),5000);
-    clients[0].on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='task.error'){clearTimeout(timer);resolve();}});
+    clients[0].on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='task.uncertain'){clearTimeout(timer);resolve();}});
   });
   const rejected=await request('task.rejected');
   assert.match(rejected.message,/budget/);
@@ -86,6 +86,8 @@ test('gateway admission counts separate clients and retains uncertain tasks', {t
   assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /may already have made changes/);
   assert.equal(aborts,1);
   await uncertain;
+  assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /Cancellation requested/);
+  assert.equal(aborts,2);
   const afterError=await request('task.rejected');
   assert.match(afterError.message,/budget/);
   assert.equal(agentSessions,1);

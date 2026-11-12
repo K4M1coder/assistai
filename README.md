@@ -34,6 +34,8 @@ A guarded synthetic ASR probe is prepared to compare recognition of operation di
 
 An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
 
+If submission or later status becomes uncertain, the updated gateway retains the task in that session and avoids resubmitting the same normalized request. This state is process-local and is not automatically reconciled after a polling failure.
+
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
 The updated gateway displays sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The older port 18088 gateway does not expose this endpoint.

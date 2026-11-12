@@ -195,6 +195,7 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'task.started') { if (event.task_id) activeTaskIds.add(event.task_id); refreshTaskButton(); log(`Agent started: ${event.task}`); }
   else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
+  else if (event.type === 'task.uncertain') { if (event.task_id) { activeTaskIds.add(event.task_id); cancellationRequested.delete(event.task_id); } refreshTaskButton(); log(`Agent task status uncertain: ${event.message}`); }
   else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
   else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
   else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; notificationPending = false; responsePending = true; }

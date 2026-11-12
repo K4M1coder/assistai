@@ -66,6 +66,8 @@ The cancellation request checks membership in the gateway's current session task
 
 The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.
 
+Retaining an uncertain task ID permits a same-session abort request and reduces duplicate submission of exactly matching requests. It does not authenticate the user, prevent differently worded duplicates, guarantee cancellation or survive a gateway restart.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.

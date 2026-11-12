@@ -169,6 +169,7 @@ wss.on('connection', (client, req) => {
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
     const taskKey = normalizeTask(task);
     const prior = runningTasks.get(taskKey);
+    if (prior?.uncertain) return { accepted: false, status: 'uncertain', error: 'A matching task may still be running; it was not submitted again.', ...(prior.id ? { task_id: prior.id } : {}) };
     if (prior) return { accepted: true, already_running: true, ...(prior.id ? { task_id: prior.id } : {}) };
     const completed = completedTasks.get(taskKey);
     if (reuseCompleted && !rerun && completed) {
@@ -194,13 +195,19 @@ wss.on('connection', (client, req) => {
         }
       }
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
+      reservation.id = agentSession.id;
       promptAttempted = true;
       const agentPrompt = buildAgentPrompt(task, nativeHistory.all(session).reverse());
       await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: agentPrompt }] }) });
-      reservation.id = agentSession.id;
     } catch (error) {
       if (!promptAttempted) releaseResource?.();
-      runningTasks.delete(taskKey);
+      if (!promptAttempted) runningTasks.delete(taskKey);
+      else {
+        reservation.uncertain = true;
+        const uncertain = { task_id: agentSession.id, task, message: 'Task submission status is uncertain; it may still be running.' };
+        record(session, turnId, 'task.uncertain', uncertain);
+        sendTask({ type: 'task.uncertain', ...uncertain });
+      }
       cleanTaskState();
       throw error;
     }
@@ -231,12 +238,14 @@ wss.on('connection', (client, req) => {
         }
         throw new Error('Agent task status timed out');
       } catch (error) {
+        if (!confirmedTerminal) reservation.uncertain = true;
         const result = { task_id: agentSession.id, message: String(error) };
-        record(session, turnId, 'task.error', result);
-        sendTask({ type: 'task.error', ...result });
+        const kind = confirmedTerminal ? 'task.error' : 'task.uncertain';
+        record(session, turnId, kind, result);
+        sendTask({ type: kind, ...result });
       } finally {
         if (confirmedTerminal) releaseResource?.();
-        runningTasks.delete(taskKey);
+        if (confirmedTerminal) runningTasks.delete(taskKey);
         cleanTaskState();
       }
     })();
