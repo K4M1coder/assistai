@@ -30,7 +30,7 @@ In a synthetic spoken follow-up, the cascade recalled one colour after reconnect
 
 For resumable sessions, the updated browser displays a bounded recent task-event history on reconnect, including recorded offline completions. Mock tests cover session separation and file-backed restart; this does not replay missed spoken notifications.
 
-The updated cascade gateway can speak a short excerpt of a completed agent result. One synthetic text-driven real-agent trial produced notification audio after a successful coding task; the audio was not listened to. This path is not yet active in the older running demo.
+The updated cascade gateway can speak a short excerpt of a completed agent result. One synthetic text-driven real-agent trial produced notification audio after a successful coding task; the audio was not listened to. A separate synthetic notification test recovered two of three marker words with the local ASR. This path is not yet active in the older running demo.
 
 The updated browser also retries ordinary gateway disconnects and preserves unsent text. If the microphone was enabled, it resumes sending when recognition is ready. Reconnect behavior currently has simulated-browser and mock-service evidence only.
 
