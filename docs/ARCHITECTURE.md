@@ -50,6 +50,8 @@ A later guarded synthetic spoken coding run recorded a distorted filename and lo
 
 A separate guarded ASR probe prepares fixed synthetic French cases for operation direction, negation and a filename without launching an agent. Its metrics include word error and token order but do not establish semantic equivalence or live-microphone accuracy. Its first preflight did not meet the 8 GiB RAM threshold.
 
+An existing quantized Kyutai French/English STT checkpoint is a research candidate. Its local model directory lacks the codec and tokenizer named in its configuration; upstream Rust source has a GGUF/CPU path, but an installed runtime, Windows execution, Intel acceleration and the complete memory footprint have not been verified.
+
 The gateway can request OpenCode cancellation for an active task ID belonging to the current session. A positive abort response is reported only as a request, not verified termination; the normal status poll remains responsible for terminal events and resource-estimate release. The browser tracks concurrently started tasks and targets the most recent one without an outstanding cancellation request. Mock integration covers session scoping and retention after uncertain status; there is no live-agent cancellation validation or rollback.
 
 If prompt submission may have reached OpenCode or polling later fails, the gateway emits `task.uncertain`, retains the task ID and estimate, and refuses to resubmit the same normalized request in that session. It continues to accept cancellation requests for that ID. Status polling retries up to three consecutive failures and can recover; ambiguous submission and exhausted retries remain uncertain, and a restart loses this process-local task map even if external work continues.

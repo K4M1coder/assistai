@@ -62,6 +62,8 @@ In a later spoken coding trial, recognition and controller interpretation change
 
 The synthetic ASR coding probe sends fixed phrases only to loopback speech services and does not delegate tasks. Its word and token metrics are diagnostic, not a permission check or proof that an operation is safe to execute.
 
+The Kyutai STT inventory reads explicitly selected local model metadata and file sizes without loading weights or accessing the network. It rejects configured asset paths outside the selected model directory; this inspection does not validate model provenance or trustworthiness.
+
 The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
 
 The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.
