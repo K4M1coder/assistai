@@ -46,6 +46,8 @@ A synthetic French audio variant reached ASR, task delegation and a distinct fol
 
 A later guarded synthetic spoken coding run recorded a distorted filename and lost operation distinction in the transcript; the controller delegated the opposite operation. The watchdog stopped the trial below the RAM reserve, with the fixture unchanged. This failure shows the current voice-to-harness path is not dependable for coding, and resource headroom remains inadequate for sustained combined operation.
 
+A separate guarded ASR probe prepares fixed synthetic French cases for operation direction, negation and a filename without launching an agent. Its metrics include word error and token order but do not establish semantic equivalence or live-microphone accuracy. Its first preflight did not meet the 8 GiB RAM threshold.
+
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.
 
 On dispatch, the gateway sends OpenCode the explicit task followed by up to 1,800 JSON characters of recent, session-scoped conversation and task events. Individual excerpts are capped at 200 characters, older entries are dropped first, and parallel ASR transcripts are marked approximate. The text is labeled untrusted but the model can still follow malicious instructions within it. An optional session-resume capability can reconnect the same browser session to retained SQLite events; it does not establish general shared memory, semantic retrieval or task isolation.

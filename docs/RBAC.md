@@ -60,6 +60,8 @@ Selecting separate trial ports does not change OpenCode's authority, authenticat
 
 In a later spoken coding trial, recognition and controller interpretation changed the requested operation before delegation. Any harness with write or command permissions could act on a similarly incorrect task. The current demo uses a read-only fixture; that observed failure does not validate broader permissions.
 
+The synthetic ASR coding probe sends fixed phrases only to loopback speech services and does not delegate tasks. Its word and token metrics are diagnostic, not a permission check or proof that an operation is safe to execute.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
