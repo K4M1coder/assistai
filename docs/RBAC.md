@@ -58,6 +58,8 @@ The prepared voice-to-agent coding probe requires an explicitly selected `.cache
 
 Selecting separate trial ports does not change OpenCode's authority, authenticate either service, or isolate the workspace at the operating-system level.
 
+In a later spoken coding trial, recognition and controller interpretation changed the requested operation before delegation. Any harness with write or command permissions could act on a similarly incorrect task. The current demo uses a read-only fixture; that observed failure does not validate broader permissions.
+
 Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
 
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.

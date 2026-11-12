@@ -18,6 +18,7 @@ test('does not expose explicitly marked reasoning in visible or spoken output', 
   }
   assert.equal(visibleAnswer('<think>private reasoning'), '');
   assert.equal(visibleAnswer('Bonjour.'), 'Bonjour.');
+  assert.equal(visibleAnswer('Je lance la tâche. (En attente du résultat...)</think>J’ai lancé la recherche.'), 'J’ai lancé la recherche.');
 });
 
 test('avoids sending markup, URLs and code to the speech engine', () => {

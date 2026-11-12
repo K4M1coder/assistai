@@ -44,6 +44,8 @@ The Windows trial accepts explicit distinct agent and gateway ports, checks they
 
 A synthetic French audio variant reached ASR, task delegation and a distinct follow-up response, but was stopped below the RAM reserve before the fixture was fixed. The recorded events did not preserve the transcription for that interrupted run. This is not a completed spoken coding test.
 
+A later guarded synthetic spoken coding run recorded a distorted filename and lost operation distinction in the transcript; the controller delegated the opposite operation. The watchdog stopped the trial below the RAM reserve, with the fixture unchanged. This failure shows the current voice-to-harness path is not dependable for coding, and resource headroom remains inadequate for sustained combined operation.
+
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.
 
 On dispatch, the gateway sends OpenCode the explicit task followed by up to 1,800 JSON characters of recent, session-scoped conversation and task events. Individual excerpts are capped at 200 characters, older entries are dropped first, and parallel ASR transcripts are marked approximate. The text is labeled untrusted but the model can still follow malicious instructions within it. An optional session-resume capability can reconnect the same browser session to retained SQLite events; it does not establish general shared memory, semantic retrieval or task isolation.

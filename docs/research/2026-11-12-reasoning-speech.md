@@ -13,3 +13,5 @@ Eight targeted tests passed, including a mock gateway test in which the model re
 ## Limits and next step
 
 The filter handles only the specified markers and is not a general reasoning detector, security boundary or guarantee against unmarked analysis. The native speech bridge produces audio directly and is not filtered by this mechanism. Check the user's actual excerpt when available and verify speech in the updated instance; adapt the parser to an observed format without discarding ordinary answer text unnecessarily.
+
+The user subsequently supplied an excerpt containing an orphan `</think>` after the spoken reasoning. A regression test based on that structure confirms that the current cascade filter removes the text before that marker and preserves the following answer. This verifies text handling, not a live retest. The same excerpt showed that the read-only agent could not retrieve live news; that is a separate harness capability gap.

@@ -28,6 +28,8 @@ The cascade filters explicit `<think>` and `<analysis>` blocks from model answer
 
 The guarded Windows coding experiment accepts separate agent and gateway ports, so an existing demo need not be stopped to run it. The experiment still requires its configured RAM and GPU headroom and uses a disposable fixture.
 
+A later synthetic spoken coding attempt misrecognized the filename and operation, then the controller delegated the opposite change. Its watchdog stopped the trial below the RAM reserve; the fixture was unchanged. Spoken coding requests are therefore not yet dependable. See [EXP-144](docs/research/2026-11-12-spoken-coding-failure.md).
+
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
 The updated gateway displays sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The older port 18088 gateway does not expose this endpoint.
