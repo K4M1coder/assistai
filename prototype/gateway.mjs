@@ -10,10 +10,12 @@ import { fileURLToPath } from 'node:url';
 import WebSocket, { WebSocketServer } from 'ws';
 import { getServiceStatus } from './service-status.mjs';
 import { attachLfmBridge } from './lfm-bridge.mjs';
+import { normalizeTask, restoreCompletedTasks } from './completed-task-cache.mjs';
 import { createTaskAdmission } from './task-admission.mjs';
 import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
 import { resumeSessionId } from './session-resume.mjs';
+import { createResourceStatus } from './resource-status.mjs';
 
 const port = Number(process.env.ASSISTAI_GATEWAY_PORT ?? 18083);
 const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
@@ -31,6 +33,7 @@ const admitTask = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? createTaskAdmission(
   requestedVramBytes: Number(process.env.ASSISTAI_TASK_VRAM_ESTIMATE_BYTES ?? NaN),
   requestedRamBytes: Number(process.env.ASSISTAI_TASK_RAM_ESTIMATE_BYTES ?? NaN),
 }) : null;
+const getResources = createResourceStatus({ samplePath: process.env.ASSISTAI_RESOURCE_STATUS_PATH || process.env.ASSISTAI_BUDGET_SAMPLE_PATH, admissionEnabled: Boolean(admitTask) });
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');
 if (lfmTranscriptUrl && !['ws:', 'wss:'].includes(new URL(lfmTranscriptUrl).protocol)) throw new Error('Transcript URL must use WebSocket');
@@ -47,6 +50,8 @@ db.exec('CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, session_id TEXT
 const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
 const history = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text') ORDER BY rowid DESC LIMIT 20");
 const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const taskSnapshot = db.prepare("SELECT kind, payload, created_at FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const completedTaskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 400");
 const nativeHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text', 'task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const record = (session, turn, kind, payload) => insert.run(randomUUID(), session, turn, kind, JSON.stringify(payload), new Date().toISOString());
 const clientRoot = fileURLToPath(new URL('./client/', import.meta.url));
@@ -66,6 +71,7 @@ const aecFiles = new Map([
 ]);
 const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental', history_storage: dbPath === ':memory:' ? 'volatile' : 'file', session_resume_enabled: sessionResumeEnabled }));
+  if (req.method === 'GET' && req.url === '/resources') return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(await getResources()));
   if (req.method === 'GET' && req.url === '/services') {
     const services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech: Boolean(lfmRealtimeUrl), nativeTranscriptUrl: lfmTranscriptUrl });
     return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ services }));
@@ -79,6 +85,9 @@ const server = http.createServer(async (req, res) => {
 });
 const wss = new WebSocketServer({ server, path: '/voice', maxPayload: 1500 * 1024 });
 const activeResumeSessions = new Set();
+// Keep active tasks and their completed results while a resumable session reconnects.
+// This is process-local and does not restore work after a gateway restart.
+const activeTaskSessions = new Map();
 wss.on('connection', (client, req) => {
   if (req.headers.origin) {
     try {
@@ -92,17 +101,49 @@ wss.on('connection', (client, req) => {
   if (resumedSession && activeResumeSessions.has(resumedSession)) { client.close(1008, 'Session already connected'); return; }
   if (resumedSession) {
     activeResumeSessions.add(resumedSession);
-    client.once('close', () => activeResumeSessions.delete(resumedSession));
+    client.once('close', () => {
+      activeResumeSessions.delete(resumedSession);
+      const state = activeTaskSessions.get(resumedSession);
+      if (state?.client === client) state.client = null;
+      if (state?.running.size === 0) activeTaskSessions.delete(resumedSession);
+    });
   }
   const session = resumedSession ?? randomUUID();
+  const hasPreviousHistory = Boolean(resumedSession && nativeHistory.all(session).length);
   const asr = lfmRealtimeUrl ? null : new WebSocket(asrUrl);
   let active;
   let segments = [];
   let waitingForFinal = false;
-  const runningTasks = new Map();
-  const completedTasks = new Map();
+  let taskState = resumedSession && activeTaskSessions.get(session);
+  if (!taskState) {
+    taskState = { running: new Map(), completed: resumedSession && lfmRealtimeUrl ? restoreCompletedTasks(completedTaskHistory.all(session).reverse()) : new Map() };
+    if (resumedSession) activeTaskSessions.set(session, taskState);
+  }
+  const runningTasks = taskState.running;
+  const completedTasks = taskState.completed;
+  if (resumedSession) taskState.client = client;
+  const cleanTaskState = () => {
+    if (resumedSession && !activeResumeSessions.has(session) && runningTasks.size === 0 && activeTaskSessions.get(session) === taskState) activeTaskSessions.delete(session);
+  };
   const send = (value) => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(value)); };
+  const sendTask = (value) => {
+    const destination = resumedSession ? taskState.client : client;
+    if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
+  };
   send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  if (resumedSession) {
+    const events = [];
+    for (const row of taskSnapshot.all(session).reverse()) {
+      try {
+        const payload = JSON.parse(row.payload);
+        if (!payload || typeof payload.task_id !== 'string') continue;
+        const value = row.kind === 'task.started' ? payload.task : row.kind === 'task.completed' ? payload.text : payload.message;
+        if (typeof value !== 'string') continue;
+        events.push({ kind: row.kind, task_id: payload.task_id, text: value.slice(0, 8000), created_at: row.created_at });
+      } catch { /* Ignore malformed historical events. */ }
+    }
+    if (events.length) send({ type: 'session.task_history', events });
+  }
   const tool = { type: 'function', function: { name: 'delegate_task', description: 'Delegate a substantive coding or research task to the local OpenCode agent in the background. Do not use for ordinary conversation.', parameters: { type: 'object', properties: { task: { type: 'string', description: 'The complete task for the agent' } }, required: ['task'] } } };
   const requestJson = async (url, options = {}) => {
     const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10_000) });
@@ -112,7 +153,7 @@ wss.on('connection', (client, req) => {
   const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false } = {}) => {
     if (!opencodeUrl) throw new Error('OpenCode is not configured');
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
-    const taskKey = task.trim().toLocaleLowerCase('fr').replace(/\s+/g, ' ').replace(/[.!?]+$/g, '');
+    const taskKey = normalizeTask(task);
     const prior = runningTasks.get(taskKey);
     if (prior) return { accepted: true, already_running: true, ...(prior.id ? { task_id: prior.id } : {}) };
     const completed = completedTasks.get(taskKey);
@@ -146,9 +187,11 @@ wss.on('connection', (client, req) => {
     } catch (error) {
       if (!promptAttempted) releaseResource?.();
       runningTasks.delete(taskKey);
+      cleanTaskState();
       throw error;
     }
     const event = { task_id: agentSession.id, task };
+    completedTasks.delete(taskKey);
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
     void (async () => {
@@ -168,7 +211,7 @@ wss.on('connection', (client, req) => {
             if (completedTasks.size >= 100) completedTasks.delete(completedTasks.keys().next().value);
             completedTasks.set(taskKey, result);
             record(session, turnId, 'task.completed', result);
-            send({ type: 'task.completed', ...result });
+            sendTask({ type: 'task.completed', ...result });
             return;
           }
         }
@@ -176,16 +219,17 @@ wss.on('connection', (client, req) => {
       } catch (error) {
         const result = { task_id: agentSession.id, message: String(error) };
         record(session, turnId, 'task.error', result);
-        send({ type: 'task.error', ...result });
+        sendTask({ type: 'task.error', ...result });
       } finally {
         if (confirmedTerminal) releaseResource?.();
         runningTasks.delete(taskKey);
+        cleanTaskState();
       }
     })();
     return { accepted: true, task_id: agentSession.id };
   };
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext,
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
       getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),
       getCompletedTask: taskId => {
@@ -208,7 +252,7 @@ wss.on('connection', (client, req) => {
     form.set('text', text);
     const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: turn.controller.signal });
     if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
-    let header = Buffer.alloc(0), started = false;
+    let header = Buffer.alloc(0), started = false, audioBytes = 0;
     for await (const bytes of speech.body) {
       if (active !== turn) return;
       let chunk = Buffer.from(bytes);
@@ -220,9 +264,11 @@ wss.on('connection', (client, req) => {
         chunk = header.subarray(44);
         started = true;
       }
+      audioBytes += chunk.length;
       if (chunk.length && client.readyState === WebSocket.OPEN) client.send(chunk, { binary: true });
     }
     if (!started) throw new Error('TTS returned no WAV audio');
+    if (!audioBytes || audioBytes % 2) throw new Error('TTS returned empty or incomplete PCM16 audio');
     if (active === turn) { active = undefined; send({ type: 'speech.end', turn_id: turn.id }); }
   };
   const respond = async (text) => {
@@ -311,6 +357,7 @@ wss.on('connection', (client, req) => {
     } catch { send({ type: 'error', message: 'Invalid ASR response' }); }
   });
   asr.on('error', () => send({ type: 'error', message: 'ASR connection failed' }));
+  asr.on('close', () => { if (client.readyState === WebSocket.OPEN) client.close(1011, 'Speech recognition disconnected'); });
   client.on('message', (data, binary) => {
     if (binary) { if (asr.readyState === WebSocket.OPEN && !waitingForFinal) asr.send(data, { binary: true }); return; }
     let event;

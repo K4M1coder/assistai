@@ -18,6 +18,19 @@ async function refreshServices() {
 }
 $('refresh-services').onclick = refreshServices;
 void refreshServices();
+async function refreshResources() {
+  try {
+    const response = await fetch('/resources', { cache: 'no-store' });
+    if (!response.ok) throw Error('Resource status unavailable');
+    const data = await response.json();
+    if (data.status === 'observed' || data.status === 'low') {
+      const gib = bytes => (bytes / 1024 ** 3).toFixed(2);
+      $('resources').textContent = `Resources: ${data.status}; GPU dedicated ${gib(data.dedicated_bytes)} GiB, GPU shared ${gib(data.shared_bytes)} GiB, available RAM ${gib(data.available_ram_bytes)} GiB. ${(data.reasons ?? []).join(' ')} Task admission: ${data.admission}. No hard limit is enforced.`;
+    } else $('resources').textContent = `Resource status: ${data.status}. ${data.reason ?? ''} Task admission: ${data.admission}. No hard limit is enforced.`;
+  } catch { $('resources').textContent = 'Resource status unavailable. No hard limit is enforced.'; }
+}
+void refreshResources();
+setInterval(refreshResources, 5000);
 const memoryKey = 'assistai.session-resume.v1';
 let memoryToken = null;
 try { memoryToken = localStorage.getItem(memoryKey); } catch {}
@@ -49,10 +62,9 @@ memoryButton.onclick = () => {
   } catch { memoryStatus.textContent = 'Could not update the local session key.'; }
 };
 void configureMemory();
-const ws = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);
-ws.binaryType = 'arraybuffer';
+let ws, reconnectAttempts = 0;
 let captureContext, playbackContext, stream, captureNode, echoBridge, referenceNode;
-let speechOpen = false, speaking = false, voiceFrames = 0, silenceFrames = 0;
+let speechOpen = false, activeSpeechTurn = null, speaking = false, voiceFrames = 0, silenceFrames = 0;
 let playbackTime = 0, playbackSources = new Set(), carry = null;
 let asrReady = false;
 let textInputAvailable = true;
@@ -79,6 +91,7 @@ function finishPushToTalk() {
 }
 function stopPlayback() {
   speechOpen = false;
+  activeSpeechTurn = null;
   for (const source of playbackSources) { try { source.stop(); } catch {} }
   playbackSources.clear();
   playbackTime = 0;
@@ -109,10 +122,7 @@ function play(data, rate) {
   playbackSources.add(source); source.onended = () => { playbackSources.delete(source); announceWhenIdle(); };
 }
 let outputRate = 24000;
-ws.onopen = () => status('Connected. Waiting for speech recognition.');
-ws.onclose = () => { asrReady = false; status('Disconnected. Reload after starting the local services.'); stopPlayback(); };
-ws.onerror = () => status('Gateway connection failed.');
-ws.onmessage = ({ data }) => {
+function handleSocketMessage({ data }) {
   if (data instanceof ArrayBuffer) { play(data, outputRate); return; }
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
@@ -122,36 +132,64 @@ ws.onmessage = ({ data }) => {
     $('image').disabled = event.image_input !== true;
     $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
-  else if (event.type === 'asr.ready') { asrReady = true; status('Ready. Start the microphone to speak French.'); }
+  else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
   else if (event.type === 'asr.empty') { responsePending = false; announceWhenIdle(); }
   else if (event.type === 'transcript.empty') $('partial').textContent = '';
   else if (event.type === 'transcript.unavailable') { $('partial').textContent = ''; log('Parallel transcription unavailable for this turn.'); }
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
+  else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
+    log('Recent task history (past events; started does not confirm current status):');
+    for (const item of event.events) {
+      if (item.kind === 'task.started') log(`Previous task started: ${item.text}`);
+      else if (item.kind === 'task.completed') log(`Previous task completed: ${item.text}`);
+      else if (item.kind === 'task.error') log(`Previous task error: ${item.text}`);
+    }
+  }
   else if (event.type === 'task.started') log(`Agent started: ${event.task}`);
   else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
   else if (event.type === 'task.completed') { log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
   else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); currentNotification = event.task_id; notificationPending = false; responsePending = true; }
   else if (event.type === 'notification.rejected') { notificationPending = false; }
-  else if (event.type === 'task.error' || event.type === 'error') { responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
-  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { speechOpen = false; currentNotification = null; responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
+  else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
+  else if (event.type === 'speech.end') { speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'speech.cancelled') { if (currentNotification) pendingNotifications.unshift(currentNotification); currentNotification = null; stopPlayback(); }
-};
+}
+function connectGateway() {
+  const socket = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);
+  ws = socket;
+  socket.binaryType = 'arraybuffer';
+  socket.onopen = () => { if (socket !== ws) return; status('Connected. Waiting for speech recognition.'); };
+  socket.onerror = () => { if (socket === ws) status('Gateway connection failed.'); };
+  socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
+  socket.onclose = event => {
+    if (socket !== ws) return;
+    asrReady = false; stopPlayback();
+    speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
+    $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
+    responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
+    if (event?.code === 1008) { status('Connection rejected. Check session settings and reload.'); return; }
+    const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempts++, 4), 15000);
+    status(`Disconnected. Reconnecting in ${delay / 1000} seconds.`);
+    setTimeout(() => { if (socket === ws) connectGateway(); }, delay);
+  };
+}
+connectGateway();
 $('interrupt').onclick = () => interrupt('manual');
 function changeMicrophoneMode() {
   finishPushToTalk();
   speaking = false; voiceFrames = 0; silenceFrames = 0;
   send(JSON.stringify({ type: 'audio.reset' }));
-  $('talk').disabled = !$('push-to-talk').checked || !stream?.active;
+  $('talk').disabled = !$('push-to-talk').checked || !stream?.active || !asrReady;
 }
 $('push-to-talk').onchange = changeMicrophoneMode;
 $('speaker-safe').onchange = changeMicrophoneMode;
 function beginPushToTalk() {
   if (pushToTalkActive) return;
-  if (!$('push-to-talk').checked || !stream?.active) return;
+  if (!$('push-to-talk').checked || !stream?.active || !asrReady || ws.readyState !== WebSocket.OPEN) return;
   if (speechOpen || playbackSources.size) interrupt('manual');
   send(JSON.stringify({ type: 'audio.reset' }));
   pushToTalkActive = true;
@@ -177,6 +215,7 @@ $('talk').onblur = finishPushToTalk;
 window.addEventListener('blur', finishPushToTalk);
 $('form').onsubmit = async event => {
   event.preventDefault();
+  if (ws.readyState !== WebSocket.OPEN) { status('Disconnected. Your message has not been sent.'); return; }
   if (!textInputAvailable) { status('Text and image input are unavailable in native speech mode.'); return; }
   const text = $('text').value.trim(), file = $('image').files?.[0];
   if (!text) return;
@@ -186,7 +225,9 @@ $('form').onsubmit = async event => {
     try { image = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); }
     catch { status('Could not read the selected image.'); return; }
   }
-  playbackContext ??= new AudioContext(); await playbackContext.resume(); interrupt(); responsePending = true;
+  playbackContext ??= new AudioContext(); await playbackContext.resume();
+  if (ws.readyState !== WebSocket.OPEN) { status('Disconnected. Your message has not been sent.'); return; }
+  interrupt(); responsePending = true;
   send(JSON.stringify(file ? { type: 'image', text, image } : { type: 'text', text }));
   $('text').value = ''; $('image').value = '';
 };
@@ -210,6 +251,7 @@ $('start').onclick = async () => {
     const lowpass = captureContext.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 7200;
     const microphone = captureContext.createMediaStreamSource(stream);
     const handleAudio = data => {
+      if (!asrReady || ws.readyState !== WebSocket.OPEN) return;
       if ($('push-to-talk').checked) {
         if (pushToTalkActive) send(data);
         return;

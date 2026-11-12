@@ -18,7 +18,17 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is disabled in the current demonstration.
 
-When a new agent task is dispatched, the gateway includes a bounded selection of recent conversation and task events as untrusted background. In one synthetic test the real local agent returned a random code supplied only in an earlier session message; the voice controller was mocked. An opt-in session-resume experiment can restore recent history after browser reloads, and after gateway restart when using file-backed history. It is not a complete shared memory or prompt-injection boundary. Existing gateway processes need restarting to pick up these changes.
+The updated gateway can also display an optional sampled GPU and RAM status in the local client. A low or stale sample is shown explicitly; reporting alone does not block work or establish that model weights remain in VRAM. The currently running demo serves updated client files but has not been restarted with the new endpoint, so its resource status is unavailable.
+
+When a new agent task is dispatched, the gateway includes a bounded selection of recent conversation and task events as untrusted background. In one synthetic test the real local agent returned a random code supplied only in an earlier session message; the voice controller was mocked. An opt-in session-resume experiment can restore recent history after browser reloads, and after gateway restart when using file-backed history. A real cascade controller recalled a synthetic code after reconnecting in one explicit-endpoint test. This is not a complete shared memory or prompt-injection boundary. Existing gateway processes need restarting to pick up these changes.
+
+A disposable-workspace probe for delegating a coding fix through the real voice controller passed a mock test. A later guarded real run changed the fixture to the expected addition, but the watchdog stopped the run after available RAM fell below the 6 GiB reserve, before the probe reported completion. It is therefore not a successful end-to-end result.
+
+In a synthetic spoken follow-up, the cascade recalled one colour after reconnecting, while separate secret-word trials failed through recognition or model behavior. No physical microphone or audible playback was tested in those runs.
+
+For resumable sessions, the updated browser displays a bounded recent task-event history on reconnect, including recorded offline completions. Mock tests cover session separation and file-backed restart; this does not replay missed spoken notifications.
+
+The updated browser also retries ordinary gateway disconnects and preserves unsent text. If the microphone was enabled, it resumes sending when recognition is ready. Reconnect behavior currently has simulated-browser and mock-service evidence only.
 
 In one short synthetic run with the cascade, an agent task and CPU speaker extraction, sampled dedicated GPU use peaked at 14.86 GiB. Sampling cannot prove a 24 GB hard ceiling or rule out RAM or disk spill; see the [measurement limitations](docs/research/2026-11-10-noisy-room.md#exp-094-concurrent-extractor-and-system-memory-sampling).
 
@@ -42,7 +52,7 @@ The client identifies the active voice mode. In experimental native speech mode 
 
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.
 
-Native speech-session resets can restore a bounded recent context from the gateway's local session events. After two synthetic tests repeated a completed task, a session-local exact-match reuse safeguard passed one real-model regression. This does not provide persistent memory across client reconnections or prevent all duplicate actions.
+Native speech-session resets can restore a bounded recent context from the gateway's local session events. After two synthetic tests repeated a completed task, an exact-match reuse safeguard passed one real-model regression. Mock-service tests also cover restoring recent completed results, retaining in-flight task tracking and delivering a completion after an opt-in reconnect to the same gateway process. Gateway restarts, offline event replay and other duplicate-action risks remain.
 
 ## Getting started with the interface mockup
 

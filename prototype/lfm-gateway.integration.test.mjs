@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { DatabaseSync } from 'node:sqlite';
 import { mkdir, mkdtemp, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -11,13 +12,13 @@ async function listen(server) { server.listen(0, '127.0.0.1'); await once(server
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
 
 test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
-  const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult='';
+  const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult=''; let nextToolOnResume=false; let agentBusy=false; let agentResult='BLUEBIRD';
   const agent=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST' && req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
     if(req.method==='POST' && req.url==='/session/fixture-session/prompt_async'){const body=await fetchJson(req);calls.push(body.parts[0].text);res.statusCode=204;return res.end();}
-    if(req.url==='/session/status')return res.end('{}');
-    if(req.url==='/session/fixture-session/message')return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:'BLUEBIRD'}]}]));
+    if(req.url==='/session/status')return res.end(JSON.stringify(agentBusy?{'fixture-session':{type:'busy'}}:{}));
+    if(req.url==='/session/fixture-session/message')return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:agentResult}]}]));
     res.statusCode=404;res.end('{}');
   });
   const agentPort=await listen(agent);
@@ -32,6 +33,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       if(e.type!=='response.create')return;
       requestNumber++;const id=`r${requestNumber}`;
       socket.send(JSON.stringify({type:'response.created',response:{id}}));
+      if(nextToolOnResume){const rerun=nextToolOnResume==='rerun';nextToolOnResume=false;socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:'resumed-call',arguments:JSON.stringify({task:'Read fixture.txt and report the secret word',...(rerun?{rerun:true}:{})})}]}}));return;}
       if([1,4,6,8].includes(requestNumber)){socket.send(JSON.stringify({type:'response.done',response:{id,status:'completed',output:[{type:'function_call',name:'delegate_task',call_id:`call${requestNumber}`,arguments:JSON.stringify({task:'Read fixture.txt and report the secret word',...(requestNumber===8?{rerun:true}:{})})}]}}));return;}
       if(requestNumber===3)assert.equal(e.response.tool_choice,'none');
       socket.send(JSON.stringify({type:'response.output_text.delta',response_id:id,delta:requestNumber===2?'Task started.':'Task finished.'}));
@@ -132,4 +134,75 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   });
   assert.match(sessionInstructions.at(-1),/BLUEBIRD/);
   assert.match(sessionInstructions.at(-1),/approximate parallel transcript/);
+  nextToolOnResume=true;
+  await new Promise((resolve,reject)=>{
+    let reused=false;
+    const timer=setTimeout(()=>reject(Error('Reconnect reuse timed out')),5000);
+    resumed.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='task.reused')reused=true;if(e.type==='speech.end'&&reused){clearTimeout(timer);resolve();}else if(e.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}});
+    resumed.send(JSON.stringify({type:'audio.start'}));resumed.send(Buffer.alloc(3200));resumed.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,2);
+  assert.equal(JSON.parse(rejectedToolResult).already_completed,true);
+  assert.equal(JSON.parse(rejectedToolResult).result,'BLUEBIRD');
+  agentBusy=true;
+  nextToolOnResume='rerun';
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Delayed task did not start')),5000);
+    resumed.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='task.started'){clearTimeout(timer);resolve();}});
+    resumed.send(JSON.stringify({type:'audio.start'}));resumed.send(Buffer.alloc(3200));resumed.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,3);
+  const upstream=[...wss.clients].find(socket=>socket.readyState===WebSocket.OPEN);
+  const upstreamClosed=once(upstream,'close');
+  resumed.close();await once(resumed,'close');await upstreamClosed;
+  const reconnect=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);
+  t.after(()=>reconnect.terminate());
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('In-flight reconnect timed out')),5000);
+    reconnect.on('error',reject);
+    reconnect.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='asr.ready'){clearTimeout(timer);resolve();}});
+  });
+  nextToolOnResume=true;
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('In-flight duplicate check timed out')),5000);
+    reconnect.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='speech.end'){clearTimeout(timer);resolve();}else if(e.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}});
+    reconnect.send(JSON.stringify({type:'audio.start'}));reconnect.send(Buffer.alloc(3200));reconnect.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,3);
+  assert.equal(JSON.parse(rejectedToolResult).already_running,true);
+  const completedAfterReconnect=new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Reconnected client did not receive completion')),5000);
+    reconnect.on('message',(data,binary)=>{if(binary)return;const event=JSON.parse(data);if(event.type==='task.completed'){clearTimeout(timer);resolve(event);}else if(event.type==='task.error'){clearTimeout(timer);reject(Error(event.message));}});
+  });
+  agentBusy=false;
+  assert.equal((await completedAfterReconnect).text,'BLUEBIRD');
+  agentBusy=true;
+  nextToolOnResume='rerun';
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Offline task did not start')),5000);
+    reconnect.on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='task.started'){clearTimeout(timer);resolve();}});
+    reconnect.send(JSON.stringify({type:'audio.start'}));reconnect.send(Buffer.alloc(3200));reconnect.send(JSON.stringify({type:'audio.end'}));
+  });
+  assert.equal(calls.length,4);
+  const oldUpstream=[...wss.clients].find(socket=>socket.readyState===WebSocket.OPEN);
+  const oldUpstreamClosed=once(oldUpstream,'close');
+  reconnect.close();await once(reconnect,'close');await oldUpstreamClosed;
+  const reader=new DatabaseSync(path.join(temp,'events.sqlite'),{readOnly:true});
+  try {
+    const query=reader.prepare("SELECT COUNT(*) AS n FROM events WHERE kind = 'task.completed'");
+    const previous=query.get().n;
+    agentResult='OFFLINE-COMPLETION';agentBusy=false;
+    const deadline=Date.now()+5000;
+    while(query.get().n===previous && Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,50));
+    assert.equal(query.get().n,previous+1,'Offline task must finish and persist before reconnect');
+  } finally { reader.close(); }
+  const afterOffline=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);
+  t.after(()=>afterOffline.terminate());
+  let recoveredHistory;
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Offline history reconnect timed out')),5000);
+    afterOffline.on('error',reject);
+    afterOffline.on('message',(data,binary)=>{if(binary)return;const event=JSON.parse(data);if(event.type==='session.task_history')recoveredHistory=event.events;if(event.type==='asr.ready'){clearTimeout(timer);resolve();}});
+  });
+  assert.ok(recoveredHistory.some(event=>event.kind==='task.completed' && event.text==='OFFLINE-COMPLETION'));
 });

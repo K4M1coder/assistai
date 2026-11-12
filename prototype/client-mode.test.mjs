@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
@@ -21,8 +21,11 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
   const stream = { active: true, getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: true }) }], getTracks: () => [] };
-  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
+  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }), location: { host: 'localhost' }, WebSocket: Socket, AudioContext: Context, AudioWorkletNode: Worklet, navigator: { mediaDevices: { getUserMedia: async () => stream } }, window: { addEventListener() {} }, setInterval() {}, Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
   vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.task_history', events:[{kind:'task.completed',text:'offline result'}]})})", context);
+  assert.match(elements.log.textContent, /Previous task completed: offline result/);
+  assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'asr.ready'})})", context);
   await elements.start.onclick();
   elements['push-to-talk'].checked = true;
@@ -44,10 +47,15 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})})", context);
   assert.ok(sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
+  assert.equal(vm.runInContext('speechOpen', context), true);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);
+  assert.equal(vm.runInContext('speechOpen', context), false);
+  assert.equal(elements.status.textContent, 'TTS failed');
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {
-  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status'];
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const storage = new Map();
   let reloads = 0, selectedProtocols;
   function start() {
@@ -55,10 +63,12 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
     elements['noise-threshold'].value = '2.5';
     class Socket { static OPEN = 1; constructor(url, protocols) { selectedProtocols = protocols; } }
     const context = vm.createContext({ document: { getElementById: id => elements[id] },
-      fetch: async url => url === '/health' ? { ok: true, json: async () => ({ session_resume_enabled: true }) } : { ok: false },
+      fetch: async url => url === '/health' ? { ok: true, json: async () => ({ session_resume_enabled: true }) }
+        : url === '/resources' ? { ok: true, json: async () => ({ status: 'low', dedicated_bytes: 15 * 1024 ** 3, shared_bytes: 0, available_ram_bytes: 4 * 1024 ** 3, reasons: ['RAM below reserve'], admission: 'disabled' }) }
+        : { ok: false },
       location: { host: 'localhost', reload() { reloads++; } }, WebSocket: Socket,
       localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-      crypto: { getRandomValues: bytes => bytes.fill(1) }, window: { addEventListener() {} },
+      crypto: { getRandomValues: bytes => bytes.fill(1) }, window: { addEventListener() {} }, setInterval() {},
       Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON, Array });
     vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
     return elements;
@@ -66,6 +76,8 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
   const first = start();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(first['session-memory'].disabled, false);
+  assert.match(first.resources.textContent, /available RAM 4\.00 GiB/);
+  assert.match(first.resources.textContent, /No hard limit is enforced/);
   assert.equal(selectedProtocols, undefined);
   first['session-memory'].onclick();
   assert.equal(storage.get('assistai.session-resume.v1'), '01'.repeat(32));
@@ -76,4 +88,29 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
   second['session-memory'].onclick();
   assert.equal(storage.size, 0);
   assert.equal(reloads, 2);
+});
+
+test('a dropped connection retries and preserves unsent text', async () => {
+  const names = ['status', 'log', 'noise-threshold', 'noise-threshold-value', 'talk', 'push-to-talk', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false }]));
+  elements.text.value = 'keep this message';
+  const sockets = [], timers = [];
+  class Socket { static OPEN = 1; constructor() { this.readyState=1; sockets.push(this); } send() {} }
+  const context = vm.createContext({ document: { getElementById: id => elements[id] }, fetch: async () => ({ ok: false }),
+    location: { host: 'localhost' }, WebSocket: Socket, window: { addEventListener() {} },
+    setInterval() {}, setTimeout: (fn, delay) => timers.push({ fn, delay }),
+    Int16Array, ArrayBuffer, Uint8Array, DataView, Set, Math, Number, JSON });
+  vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
+  sockets[0].readyState = 3; sockets[0].onclose({ code: 1006 });
+  assert.equal(timers[0].delay, 1000);
+  await elements.form.onsubmit({ preventDefault() {} });
+  assert.equal(elements.text.value, 'keep this message');
+  assert.match(elements.status.textContent, /not been sent/);
+  timers.shift().fn();
+  assert.equal(sockets.length, 2);
+  sockets[1].onmessage({ data: JSON.stringify({type:'asr.ready'}) });
+  assert.match(elements.status.textContent, /Ready/);
+  sockets[1].readyState = 3; sockets[1].onclose({ code: 1008 });
+  assert.equal(timers.length, 0);
+  assert.match(elements.status.textContent, /rejected/);
 });
