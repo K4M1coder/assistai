@@ -8,6 +8,8 @@ In cascade mode, a selected image can accompany the final transcript of the next
 
 The browser detects when an audio chunk arrives more than 30 ms after the previously scheduled playback end during the same speech stream. It logs the count and longest observed gap when that stream ends. This client-clock diagnostic does not attribute gaps to synthesis, network, browser scheduling or the audio device and cannot detect pronunciation errors.
 
+Consecutive chunks now start at the end of the existing playback queue while it remains ahead of the audio clock. A 40 ms lead is added at the beginning of a stream or following an underrun. The former unconditional lead could create a gap when less than 40 ms was queued; a mock-clock test verifies adjacency, while actual browser playback still needs listening validation.
+
 ```mermaid
 flowchart LR
   U[Browser voice client] <-->|PCM and events| G[Local gateway]

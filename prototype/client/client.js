@@ -141,12 +141,15 @@ function play(data, rate) {
   const source = playbackContext.createBufferSource();
   source.buffer = buffer; source.connect(playbackContext.destination);
   if (referenceNode && captureContext === playbackContext) source.connect(referenceNode, 0, 1);
-  if (speechHasAudio && playbackContext.currentTime - playbackTime > 0.03) {
+  const continuingSpeech = speechHasAudio;
+  if (continuingSpeech && playbackContext.currentTime - playbackTime > 0.03) {
     playbackGapCount++;
     playbackGapMaxMs = Math.max(playbackGapMaxMs, (playbackContext.currentTime - playbackTime) * 1000);
   }
   speechHasAudio = true;
-  playbackTime = Math.max(playbackTime, playbackContext.currentTime + 0.04);
+  // Preserve a continuous queue. Add startup lead only for the first chunk or after an underrun.
+  playbackTime = continuingSpeech && playbackTime >= playbackContext.currentTime
+    ? playbackTime : Math.max(playbackTime, playbackContext.currentTime + 0.04);
   source.start(playbackTime); playbackTime += buffer.duration;
   playbackSources.add(source); source.onended = () => { playbackSources.delete(source); announceWhenIdle(); };
 }

@@ -8,7 +8,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5';
   elements['speaker-safe'].checked = true;
-  const sent = [], timers = [];
+  const sent = [], timers = [], playbackStarts = [];
   class Socket { static OPEN = 1; readyState = 1; send(data) { sent.push(data); } }
   class Context {
     destination = {};
@@ -20,7 +20,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
     createMediaStreamSource() { return { connect(node) { return node; } }; }
     createGain() { return { gain: {}, connect(node) { return node; } }; }
     createBuffer(channels, length, rate) { return { duration: length / rate, getChannelData: () => new Float32Array(length) }; }
-    createBufferSource() { return { connect() {}, start() {}, stop() {} }; }
+    createBufferSource() { return { connect() {}, start(at) { playbackStarts.push(at); }, stop() {} }; }
   }
   class Worklet { constructor() { this.port = {}; } connect(node) { return node; } disconnect() {} }
   class Reader { readAsDataURL() { this.result = 'data:image/png;base64,iVBORw0KGgo='; this.onload(); } }
@@ -72,6 +72,9 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.equal(JSON.parse(sent.at(-1)).image, 'data:image/png;base64,iVBORw0KGgo=');
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'gap-test', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); playbackContext.currentTime = 0.25; ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end', turn_id:'gap-test'})})", context);
   assert.match(elements.log.textContent, /Playback detected 1 gap/);
+  vm.runInContext("playbackContext.currentTime = 1; ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'continuous-test', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); playbackContext.currentTime = 1.045; ws.onmessage({data: new ArrayBuffer(480)})", context);
+  assert.ok(Math.abs(playbackStarts.at(-2) - 1.04) < 0.000001);
+  assert.ok(Math.abs(playbackStarts.at(-1) - 1.05) < 0.000001, 'queued audio must not gain a 35 ms gap');
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {

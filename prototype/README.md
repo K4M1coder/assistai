@@ -73,6 +73,8 @@ When the cascade gateway advertises `spoken_image_input`, an image selected and 
 
 For diagnosing choppy playback, the client logs the number and longest duration of gaps over 30 ms between scheduled chunks within a speech stream. This uses the browser audio clock and is not a measurement of microphone input, pronunciation or actual device output. It has mock-clock coverage; browser and device behavior still need validation. See EXP-139.
 
+The browser now preserves adjacent chunk scheduling while audio is queued, adding a 40 ms lead only at stream start or after an underrun. `scripts/run-tts-pacing.ps1` measures synthetic local TTS delivery against an approximate virtual queue with sampled B60 resource guards. It does not open audio devices, measure browser behavior or assess intelligibility. See EXP-140.
+
 The client defaults to **speaker-safe mode**: it pauses microphone input while generated speech is playing to prevent acoustic feedback. Use the Interrupt button to stop the assistant and reopen the microphone. Uncheck the setting to experiment with automatic spoken interruptions; echo and false interruptions are not yet solved in that mode.
 
 On Windows, `scripts/measure-windows-memory.ps1 -ModelPid <pid>` samples dedicated and shared GPU allocations, model process memory, available physical RAM and global page-file use. Establish a baseline before starting services and compare it with sustained audio, vision and agent workloads. This is monitoring, not an automatic memory limiter.
