@@ -158,14 +158,14 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-bold text-slate-100 font-mono tracking-tight">
-                Console de Sécurité & RBAC Étendu
+                Security & Extended RBAC Console
               </h2>
               <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-semibold">
-                Mode Démo 100% Unrestricted
+                Demo Mode: 100% Unrestricted
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Activation / Désactivation granulaire par rôle et par utilisateur • Jetons locaux & API Keys
+              Granular role and user permissions • Local tokens & API keys
             </p>
           </div>
         </div>
@@ -175,10 +175,10 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
           <button
             onClick={() => authService.resetToDemoDefaults()}
             className="px-3 py-1.5 rounded-lg text-xs font-mono bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
-            title="Rétablir 100% des fonctions activées par défaut"
+            title="Restore all demo features to their enabled defaults"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Réinitialiser Tout Démo</span>
+            <span>Reset Demo</span>
           </button>
           {onClose && (
             <button
@@ -194,7 +194,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
       {/* Active User Switcher Bar */}
       <div className="px-4 py-2.5 bg-slate-950/40 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-2 text-xs">
-          <span className="text-slate-400 font-mono text-[11px] uppercase">Utilisateur Actif :</span>
+          <span className="text-slate-400 font-mono text-[11px] uppercase">Active User:</span>
           <div className="flex items-center space-x-2 bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1">
             <img
               src={currentUser.avatar}
@@ -220,7 +220,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
 
         {/* Quick Switch Dropdown */}
         <div className="flex items-center space-x-1 text-xs">
-          <span className="text-slate-400 text-[11px]">Simuler un rôle :</span>
+          <span className="text-slate-400 text-[11px]">Simulate a role:</span>
           {allUsers.map((u) => (
             <button
               key={u.id}
@@ -240,10 +240,10 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
       {/* Tabs Bar */}
       <div className="flex border-b border-slate-800 bg-slate-950/60 px-4">
         {[
-          { id: 'matrix', label: '1. Matrice des 13 Fonctions', icon: Sliders },
-          { id: 'users', label: '2. Utilisateurs & Dérogations', icon: Users },
+          { id: 'matrix', label: '1. Feature Matrix', icon: Sliders },
+          { id: 'users', label: '2. Users & Overrides', icon: Users },
           { id: 'mcp', label: '3. Sandbox & MCP Plugins', icon: Server },
-          { id: 'logs', label: "4. Journal d'Audit", icon: Activity },
+          { id: 'logs', label: '4. Audit Log', icon: Activity },
         ].map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -273,11 +273,11 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>
-                  <strong>Configuration Démo Active :</strong> Toutes les fonctionnalités sont autorisées par défaut.
-                  Basculez n'importe quel commutateur pour tester les restrictions en temps réel.
+                  <strong>Demo configuration active:</strong> All features are allowed by default.
+                  Toggle a switch to test restrictions in real time.
                 </span>
               </div>
-              <span className="font-mono text-cyan-400 text-[11px]">13 / 13 Fonctions Activées</span>
+              <span className="font-mono text-cyan-400 text-[11px]">13 / 13 Features Enabled</span>
             </div>
 
             {/* Matrix Table */}
@@ -285,7 +285,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/80 text-[11px] font-mono text-slate-400 uppercase">
-                    <th className="py-3 px-4">Fonctionnalité Système</th>
+                    <th className="py-3 px-4">System Feature</th>
                     <th className="py-3 px-3 text-center">Admin</th>
                     <th className="py-3 px-3 text-center">AI Engineer</th>
                     <th className="py-3 px-3 text-center">Operator</th>
@@ -384,10 +384,10 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-100 font-mono">
-                  Comptes Collaborateurs & Dérogations Individuelles
+                  User Accounts & Individual Overrides
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Attribuez des rôles et personnalisez des permissions au niveau de chaque compte utilisateur.
+                  Assign roles and customize permissions for each user account.
                 </p>
               </div>
               <button
@@ -395,7 +395,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white transition flex items-center space-x-1.5 cursor-pointer shadow-md shadow-cyan-950/40"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Nouveau Collaborateur</span>
+                <span>New User</span>
               </button>
             </div>
 
@@ -406,13 +406,13 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                 className="p-4 bg-slate-950/90 border border-slate-700 rounded-xl space-y-3"
               >
                 <div className="text-xs font-semibold text-cyan-400 font-mono uppercase">
-                  Ajouter un Collaborateur Local
+                  Add a Local User
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <input
                     type="text"
                     required
-                    placeholder="Nom complet (ex: Sarah Vance)"
+                    placeholder="Full name (e.g. Sarah Vance)"
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
                     className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
@@ -420,7 +420,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                   <input
                     type="email"
                     required
-                    placeholder="Email (ex: sarah.vance@ai-lab.local)"
+                    placeholder="Email (e.g. sarah.vance@ai-lab.local)"
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
                     className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
@@ -442,13 +442,13 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                     onClick={() => setIsAddingUser(false)}
                     className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1"
                   >
-                    Annuler
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-1 rounded"
                   >
-                    Créer Compte
+                    Create Account
                   </button>
                 </div>
               </form>
@@ -490,7 +490,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                             </span>
                             {user.id === currentUser.id && (
                               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.2 rounded">
-                                Connecté
+                                Connected
                               </span>
                             )}
                           </div>
@@ -507,7 +507,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                         <button
                           onClick={() => handleCopyApiKey(user.id, user.apiKey)}
                           className="p-1 text-slate-400 hover:text-cyan-300 rounded"
-                          title="Copier la clé API pour CLI / MCP"
+                          title="Copy API key for CLI / MCP"
                         >
                           {copiedKeyUserId === user.id ? (
                             <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -522,7 +522,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                           onClick={() => authService.generateApiKey(user.id)}
                           className="text-[11px] font-mono text-slate-400 hover:text-slate-200 border border-slate-800 bg-slate-900 px-2 py-1 rounded"
                         >
-                          Régénérer Clé
+                          Regenerate Key
                         </button>
                         <button
                           onClick={() =>
@@ -533,8 +533,8 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                           <Sliders className="w-3 h-3" />
                           <span>
                             {isExpanded
-                              ? 'Fermer Dérogations'
-                              : `Dérogations (${overridesCount})`}
+                              ? 'Close Overrides'
+                              : `Overrides (${overridesCount})`}
                           </span>
                         </button>
                       </div>
@@ -544,7 +544,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                     {isExpanded && (
                       <div className="pt-3 border-t border-slate-800/80">
                         <div className="text-xs font-mono text-slate-300 mb-2 font-semibold">
-                          Dérogations Individuelles pour {user.name} :
+                          Individual Overrides for {user.name}:
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                           {ALL_FEATURES.map((feat) => {
@@ -560,7 +560,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                                 <div>
                                   <div className="text-slate-200 font-medium">{feat.label}</div>
                                   <span className="text-[10px] font-mono text-slate-400">
-                                    {isInherited ? '(Hérité rôle)' : '(Dérogé)'}
+                                    {isInherited ? '(Inherited from role)' : '(Overridden)'}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1">
@@ -578,7 +578,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                                         : 'bg-rose-950 text-rose-300 border border-rose-800'
                                     }`}
                                   >
-                                    {effectiveVal ? 'ACTIF' : 'BLOQUÉ'}
+                                    {effectiveVal ? 'ENABLED' : 'BLOCKED'}
                                   </button>
                                 </div>
                               </div>
@@ -603,31 +603,30 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                 <div className="flex items-center space-x-2">
                   <Terminal className="w-4 h-4 text-cyan-400" />
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200 font-mono">
-                    Mode d'Exécution Sandbox
+                    Sandbox Execution Mode
                   </h3>
                 </div>
                 <span className="text-xs font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60 font-semibold">
-                  Isolat v8 Hermétique Actif (0 Fuite)
+                  Hermetic V8 Isolate Active (Demo)
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                La sandbox locale prend en charge deux modes de confinement. L'isolat strict bloque tout socket externe,
-                tandis que la sandbox connectée autorise les téléchargements de bibliothèques pip/npm contrôlés.
+                The demo describes two containment modes: an isolated sandbox and a connected sandbox with controlled pip/npm downloads.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="p-3 rounded-lg border border-cyan-800/60 bg-cyan-950/20 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-semibold text-cyan-300">Sandbox Isolée (Air-Gapped)</div>
-                    <div className="text-[11px] text-slate-400">RAM/CPU isolés, aucun accès réseau sortant</div>
+                    <div className="text-xs font-semibold text-cyan-300">Isolated Sandbox (Air-Gapped)</div>
+                    <div className="text-[11px] text-slate-400">Isolated RAM/CPU, no outbound network access</div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 font-bold">ACTIF</span>
+                  <span className="text-xs font-mono text-emerald-400 font-bold">ACTIVE</span>
                 </div>
                 <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/40 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-semibold text-slate-200">Sandbox Connectée (Réseau)</div>
-                    <div className="text-[11px] text-slate-400">Accès internet autorisé pour npm / pip / git</div>
+                    <div className="text-xs font-semibold text-slate-200">Connected Sandbox (Network)</div>
+                    <div className="text-[11px] text-slate-400">Internet access allowed for npm / pip / git</div>
                   </div>
-                  <span className="text-xs font-mono text-cyan-400 font-bold">AUTORISÉ DÉMO</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">ALLOWED IN DEMO</span>
                 </div>
               </div>
             </div>
@@ -638,14 +637,14 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200 font-mono flex items-center space-x-2">
                     <Server className="w-4 h-4 text-purple-400" />
-                    <span>Registre Serveurs MCP (Model Context Protocol)</span>
+                    <span>MCP Server Registry (Model Context Protocol)</span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Connecteurs standardisés permettant aux agents d'interroger le système de fichiers, git et les capteurs GPU Intel.
+                    Standard connectors for filesystem, git, and Intel GPU sensor access.
                   </p>
                 </div>
                 <span className="text-xs font-mono text-slate-400">
-                  {mcpPlugins.filter((p) => p.status === 'enabled').length} / {mcpPlugins.length} Actifs
+                  {mcpPlugins.filter((p) => p.status === 'enabled').length} / {mcpPlugins.length} Active
                 </span>
               </div>
 
@@ -669,7 +668,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                       </div>
                       <p className="text-[11px] text-slate-400 mt-1">{plugin.description}</p>
                       <div className="flex items-center space-x-1.5 mt-2">
-                        <span className="text-[10px] text-slate-400 font-mono uppercase">Outils:</span>
+                        <span className="text-[10px] text-slate-400 font-mono uppercase">Tools:</span>
                         {plugin.tools.map((t) => (
                           <span
                             key={t}
@@ -689,7 +688,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                           : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
                       }`}
                     >
-                      {plugin.status === 'enabled' ? 'ACTIVÉ' : 'DÉSACTIVÉ'}
+                      {plugin.status === 'enabled' ? 'ENABLED' : 'DISABLED'}
                     </button>
                   </div>
                 ))}
@@ -704,10 +703,10 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200 font-mono">
-                  Journal d'Audit de Sécurité en Temps Réel
+                  Real-Time Security Audit Log
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Traçabilité des vérifications de permissions RBAC et exécutions d'outils.
+                  Trace RBAC permission checks and tool executions.
                 </p>
               </div>
 
@@ -715,7 +714,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
-                  placeholder="Rechercher dans les logs..."
+                  placeholder="Search logs..."
                   value={searchLogQuery}
                   onChange={(e) => setSearchLogQuery(e.target.value)}
                   className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-48"
@@ -725,9 +724,9 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                   onChange={(e) => setLogFilter(e.target.value as any)}
                   className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
                 >
-                  <option value="all">Tous les statuts</option>
-                  <option value="granted">Autorisés uniquement</option>
-                  <option value="denied">Refusés uniquement</option>
+                  <option value="all">All statuses</option>
+                  <option value="granted">Granted only</option>
+                  <option value="denied">Denied only</option>
                 </select>
               </div>
             </div>
@@ -737,12 +736,12 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/80 text-[10px] font-mono text-slate-400 uppercase">
-                    <th className="py-2.5 px-3">Horodatage</th>
-                    <th className="py-2.5 px-3">Collaborateur</th>
-                    <th className="py-2.5 px-3">Fonction</th>
-                    <th className="py-2.5 px-3">Action Exécutée</th>
-                    <th className="py-2.5 px-3">Statut</th>
-                    <th className="py-2.5 px-3">Détails</th>
+                    <th className="py-2.5 px-3">Timestamp</th>
+                    <th className="py-2.5 px-3">User</th>
+                    <th className="py-2.5 px-3">Feature</th>
+                    <th className="py-2.5 px-3">Action</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
@@ -765,7 +764,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
                               : 'bg-rose-950/80 text-rose-300 border-rose-800/80'
                           }`}
                         >
-                          {log.status === 'granted' ? 'AUTORISÉ' : 'REFUSÉ'}
+                          {log.status === 'granted' ? 'GRANTED' : 'DENIED'}
                         </span>
                       </td>
                       <td className="py-2 px-3 text-slate-400 text-[10px] truncate max-w-xs">
@@ -784,7 +783,7 @@ export const RBACSecurityStudio: React.FC<RBACSecurityStudioProps> = ({ onClose 
       <div className="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-[11px] font-mono text-slate-400">
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span>Matrice de permissions synchronisée en temps réel (REST + WebSocket)</span>
+          <span>Permission matrix synchronized in real time (REST + WebSocket)</span>
         </div>
         <span className="text-slate-500">Self-Hosted Workstation (Local Bearer Tokens)</span>
       </div>

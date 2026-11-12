@@ -85,7 +85,7 @@ export function ProjectSidebar({
         <button
           onClick={onToggleCollapse}
           className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800/80 rounded transition"
-          title="Ouvrir la barre des projets & sessions"
+          title="Open projects and sessions sidebar"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -125,14 +125,14 @@ export function ProjectSidebar({
         <div className="flex items-center space-x-2">
           <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">
-            Projets & Sessions (256K)
+            Projects & Sessions (256K)
           </h2>
         </div>
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setIsCreatingProject(!isCreatingProject)}
             className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition"
-            title="Nouveau Projet"
+            title="New Project"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -142,7 +142,7 @@ export function ProjectSidebar({
             <button
               onClick={onToggleCollapse}
               className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition"
-              title="Réduire le panneau"
+              title="Collapse panel"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -159,7 +159,7 @@ export function ProjectSidebar({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher session ou projet..."
+            placeholder="Search sessions or projects..."
             className="w-full bg-slate-900 text-xs text-slate-100 placeholder-slate-500 pl-7 pr-7 py-1.5 rounded border border-slate-700/80 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
           />
           <svg
@@ -184,14 +184,14 @@ export function ProjectSidebar({
         <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
           <span className="flex items-center space-x-1">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>Recherche vocale active</span>
+            <span>Voice search active</span>
           </span>
           {onVoiceSearchRequest && (
             <button
-              onClick={() => onVoiceSearchRequest(searchQuery || 'état de la session')}
+              onClick={() => onVoiceSearchRequest(searchQuery || 'session status')}
               className="text-cyan-400 hover:text-cyan-300 hover:underline flex items-center space-x-0.5"
             >
-              <span>Vocaliser</span>
+              <span>Speak</span>
               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
@@ -203,21 +203,21 @@ export function ProjectSidebar({
       {/* New Project Form Modal/Inline */}
       {isCreatingProject && (
         <form onSubmit={handleCreateProjectSubmit} className="p-3 bg-slate-800/80 border-b border-slate-700 space-y-2">
-          <div className="text-xs font-semibold text-cyan-400">Nouveau Projet Harnais</div>
+          <div className="text-xs font-semibold text-cyan-400">New Harness Project</div>
           <input
             type="text"
             required
             autoFocus
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
-            placeholder="Nom du projet (ex: Robotique Spatial 3D)"
+            placeholder="Project name (e.g. 3D Space Robotics)"
             className="w-full bg-slate-900 text-xs px-2 py-1 rounded border border-slate-700 text-slate-100"
           />
           <input
             type="text"
             value={newProjectDesc}
             onChange={(e) => setNewProjectDesc(e.target.value)}
-            placeholder="Description courte..."
+            placeholder="Short description..."
             className="w-full bg-slate-900 text-xs px-2 py-1 rounded border border-slate-700 text-slate-100"
           />
           <div className="flex space-x-2 justify-end pt-1">
@@ -226,13 +226,13 @@ export function ProjectSidebar({
               onClick={() => setIsCreatingProject(false)}
               className="text-[11px] text-slate-400 hover:text-slate-200 px-2 py-0.5"
             >
-              Annuler
+              Cancel
             </button>
             <button
               type="submit"
               className="text-[11px] bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-2.5 py-0.5 rounded"
             >
-              Créer
+              Create
             </button>
           </div>
         </form>
@@ -242,7 +242,7 @@ export function ProjectSidebar({
       <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
         {filteredProjects.length === 0 ? (
           <div className="text-center py-8 text-xs text-slate-500">
-            Aucun projet ou session correspondant à « {searchQuery} »
+            No project or session matches “{searchQuery}”
           </div>
         ) : (
           filteredProjects.map((project) => {
@@ -285,7 +285,7 @@ export function ProjectSidebar({
                         );
                       }}
                       className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-700/60 rounded"
-                      title="Ajouter une session de conversation"
+                      title="Add a conversation session"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -310,14 +310,14 @@ export function ProjectSidebar({
                     onSubmit={(e) => handleCreateSessionSubmit(e, project.id)}
                     className="p-2 bg-slate-800/90 border-t border-slate-700 flex flex-col space-y-1.5"
                   >
-                    <div className="text-[11px] text-cyan-400 font-medium">Nouvelle session isolée 256K</div>
+                    <div className="text-[11px] text-cyan-400 font-medium">New isolated 256K session</div>
                     <input
                       type="text"
                       required
                       autoFocus
                       value={newSessionTitle}
                       onChange={(e) => setNewSessionTitle(e.target.value)}
-                      placeholder="Titre de la session..."
+                      placeholder="Session title..."
                       className="bg-slate-900 text-xs px-2 py-1 rounded border border-slate-700 text-slate-100"
                     />
                     <div className="flex justify-end space-x-2 pt-1">
@@ -326,13 +326,13 @@ export function ProjectSidebar({
                         onClick={() => setAddingSessionToProjId(null)}
                         className="text-[10px] text-slate-400 hover:text-slate-200"
                       >
-                        Annuler
+                        Cancel
                       </button>
                       <button
                         type="submit"
                         className="text-[10px] bg-cyan-600 hover:bg-cyan-500 text-white px-2 py-0.5 rounded"
                       >
-                        Créer session
+                        Create session
                       </button>
                     </div>
                   </form>
@@ -343,7 +343,7 @@ export function ProjectSidebar({
                   <div className="px-1.5 py-1 space-y-1 border-t border-slate-800/60 bg-slate-950/20">
                     {sessionsToRender.length === 0 ? (
                       <div className="text-[11px] text-slate-500 py-1.5 px-2 italic">
-                        Aucune session
+                        No sessions
                       </div>
                     ) : (
                       sessionsToRender.map((session) => {

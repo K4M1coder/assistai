@@ -14,81 +14,81 @@ export const ALL_FEATURES: Array<{
 }> = [
   {
     key: 'web_search',
-    label: 'Recherche Web',
+    label: 'Web Search',
     category: 'intelligence',
-    description: 'Requêtes de recherche internet en direct et grounding de contextes.',
+    description: 'Live internet search and context grounding.',
   },
   {
     key: 'code_execution',
-    label: 'Exécution de Code',
+    label: 'Code Execution',
     category: 'sandbox',
-    description: 'Lancement de scripts et isolats (TypeScript, Python, Rust).',
+    description: 'Run scripts and isolates (TypeScript, Python, Rust).',
   },
   {
     key: 'isolated_sandbox',
-    label: 'Sandbox Isolée (Air-Gapped)',
+    label: 'Isolated Sandbox (Air-Gapped)',
     category: 'sandbox',
-    description: 'Exécution locale v8 hermétique sans accès réseau ni socket sortant.',
+    description: 'Local V8 execution without network or outbound sockets.',
   },
   {
     key: 'connected_sandbox',
-    label: 'Sandbox Connectée',
+    label: 'Connected Sandbox',
     category: 'sandbox',
-    description: 'Accès réseau autorisé, téléchargement de paquets npm/pip.',
+    description: 'Network access and npm/pip package downloads.',
   },
   {
     key: 'agentic_tasks',
-    label: 'Tâches Agentiques (OpenHands)',
+    label: 'Agentic Tasks (OpenHands)',
     category: 'intelligence',
-    description: 'Boucles autonomes multi-étapes planification/observation/action.',
+    description: 'Autonomous multi-step planning, observation, and action loops.',
   },
   {
     key: 'image_generation',
-    label: "Création d'Images",
+    label: 'Image Generation',
     category: 'media',
-    description: 'Génération neuronale de rendus visuels et schémas conceptuels.',
+    description: 'Neural generation of visual renders and conceptual diagrams.',
   },
   {
     key: 'music_generation',
-    label: 'Création Musicale',
+    label: 'Music Generation',
     category: 'media',
-    description: 'Synthétiseur polyphonique 6 voix et flux audio procéduraux.',
+    description: 'Six-voice polyphonic synthesizer and procedural audio streams.',
   },
   {
     key: 'threejs_3d',
-    label: 'Moteur 3D & Shaders',
+    label: '3D Engine & Shaders',
     category: 'media',
-    description: 'Génération de maillages Three.js WebGL, shaders PBR et particules.',
+    description: 'Three.js WebGL meshes, PBR shaders, and particles.',
   },
   {
     key: 'enterprise_connectors',
-    label: 'Connecteurs Entreprise',
+    label: 'Enterprise Connectors',
     category: 'devops',
-    description: 'Synchronisation Atlassian Jira, Microsoft Teams et Google Workspace.',
+    description: 'Atlassian Jira, Microsoft Teams, and Google Workspace synchronization.',
   },
   {
     key: 'mcp_plugins',
-    label: 'MCP & Plugins Externes',
+    label: 'MCP & External Plugins',
     category: 'devops',
-    description: 'Appel d’outils Model Context Protocol et extensions d’agents.',
+    description: 'Model Context Protocol tool calls and agent extensions.',
   },
   {
     key: 'hardware_override',
     label: 'Hardware Overrides (B60)',
     category: 'system',
-    description: 'Réallocation mémoire VRAM 24GB et tuning de scripts GPU.',
+    description: '24 GB VRAM reallocation and GPU script tuning.',
   },
   {
     key: 'user_management',
-    label: 'Gestion Utilisateurs & Rôles',
+    label: 'User & Role Management',
     category: 'system',
-    description: 'Création d’utilisateurs, attribution de rôles et génération de clés API.',
+    description: 'User creation, role assignment, and API key generation.',
   },
   {
     key: 'delete_project',
-    label: 'Suppression Projets & Sessions',
+    label: 'Delete Projects & Sessions',
     category: 'system',
-    description: 'Suppression définitive d’archives de projets et mémoires 256K.',
+    description: 'Permanently delete project archives and 256K memories.',
   },
 ];
 
@@ -147,7 +147,7 @@ export const INITIAL_USERS: UserProfile[] = [
   },
   {
     id: 'usr-auditor-guest',
-    name: 'Security Auditor (Invité)',
+    name: 'Security Auditor (Guest)',
     email: 'guest.auditor@telemetry.local',
     role: 'viewer',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=faces',
@@ -178,7 +178,7 @@ class AuthService {
       feature: 'hardware_override',
       action: 'VRAM Allocation Inspection (Intel Arc Pro B60)',
       status: 'granted',
-      details: 'Alloué 24GB VRAM avec ratio 76.3% sous mode Démo Unrestricted.',
+      details: 'Allocated 24GB VRAM at 76.3% in unrestricted demo mode.',
     },
     {
       id: 'log-2',
@@ -189,7 +189,7 @@ class AuthService {
       feature: 'agentic_tasks',
       action: 'OpenHands Autonomous Loop Dispatch',
       status: 'granted',
-      details: 'Exécution autorisée via jeton de session administrateur.',
+      details: 'Execution allowed via administrator session token.',
     },
   ];
   private listeners: Array<() => void> = [];
@@ -263,9 +263,9 @@ class AuthService {
       this.currentUser = found;
       this.logSecurityEvent(
         'user_management',
-        `Changement de session active vers ${found.name} (${found.role.toUpperCase()})`,
+        `Active session switched to ${found.name} (${found.role.toUpperCase()})`,
         'granted',
-        `Jeton de session basculé vers ${found.email}`
+        `Session token switched to ${found.email}`
       );
       this.notify();
       try {
@@ -285,9 +285,9 @@ class AuthService {
     this.roleDefaults[role][feature] = allowed;
     this.logSecurityEvent(
       'user_management',
-      `Modification rôle ${role.toUpperCase()} : ${feature} -> ${allowed ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`,
+      `Updated role ${role.toUpperCase()}: ${feature} -> ${allowed ? 'ENABLED' : 'DISABLED'}`,
       'granted',
-      `Matrice de permissions globale mise à jour`
+      `Global permission matrix updated`
     );
     this.notify();
 
@@ -321,9 +321,9 @@ class AuthService {
 
     this.logSecurityEvent(
       'user_management',
-      `Dérogation utilisateur pour ${userId} : ${feature} -> ${allowed === null ? 'HERITÉ' : allowed ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`,
+      `User override for ${userId}: ${feature} -> ${allowed === null ? 'INHERITED' : allowed ? 'ENABLED' : 'DISABLED'}`,
       'granted',
-      `Priorité locale appliquée sur le profil utilisateur`
+      `Local priority applied to user profile`
     );
     this.notify();
 
@@ -355,9 +355,9 @@ class AuthService {
 
     this.logSecurityEvent(
       'user_management',
-      'Réinitialisation configuration Démo : Toutes les fonctionnalités autorisées',
+      'Demo configuration reset: all features allowed',
       'granted',
-      'Mode démonstration sans restriction restauré'
+      'Unrestricted demo mode restored'
     );
     this.notify();
 
@@ -379,14 +379,14 @@ class AuthService {
       apiKey,
       customOverrides: {},
       createdAt: new Date().toISOString(),
-      lastLogin: 'Nouveau compte',
+      lastLogin: 'New account',
     };
     this.allUsers.push(newUser);
     this.logSecurityEvent(
       'user_management',
-      `Création compte utilisateur : ${name} (${role.toUpperCase()})`,
+      `Created user account: ${name} (${role.toUpperCase()})`,
       'granted',
-      `Clé API générée : ${apiKey.slice(0, 10)}...`
+      `API key generated: ${apiKey.slice(0, 10)}...`
     );
     this.notify();
 
@@ -414,9 +414,9 @@ class AuthService {
 
     this.logSecurityEvent(
       'user_management',
-      `Régénération Clé API pour ${userId}`,
+      `Regenerated API key for ${userId}`,
       'granted',
-      `Nouvelle clé MCP/CLI générée`
+      `New MCP/CLI key generated`
     );
     this.notify();
 

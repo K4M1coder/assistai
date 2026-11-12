@@ -444,7 +444,7 @@ const authStore: {
     },
     {
       id: 'usr-auditor-guest',
-      name: 'Security Auditor (Invité)',
+      name: 'Security Auditor (Guest)',
       email: 'guest.auditor@telemetry.local',
       role: 'viewer',
       avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=faces',
@@ -470,7 +470,7 @@ const authStore: {
       feature: 'hardware_override',
       action: 'VRAM Allocation Inspection (Intel Arc Pro B60)',
       status: 'granted',
-      details: 'Alloué 24GB VRAM avec ratio 76.3% sous mode Démo Unrestricted.',
+      details: 'Allocated 24GB VRAM at 76.3% in unrestricted demo mode.',
     },
     {
       id: 'log-2',
@@ -481,7 +481,7 @@ const authStore: {
       feature: 'agentic_tasks',
       action: 'OpenHands Autonomous Loop Dispatch',
       status: 'granted',
-      details: 'Exécution autorisée via jeton de session administrateur.',
+      details: 'Execution allowed via administrator session token.',
     },
   ],
   mcpPlugins: [
@@ -562,7 +562,7 @@ app.post('/api/auth/switch-user', (req: Request, res: Response) => {
   const user = authStore.users.find((u) => u.id === userId);
   if (user) {
     authStore.currentUserId = user.id;
-    logAudit('user_management', `Session commutée sur ${user.name}`, 'granted', `Rôle actif: ${user.role}`);
+    logAudit('user_management', `Session switched to ${user.name}`, 'granted', `Active role: ${user.role}`);
     res.json({ success: true, currentUser: user });
   } else {
     res.status(404).json({ error: 'User not found' });
@@ -573,7 +573,7 @@ app.put('/api/auth/roles-permissions', (req: Request, res: Response) => {
   const { role, feature, allowed } = req.body;
   if (authStore.roleDefaults[role] && feature) {
     authStore.roleDefaults[role][feature] = !!allowed;
-    logAudit('user_management', `Mise à jour rôle ${role}: ${feature}=${allowed}`, 'granted', 'Matrice globale mise à jour');
+    logAudit('user_management', `Updated role ${role}: ${feature}=${allowed}`, 'granted', 'Global matrix updated');
     res.json({ success: true, roleDefaults: authStore.roleDefaults });
   } else {
     res.status(400).json({ error: 'Invalid role or feature' });
@@ -591,7 +591,7 @@ app.put('/api/auth/users/:userId/override', (req: Request, res: Response) => {
     } else {
       user.customOverrides[feature] = !!allowed;
     }
-    logAudit('user_management', `Dérogation individuelle ${user.name}: ${feature}=${allowed}`, 'granted', 'Priorité locale');
+    logAudit('user_management', `Individual override ${user.name}: ${feature}=${allowed}`, 'granted', 'Local priority');
     res.json({ success: true, user });
   } else {
     res.status(404).json({ error: 'User not found' });
@@ -604,7 +604,7 @@ app.post('/api/auth/users', (req: Request, res: Response) => {
   if (!newUser.role) newUser.role = 'ai_engineer';
   if (!newUser.customOverrides) newUser.customOverrides = {};
   authStore.users.push(newUser);
-  logAudit('user_management', `Création compte ${newUser.name}`, 'granted', `Rôle: ${newUser.role}`);
+  logAudit('user_management', `Created account ${newUser.name}`, 'granted', `Role: ${newUser.role}`);
   res.json({ success: true, user: newUser });
 });
 
@@ -613,7 +613,7 @@ app.post('/api/auth/api-keys/generate', (req: Request, res: Response) => {
   const user = authStore.users.find((u) => u.id === userId);
   if (user) {
     user.apiKey = newKey || ('mochi_key_' + Math.random().toString(36).substring(2, 14));
-    logAudit('user_management', `Clé API régénérée pour ${user.name}`, 'granted', 'MCP/CLI Key');
+    logAudit('user_management', `Regenerated API key for ${user.name}`, 'granted', 'MCP/CLI Key');
     res.json({ success: true, apiKey: user.apiKey });
   } else {
     res.status(404).json({ error: 'User not found' });
@@ -630,7 +630,7 @@ app.post('/api/auth/reset-demo', (req: Request, res: Response) => {
   authStore.users.forEach((u) => {
     u.customOverrides = {};
   });
-  logAudit('user_management', 'Réinitialisation démo : 100% des fonctions autorisées', 'granted', 'Defaults restored');
+  logAudit('user_management', 'Demo reset: all features allowed', 'granted', 'Defaults restored');
   res.json({ success: true, message: 'All features reset to enabled' });
 });
 
@@ -652,14 +652,14 @@ app.put('/api/auth/mcp-plugins/:id/toggle', (req: Request, res: Response) => {
 
 app.delete('/api/projects/:projectId', (req: Request, res: Response) => {
   if (!isFeatureAllowedForCurrent('delete_project')) {
-    logAudit('delete_project', `Suppression projet ${req.params.projectId}`, 'denied', 'Permission delete_project désactivée');
-    res.status(403).json({ error: 'Permission refusée: suppression de projet non autorisée.' });
+    logAudit('delete_project', `Delete project ${req.params.projectId}`, 'denied', 'delete_project permission disabled');
+    res.status(403).json({ error: 'Permission denied: project deletion is not allowed.' });
     return;
   }
   const idx = harnessStore.projects.findIndex((p) => p.id === req.params.projectId);
   if (idx !== -1) {
     const deleted = harnessStore.projects.splice(idx, 1)[0];
-    logAudit('delete_project', `Suppression projet ${deleted.name}`, 'granted', 'Archive supprimée');
+    logAudit('delete_project', `Delete project ${deleted.name}`, 'granted', 'Archive deleted');
     res.json({ success: true, deleted });
   } else {
     res.status(404).json({ error: 'Project not found' });
@@ -678,17 +678,17 @@ app.post('/api/agent/execute', async (req: Request, res: Response) => {
   }
 
   if (!isFeatureAllowedForCurrent(requiredFeature)) {
-    logAudit(requiredFeature, `Exécution outil ${tool}`, 'denied', 'Gated by RBAC policy');
+    logAudit(requiredFeature, `Execute tool ${tool}`, 'denied', 'Gated by RBAC policy');
     res.status(403).json({
       success: false,
-      error: `Action non autorisée. La fonctionnalité « ${requiredFeature} » est désactivée dans la console RBAC.`,
+      error: `Action denied. The ${requiredFeature} feature is disabled in the RBAC console.`,
     });
     return;
   }
 
   try {
     const result = handleToolExecution(tool, params || {});
-    logAudit(requiredFeature, `Exécution outil ${tool}`, 'granted', 'Tool executed successfully');
+    logAudit(requiredFeature, `Execute tool ${tool}`, 'granted', 'Tool executed successfully');
     res.json({ success: true, result });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || 'Execution failed' });
@@ -698,8 +698,8 @@ app.post('/api/agent/execute', async (req: Request, res: Response) => {
 // Launcher script for Intel Arc Pro B60 on Linux (oneAPI / SYCL / IPEX)
 app.get('/api/scripts/intel-b60-linux', (req: Request, res: Response) => {
   if (!isFeatureAllowedForCurrent('hardware_override')) {
-    logAudit('hardware_override', 'Téléchargement script launcher Linux B60', 'denied', 'Permission hardware_override requise');
-    res.status(403).send('# Permission refusée par le contrôle d’accès RBAC.');
+    logAudit('hardware_override', 'Download B60 Linux launcher script', 'denied', 'hardware_override permission required');
+    res.status(403).send('# Permission denied by RBAC.');
     return;
   }
   const script = `#!/usr/bin/env bash
@@ -1206,7 +1206,7 @@ wss.on('connection', (clientWs: WebSocket) => {
                 (lower.includes('quantum') && t.includes('quantum')) ||
                 (lower.includes('jira') && (t.includes('jira') || pn.includes('enterprise'))) ||
                 (lower.includes('robot') && pn.includes('robot')) ||
-                t.includes(lower.replace(/cherche|trouve|bascule|session|projet|sur|la|le|l'|état|status/gi, '').trim())
+                t.includes(lower.replace(/cherche|trouve|bascule|session|projet|sur|la|le|l'|état|status|find|search|switch|project|the/gi, '').trim())
               ) {
                 sessionMatch = { project: p, session: s };
                 break;
@@ -1293,18 +1293,18 @@ wss.on('connection', (clientWs: WebSocket) => {
           }
 
           if (!isFeatureAllowedForCurrent(requiredFeature)) {
-            logAudit(requiredFeature, `Exécution vocale [${toolTriggered}]`, 'denied', `Bloqué par le contrôle d'accès RBAC`);
+            logAudit(requiredFeature, `Voice execution [${toolTriggered}]`, 'denied', 'Blocked by RBAC');
             broadcastAll({
               type: 'auth_denied',
               feature: requiredFeature,
               tool: toolTriggered,
-              message: `Action [${toolTriggered}] bloquée par le contrôle d'accès RBAC.`
+              message: `Action [${toolTriggered}] blocked by RBAC.`
             });
-            reply = `Action non autorisée. La fonctionnalité « ${requiredFeature.replace('_', ' ')} » est actuellement désactivée pour votre profil dans la console de sécurité RBAC.`;
+            reply = `Action denied. The ${requiredFeature.replace('_', ' ')} feature is currently disabled for your profile in the RBAC security console.`;
             toolTriggered = null;
           } else {
             const res = handleToolExecution(toolTriggered, toolParams);
-            logAudit(requiredFeature, `Exécution vocale [${toolTriggered}]`, 'granted', 'Exécution autorisée');
+            logAudit(requiredFeature, `Voice execution [${toolTriggered}]`, 'granted', 'Execution allowed');
             toolResultText = ` I've dispatched the ${toolTriggered.replace('_', ' ')} tool to the agent harness.`;
             broadcastAll({
               type: 'tool_execution',
@@ -1319,10 +1319,7 @@ wss.on('connection', (clientWs: WebSocket) => {
 
         // Generate response speech text
         if (sessionMatch) {
-          const isFrench = /[éèàùç]/.test(userText) || lower.includes('cherche') || lower.includes('trouve') || lower.includes('bascule') || lower.includes('état') || lower.includes('session');
-          const spokenSummary = isFrench
-            ? `J'ai trouvé la session « ${sessionMatch.session.title} » dans le projet « ${sessionMatch.project.name} ». Son statut est ${sessionMatch.session.status}, avec ${sessionMatch.session.contextTokensUsed.toLocaleString()} tokens alloués sur l'horizon 256K. Résumé : ${sessionMatch.session.summary}. Je bascule l'affichage et l'espace de travail dessus.`
-            : `I found session "${sessionMatch.session.title}" in project "${sessionMatch.project.name}". Status is ${sessionMatch.session.status}, using ${sessionMatch.session.contextTokensUsed.toLocaleString()} tokens of the 256K context. Summary: ${sessionMatch.session.summary}. Switching workspace now.`;
+          const spokenSummary = `I found session "${sessionMatch.session.title}" in project "${sessionMatch.project.name}". Status is ${sessionMatch.session.status}, using ${sessionMatch.session.contextTokensUsed.toLocaleString()} tokens of the 256K context. Summary: ${sessionMatch.session.summary}. Switching workspace now.`;
 
           broadcastAll({
             type: 'switch_session',
@@ -1339,7 +1336,7 @@ wss.on('connection', (clientWs: WebSocket) => {
             `I heard: "${userText}". I'm operating on the Mochi low-latency conversational architecture. You can talk freely or cut in with an interruption.`,
             `Received loud and clear! The agent server harness is standing by with 3D engine rendering, code execution, music synthesis, and Atlassian/Microsoft/Google connectors. What would you like to build?`,
             `Got it. I'm streaming bidirectional audio at 24kHz. Notice how smoothly you can interrupt me while I'm speaking.`,
-            `Understood! Try asking me to "Cherche la session drone 3D", "Donne l'état du projet Audio DSP", "Create a 3D hologram drone", or "Create a Jira issue".`
+            `Understood! Try asking me to "Find the 3D drone session", "Show the Audio DSP project status", "Create a 3D hologram drone", or "Create a Jira issue".`
           ];
           reply = sampleReplies[Math.floor(Math.random() * sampleReplies.length)];
         }

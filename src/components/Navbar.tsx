@@ -76,7 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             { id: 'terminal', label: 'Terminal (CLI)', icon: Terminal },
             { id: 'smartphone', label: 'Smartphone App', icon: Smartphone },
             { id: 'harness', label: 'Agent Harness', icon: Cpu },
-            { id: 'rbac', label: 'Sécurité & RBAC', icon: Shield },
+            { id: 'rbac', label: 'Security & RBAC', icon: Shield },
           ].map((item) => {
             const Icon = item.icon;
             const active = currentView === item.id;
@@ -133,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {showUserDropdown && (
               <div className="absolute right-0 mt-1.5 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 text-xs font-sans">
                 <div className="px-2 py-1.5 border-b border-slate-800 text-[10px] uppercase font-mono text-slate-400 font-semibold">
-                  Changer d'utilisateur (Test RBAC)
+                  Switch User (RBAC Test)
                 </div>
                 <div className="py-1 space-y-1">
                   {allUsers.map((u) => {
@@ -176,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="w-full text-center py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 font-mono text-[11px] font-semibold transition"
                   >
-                    Ouvrir Console Sécurité & RBAC
+                    Open Security & RBAC Console
                   </button>
                 </div>
               </div>

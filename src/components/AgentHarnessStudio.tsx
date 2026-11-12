@@ -172,8 +172,8 @@ export const AgentHarnessStudio: React.FC<AgentHarnessStudioProps> = ({
 
     if (!canAgent) {
       audioEngine.playCue('interrupt');
-      authService.logSecurityEvent('agentic_tasks', 'Tâche agentique bloquée par RBAC', 'denied', `Rôle ${currentUser.role}`);
-      alert(`Action non autorisée : La fonctionnalité « Tâches agentiques » est désactivée pour votre profil.`);
+      authService.logSecurityEvent('agentic_tasks', 'Agentic task blocked by RBAC', 'denied', `Role ${currentUser.role}`);
+      alert('Action denied: agentic tasks are disabled for your profile.');
       return;
     }
 
@@ -206,8 +206,8 @@ export const AgentHarnessStudio: React.FC<AgentHarnessStudioProps> = ({
   const handleGenerate3D = () => {
     if (!can3D) {
       audioEngine.playCue('interrupt');
-      authService.logSecurityEvent('threejs_3d', 'Génération 3D bloquée par RBAC', 'denied', `Rôle ${currentUser.role}`);
-      alert(`Action non autorisée : La fonctionnalité « Moteur 3D & Shaders » est désactivée pour votre profil.`);
+      authService.logSecurityEvent('threejs_3d', '3D generation blocked by RBAC', 'denied', `Role ${currentUser.role}`);
+      alert('Action denied: the 3D engine and shaders are disabled for your profile.');
       return;
     }
 
@@ -230,8 +230,8 @@ export const AgentHarnessStudio: React.FC<AgentHarnessStudioProps> = ({
   const handleRunCode = () => {
     if (!canRunCode) {
       audioEngine.playCue('interrupt');
-      authService.logSecurityEvent('code_execution', 'Exécution de code bloquée par RBAC', 'denied', `Rôle ${currentUser.role}`);
-      alert(`Action non autorisée : La fonctionnalité « Exécution de code » est désactivée pour votre profil.`);
+      authService.logSecurityEvent('code_execution', 'Code execution blocked by RBAC', 'denied', `Role ${currentUser.role}`);
+      alert('Action denied: code execution is disabled for your profile.');
       return;
     }
 
@@ -408,7 +408,7 @@ export const AgentHarnessStudio: React.FC<AgentHarnessStudioProps> = ({
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span>Shared Memory IPC Latency: 14μs • Isolât de session</span>
+                <span>Shared Memory IPC Latency: 14μs • Session isolate</span>
                 <span>Statut : <span className="uppercase text-emerald-400">{activeSession?.status || 'Active'}</span></span>
               </div>
             </div>
@@ -611,14 +611,14 @@ export const AgentHarnessStudio: React.FC<AgentHarnessStudioProps> = ({
                         ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 cursor-pointer shadow-sm'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                     }`}
-                    title={canRunCode ? 'Exécuter le script dans la sandbox' : 'Exécution bloquée par la politique RBAC'}
+                    title={canRunCode ? 'Run the script in the sandbox' : 'Execution blocked by RBAC policy'}
                   >
                     {canRunCode ? (
                       <Play className="w-3 h-3 fill-current" />
                     ) : (
                       <Lock className="w-3 h-3 text-rose-400" />
                     )}
-                    <span>{isExecuting ? 'Running...' : canRunCode ? 'Run' : 'Bloqué RBAC'}</span>
+                    <span>{isExecuting ? 'Running...' : canRunCode ? 'Run' : 'Blocked by RBAC'}</span>
                   </button>
                 </div>
               </div>

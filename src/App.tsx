@@ -141,7 +141,7 @@ export default function App() {
     {
       id: 'welcome-1',
       role: 'agent',
-      text: "Hello! I'm running on the Mochi full-duplex conversational voice architecture. You can talk freely, interrupt me mid-sentence, ask me to search or switch sessions (e.g. 'Cherche la session drone 3D'), or command the agent harness to generate 3D models, execute code, and sync enterprise tools.",
+      text: "Hello! I'm running on the Mochi full-duplex conversational voice architecture. You can talk freely, interrupt me mid-sentence, ask me to search or switch sessions (e.g. 'Find the 3D drone session'), or command the agent harness to generate 3D models, execute code, and sync enterprise tools.",
       timestamp: Date.now() - 4000,
     },
   ]);
@@ -246,7 +246,7 @@ export default function App() {
         setActiveProjectId(projectId);
         setActiveSessionId(sessionId);
         setVoiceNotice(
-          `Bascule vocale exécutée : Session « ${session?.title || sessionId} » activée (Contexte 256K synchronisé)`
+          `Voice switch complete: session “${session?.title || sessionId}” activated (256K context synchronized)`
         );
         setTimeout(() => setVoiceNotice(null), 6000);
         // Switch to split view so user sees both the voice interaction and the updated harness
@@ -302,7 +302,7 @@ export default function App() {
     const selectedProj = projects.find((p) => p.id === projectId);
     const selectedSess = selectedProj?.sessions.find((s) => s.id === sessionId);
     if (selectedSess) {
-      setVoiceNotice(`Session sélectionnée : « ${selectedSess.title} » (Contexte 256K isolé)`);
+      setVoiceNotice(`Session selected: “${selectedSess.title}” (isolated 256K context)`);
       setTimeout(() => setVoiceNotice(null), 4000);
     }
   };
@@ -347,7 +347,7 @@ export default function App() {
   };
 
   const handleVoiceSearch = (query: string) => {
-    voiceSocket.sendText(`cherche la session ${query}`);
+    voiceSocket.sendText(`find session ${query}`);
   };
 
   const handleToolSelect = (toolName: string) => {

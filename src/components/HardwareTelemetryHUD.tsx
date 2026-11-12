@@ -105,7 +105,7 @@ export const HardwareTelemetryHUD: React.FC<HardwareTelemetryHUDProps> = ({
                 href="/api/scripts/intel-b60-linux"
                 download="start_intel_b60_linux.sh"
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition flex items-center gap-1 text-[10px]"
-                title="Télécharger script de lancement Linux Intel B60"
+                title="Download Intel B60 Linux launch script"
               >
                 <Download className="w-3 h-3" />
                 <span className="hidden sm:inline">Linux .sh</span>
@@ -115,7 +115,7 @@ export const HardwareTelemetryHUD: React.FC<HardwareTelemetryHUDProps> = ({
                 href="/api/scripts/intel-b60-windows"
                 download="start_intel_b60_windows.bat"
                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition flex items-center gap-1 text-[10px]"
-                title="Télécharger script de lancement Windows Intel B60"
+                title="Download Intel B60 Windows launch script"
               >
                 <Download className="w-3 h-3" />
                 <span className="hidden sm:inline">Win .bat</span>
@@ -124,10 +124,10 @@ export const HardwareTelemetryHUD: React.FC<HardwareTelemetryHUDProps> = ({
           ) : (
             <div
               className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 flex items-center gap-1 text-[10px] cursor-not-allowed"
-              title="Scripts de lancement et overrides bloqués par la politique RBAC"
+              title="Launch scripts and overrides blocked by RBAC policy"
             >
               <Lock className="w-3 h-3 text-rose-400" />
-              <span className="hidden sm:inline">Scripts Bloqués RBAC</span>
+              <span className="hidden sm:inline">Scripts Blocked by RBAC</span>
             </div>
           )}
         </div>

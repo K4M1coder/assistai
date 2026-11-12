@@ -361,9 +361,9 @@ export const WebVoiceClient: React.FC<WebVoiceClientProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
           <span className="text-slate-500 font-medium text-[10px] uppercase shrink-0">Try:</span>
           {[
-            'Cherche la session drone 3D',
-            "Donne l'état du projet Audio DSP",
-            'Bascule sur la session Jira',
+            'Find the 3D drone session',
+            'Show the Audio DSP project status',
+            'Switch to the Jira session',
             'Create a 3D hologram drone',
             'Write Python FFT filter script',
             'Synthesize ambient synth music',
