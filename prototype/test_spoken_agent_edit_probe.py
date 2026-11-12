@@ -54,5 +54,27 @@ class SpokenAgentProbeTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('synthetic_task', trace.getvalue())
             self.assertTrue(any(isinstance(item, bytes) for item in socket.sent))
 
+    async def test_notification_waits_for_followup_and_completed_task(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / '.cache') as folder:
+            (Path(folder) / 'calculator.py').write_text('def add(a, b):\n    return a - b\n', encoding='utf-8')
+            socket = FakeSocket()
+            socket.events = iter([{'type':'asr.ready'}, {'type':'user.text','text':'request'},
+                {'type':'task.started','task':'Fix calculator.py','turn_id':'task-turn'},
+                {'type':'assistant.text','turn_id':'followup-turn'}, b'12',
+                {'type':'task.completed','task_id':'task-1'}, {'type':'speech.end','turn_id':'followup-turn'},
+                {'type':'notification.started'}, b'1234', {'type':'speech.end'}])
+            output = io.StringIO()
+            env = {'ASSISTAI_PROBE_WORKSPACE':folder, 'ASSISTAI_TEST_VOICE_URL':'ws://127.0.0.1:18091/voice',
+                   'ASSISTAI_PROBE_NOTIFICATION':'1'}
+            with patch.dict(os.environ, env), patch.object(probe, 'connect', return_value=socket), \
+                 patch.object(probe.spoken_recall, 'synthesize', return_value=b'00'), \
+                 patch.object(probe.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
+                 contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                await probe.main()
+            result = json.loads(output.getvalue())
+            self.assertEqual(result['notification_audio_bytes'], 4)
+            self.assertIn({'type':'notification.speak','task_id':'task-1'},
+                          [json.loads(item) for item in socket.sent if isinstance(item, str)])
+
 
 if __name__ == '__main__': unittest.main()

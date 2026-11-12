@@ -46,6 +46,8 @@ OpenCode applies its own configured permissions. The currently tested fixture co
 
 The prepared voice-to-agent coding probe requires an explicitly selected `.cache` workspace and a separately configured gateway and harness. Its static arithmetic checker avoids executing the generated fixture but does not confine the harness. One synthetic text-driven real-agent edit passed; a synthetic spoken-input attempt stopped below the RAM reserve before completion. The current demo's read-only fixture remains unchanged.
 
+Adding notification verification to the spoken probe does not alter the fixture permissions or give the gateway additional authority. The combined path has mock coverage only; its first real-run preflight did not meet the RAM threshold.
+
 The experimental spoken completion notification uses a completed task event and does not grant new harness permissions. Its synthetic real-model test does not establish authentication, isolation, or authorization.
 
 ## React mockup permissions

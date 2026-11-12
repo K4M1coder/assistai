@@ -6,7 +6,6 @@ param(
   [switch]$Notification
 )
 $ErrorActionPreference = 'Stop'
-if ($SpokenInput -and $Notification) { throw 'Notification probing is currently supported only for text input' }
 $root = Split-Path -Parent $PSScriptRoot
 $workspacePath = (Resolve-Path -LiteralPath $Workspace).Path
 $cachePath = (Resolve-Path -LiteralPath (Join-Path $root '.cache')).Path
