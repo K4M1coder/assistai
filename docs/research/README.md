@@ -45,3 +45,5 @@ Subsequent native LFM3-Audio trials ran synthetic speech and delegation on this 
 EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manual interruption, native-client mock integration, bounded session context, opt-in session resume and LocalVQE echo research. The index records their principal measurements and points to the detailed notes; physical LocalVQE probes have not demonstrated reliable echo cancellation. Neither native full-duplex voice nor the no-spill memory requirement is established.
 
 [EXP-180](2026-11-13-resumption-preflight.md) records the current service inventory, resource guard failure, controlled failure-path tests and the remaining physical French demonstration. Existing gateway health is not proof of a functioning audio conversation.
+
+[EXP-182](2026-11-14-current-gateway.md) records a new current-source gateway started after the operator freed memory, and the proposed physical test; startup is not an end-to-end result.

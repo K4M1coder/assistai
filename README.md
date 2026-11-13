@@ -12,6 +12,8 @@ The updated experimental client is currently available on this machine at [http:
 
 On the latest resumption preflight, service health checks passed but system resource readings exceeded the existing trial guard. Physical French conversation and audible playback were not tested in that preflight. Existing gateway processes may run older source. See [EXP-180](docs/research/2026-11-13-resumption-preflight.md) before starting a new trial or interpreting health as end-to-end readiness.
 
+After memory was freed, a current-source gateway was started on [http://127.0.0.1:18094/](http://127.0.0.1:18094/) with volatile history and existing local services. Its startup and a suggested physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md); the physical test remains outstanding.
+
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
 In automatic detection mode, the browser keeps a bounded 200 ms pre-roll locally and starts sending it to recognition only when the threshold detects speech. This avoids accumulating unlimited below-threshold background audio, but cannot distinguish the user from a television or another person above the threshold. Push-to-talk remains the more controlled option in noisy rooms. This change has a simulated browser-frame test; physical recognition and barge-in need further testing.
