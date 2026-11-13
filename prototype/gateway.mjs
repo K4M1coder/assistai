@@ -247,6 +247,7 @@ wss.on('connection', (client, req) => {
           if (last) {
             const text = (last.parts ?? []).filter(part => part.type === 'text' && !part.synthetic).map(part => part.text).join('\n').trim();
             if (last.info.error) { confirmedTerminal = true; throw new Error('Agent reported an error'); }
+            if (last.info.finish === 'length') { confirmedTerminal = true; throw new Error('Agent response was truncated before the task could be confirmed complete'); }
             if (!text) continue;
             confirmedTerminal = true;
             const result = { task_id: agentSession.id, text: text.slice(0, 8000) };

@@ -20,8 +20,8 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     if(req.url==='/session/status')return res.end(JSON.stringify(agentBusy?{'fixture-session':{type:'busy'}}:{}));
     if(req.url==='/session/fixture-session/message') {
       messagePolls++;
-      if(messagePolls===1)return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:'STALE INTERMEDIATE'}]},{info:{role:'assistant',time:{}},parts:[]}]));
-      return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:agentResult}]}]));
+      if(messagePolls===1)return res.end(JSON.stringify([{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:'STALE INTERMEDIATE'}]},{info:{role:'assistant',finish:'tool-calls',time:{completed:1}},parts:[{type:'text',text:'TOOL HANDOFF'}]}]));
+      return res.end(JSON.stringify([{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:agentResult}]}]));
     }
     res.statusCode=404;res.end('{}');
   });

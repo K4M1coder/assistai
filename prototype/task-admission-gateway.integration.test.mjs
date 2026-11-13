@@ -17,7 +17,7 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
     if(req.method==='POST'&&req.url==='/session/busy-task/prompt_async'){res.statusCode=204;return res.end();}
     if(req.method==='POST'&&req.url==='/session/busy-task/abort'){aborts++;return res.end('true');}
     if(req.url==='/session/status'){if(!recover)res.statusCode=500;return res.end('{}');}
-    if(req.url==='/session/busy-task/message')return res.end(JSON.stringify(recover ? [{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:'Done'}]}] : []));
+    if(req.url==='/session/busy-task/message')return res.end(JSON.stringify(recover ? [{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:'Done'}]}] : []));
     res.statusCode=404;res.end('{}');
   });
   const agentPort=await listen(agent);

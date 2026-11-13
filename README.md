@@ -56,7 +56,7 @@ The updated gateway offers a button to request cancellation of the latest backgr
 
 If submission or later status becomes uncertain, the updated gateway retains the task in that session and avoids resubmitting the same normalized request. Status polling retries temporary failures up to three consecutive times; unresolved state remains process-local.
 
-The gateway no longer reports an older completed assistant message as a task result when a newer message is unfinished. The updated code has mock integration coverage; a running gateway must be restarted to load this change.
+The gateway no longer reports an older completed assistant message as a task result when a newer message is unfinished. It also waits after tool-call steps and reports output-limit truncation as an error. The updated code has mock coverage; a running gateway must be restarted to load this change.
 
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
