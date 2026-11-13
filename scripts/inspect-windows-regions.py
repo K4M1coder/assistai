@@ -64,12 +64,17 @@ def inspect(pid, sample_residency=False):
                 entries = (WorkingSetEntry * len(addresses))(*(WorkingSetEntry(address, 0) for address in addresses))
                 if not kernel.K32QueryWorkingSetEx(handle, entries, ctypes.sizeof(entries)):
                     raise ctypes.WinError(ctypes.get_last_error())
-                item.update(sampled_pages=len(entries), sampled_valid=sum(bool(entry.attributes & 1) for entry in entries), sample_stride_bytes=1024 * 1024)
+                valid = [entry.attributes for entry in entries if entry.attributes & 1]
+                item.update(sampled_pages=len(entries), sampled_valid=len(valid),
+                            sampled_shared=sum(bool(flags & (1 << 15)) for flags in valid),
+                            sampled_locked=sum(bool(flags & (1 << 22)) for flags in valid),
+                            sampled_large_page=sum(bool(flags & (1 << 23)) for flags in valid),
+                            sample_stride_bytes=1024 * 1024)
             largest.append(item)
     finally:
         kernel.CloseHandle(handle)
     return {'pid': pid, 'committed_by_type_bytes': totals, 'largest_allocations': largest,
-            'note': 'Commit sizes and sparsely sampled valid flags are not additive resident-byte measurements or proof of GPU spill; process contents were not read.'}
+            'note': 'QueryWorkingSetEx can report valid pages outside the ordinary working set. Sparse flags are not additive residency measurements or proof of GPU spill; process contents were not read.'}
 
 
 if __name__ == '__main__':

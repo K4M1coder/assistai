@@ -40,6 +40,8 @@ A temporary real-service gateway started with the ledger and updated resource sa
 
 The updated Windows sampler can also report system-wide pagefile usage, and resource status warns above 256 MiB total shared GPU use. Pagefile usage cannot be attributed to this application from that number alone. Running samplers and gateways must be restarted to expose the new field. See [EXP-173](docs/research/2026-11-13-windows-memory-counters.md).
 
+A sparse agent-process page inspection could not resolve which allocations reside in VRAM, RAM or storage; valid page flags are not proof of model residency. See [EXP-179](docs/research/2026-11-13-agent-residency-snapshot.md).
+
 An official Q4_K_M version of the current Q8 controller has been downloaded and hash-verified for a future controlled comparison. Its smaller file size is not a measured VRAM saving or evidence of equivalent French tool use. See [EXP-174](docs/research/2026-11-13-controller-q4-candidate.md).
 
 A French text delegation probe now covers opposing operations, negation and ordinary conversation without executing tools. Semantic review remains mandatory; no Q4/Q8 result is claimed yet. See [EXP-175](docs/research/2026-11-13-controller-eval.md).

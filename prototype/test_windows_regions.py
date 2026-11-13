@@ -18,6 +18,9 @@ class WindowsRegionsTests(unittest.TestCase):
         result = module.inspect(os.getpid(), sample_residency=True)
         self.assertGreater(result['committed_by_type_bytes']['private'], len(buffer))
         self.assertTrue(all('sampled_pages' in item and item['sampled_valid'] <= item['sampled_pages'] for item in result['largest_allocations']))
+        for item in result['largest_allocations']:
+            for field in ('sampled_shared', 'sampled_locked', 'sampled_large_page'):
+                self.assertLessEqual(item[field], item['sampled_valid'])
         self.assertNotIn('address', repr(result).lower())
 
 
