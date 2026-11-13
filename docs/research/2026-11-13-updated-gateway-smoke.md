@@ -1,0 +1,5 @@
+# EXP-161: Updated gateway with existing local services
+
+The updated cascade gateway was started on port 18092 using the existing inference services and a separate volatile session store. A real text turn returned a French answer and 240,000 bytes of PCM audio. A synthetic French recording of “Bonjour, comment vas-tu ?” was sent to the real Vosk service; review held the transcript `bonjour comment vas tu` until an edited request was submitted, after which the real controller and TTS returned a French answer and 117,120 audio bytes. The tests did not open a physical microphone or speaker, assess audibility, exercise a task, or test echo interruption.
+
+After the tests, a single advisory sample reported 16,266,444,800 bytes dedicated GPU memory, 265,142,272 bytes shared GPU memory and 10,385,375,232 bytes available host RAM. These are observations, not a hard VRAM limit or proof that sustained concurrent work will avoid spill. No new model was loaded. The older port 18091 gateway was retained to avoid discarding its volatile session; the updated gateway has a distinct session.

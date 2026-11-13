@@ -8,7 +8,7 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 ## Current local voice prototype
 
-The experimental client is currently available on this machine at [http://127.0.0.1:18091/](http://127.0.0.1:18091/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
+The updated experimental client is currently available on this machine at [http://127.0.0.1:18092/](http://127.0.0.1:18092/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
@@ -24,13 +24,13 @@ The browser reports detected playback gaps over 30 ms in the conversation log. T
 
 Playback scheduling now keeps consecutive audio chunks adjacent while a queue remains, avoiding a previously possible artificial pause. This correction has a mock-clock regression test; its effect on live speech remains to be heard.
 
-The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech, including an unmatched closing tag and a truncated closing marker. An integration test covers the reported Nantes response through the gateway and TTS request. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path. Running gateway processes need a restart to pick up changes to the filter.
+The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech, including an unmatched closing tag and a truncated closing marker. An integration test covers the reported Nantes response through the gateway and TTS request. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path. The updated port 18092 gateway includes this filter.
 
 The guarded Windows coding experiment accepts separate agent and gateway ports, so an existing demo need not be stopped to run it. The experiment still requires its configured RAM and GPU headroom and uses a disposable fixture.
 
 A later synthetic spoken coding attempt misrecognized the filename and operation, then the controller delegated the opposite change. Its watchdog stopped the trial below the RAM reserve; the fixture was unchanged. Spoken coding requests are therefore not yet dependable. See [EXP-144](docs/research/2026-11-12-spoken-coding-failure.md).
 
-The updated cascade offers an optional **Review speech before sending** mode: the user can edit the transcript before it reaches the controller. It is off by default and has mock coverage; it does not make recognition or task execution infallible. The running gateway must be restarted to enable it.
+The updated cascade offers an optional **Review speech before sending** mode: the user can edit the transcript before it reaches the controller. It is off by default and does not make recognition or task execution infallible. A synthetic French review and edited submission passed through the real services on port 18092; physical microphone use remains unverified for this version.
 
 A guarded synthetic ASR probe compares recognition of operation direction, negation and a filename. In one three-phrase run, both the Vosk baseline and a CPU FastConformer candidate missed the filename; this does not establish general accuracy.
 
@@ -52,7 +52,7 @@ The installed llama.cpp build's source allocates a separate FP16 Voxtral audio e
 
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
-An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
+The updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes.
 
 If submission or later status becomes uncertain, the updated gateway retains the task in that session and avoids resubmitting the same normalized request. Status polling retries temporary failures up to three consecutive times; unresolved state remains process-local.
 
