@@ -8,7 +8,7 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 ## Current local voice prototype
 
-The updated experimental client is currently available on this machine at [http://127.0.0.1:18092/](http://127.0.0.1:18092/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
+The updated experimental client is currently available on this machine at [http://127.0.0.1:18093/](http://127.0.0.1:18093/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
@@ -40,7 +40,7 @@ The browser reports detected playback gaps over 30 ms in the conversation log. T
 
 Playback scheduling now keeps consecutive audio chunks adjacent while a queue remains, avoiding a previously possible artificial pause. This correction has a mock-clock regression test; its effect on live speech remains to be heard.
 
-The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech, including an unmatched closing tag and a truncated closing marker. An integration test covers the reported Nantes response through the gateway and TTS request. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path. The updated port 18092 gateway includes this filter.
+The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech, including an unmatched closing tag and a truncated closing marker. An integration test covers the reported Nantes response through the gateway and TTS request. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path. The updated port 18093 gateway includes this filter.
 
 The guarded Windows coding experiment accepts separate agent and gateway ports, so an existing demo need not be stopped to run it. The experiment still requires its configured RAM and GPU headroom and uses a disposable fixture.
 
@@ -72,7 +72,7 @@ The updated gateway offers a button to request cancellation of the latest backgr
 
 If submission or later status becomes uncertain, the updated gateway retains the task in that session and avoids resubmitting the same normalized request. Status polling retries temporary failures up to three consecutive times; unresolved state remains process-local.
 
-The gateway no longer reports an older completed assistant message as a task result when a newer message is unfinished. It also waits after tool-call steps and reports output-limit truncation as an error. The updated code has mock coverage; a running gateway must be restarted to load this change.
+The gateway no longer reports an older completed assistant message as a task result when a newer message is unfinished. It also waits after tool-call steps and reports output-limit truncation as an error. The updated port 18093 gateway includes this code, which has mock coverage but has not been verified with a new live agent task.
 
 When resource reporting and admission use the same sample, the browser can also show estimated headroom for one task. This projection excludes active task reservations and is not a promise that a task will be accepted.
 
