@@ -14,6 +14,8 @@ Speaker-safe mode prevents voice interruption during playback; the Interrupt but
 
 In automatic detection mode, the browser keeps a bounded 200 ms pre-roll locally and starts sending it to recognition only when the threshold detects speech. This avoids accumulating unlimited below-threshold background audio, but cannot distinguish the user from a television or another person above the threshold. Push-to-talk remains the more controlled option in noisy rooms. This change has a simulated browser-frame test; physical recognition and barge-in need further testing.
 
+The **Pause before sending** slider sets how long automatic detection waits after quiet audio; its default is 1.4 seconds. A longer pause can prevent sentence splitting but adds response latency. Push-to-talk sends when released and does not use this setting.
+
 A headless Chrome test also sent synthetic French audio through the browser capture path and local Vosk into transcript review without submitting a turn; see [EXP-166](docs/research/2026-11-13-browser-synthetic-audio.md).
 
 A headless Chrome smoke test confirmed that Speaker-safe, push-to-talk and the experimental echo-filter controls can be selected together, and that service names are displayed. It did not test microphone audio or filter effectiveness. See [EXP-164](docs/research/2026-11-13-browser-controls.md).

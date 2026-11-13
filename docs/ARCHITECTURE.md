@@ -70,6 +70,8 @@ Task polling considers a result only when the session has no active status and t
 
 In the browser's automatic speech mode, idle capture remains local in a ten-frame pre-roll until the energy detector starts a turn; the pre-roll is then sent before subsequent frames. This bounds idle audio sent to ASR but is not target-speaker separation. Speaker-safe and push-to-talk discard the automatic-mode pre-roll when their gates are active.
 
+Automatic speech turns end after a configurable quiet interval, default 1.4 seconds; push-to-talk ends on release. Longer intervals tolerate pauses at the cost of response latency and do not separate nearby speakers.
+
 If prompt submission may have reached OpenCode or polling later fails, the gateway emits `task.uncertain`, retains the task ID and estimate, and refuses to resubmit the same normalized request in that session. It continues to accept cancellation requests for that ID. Status polling retries up to three consecutive failures and can recover; ambiguous submission and exhausted retries remain uncertain, and a restart loses this process-local task map even if external work continues.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.

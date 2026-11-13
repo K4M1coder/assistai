@@ -31,6 +31,9 @@
   <p><label for="noise-threshold">Microphone detection threshold: <output id="noise-threshold-value" for="noise-threshold">2.5%</output></label><br>
     <input id="noise-threshold" type="range" min="0.5" max="12" step="0.5" value="2.5">
     <br>Increase to ignore quieter background noise; decrease to detect a quieter voice.</p>
+  <p><label for="end-silence">Pause before sending: <output id="end-silence-value" for="end-silence">1.4 s</output></label><br>
+    <input id="end-silence" type="range" min="0.6" max="2.0" step="0.1" value="1.4">
+    <br>Increase if your sentences are split; decrease for a faster response.</p>
   <p><button id="talk" disabled>Hold to talk</button></p>
   <p>Push-to-talk ignores background audio between turns. Keep the microphone close to your mouth when other people are speaking.</p>
   <p id="status" class="status" role="status">Connecting…</p>

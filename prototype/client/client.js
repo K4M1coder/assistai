@@ -107,6 +107,12 @@ $('stop-task').onclick = () => {
 const pendingNotifications = [];
 let notificationRetries = 0;
 let detectionThreshold = Number($('noise-threshold').value) / 100;
+let endSilenceFrames = Math.round(Number($('end-silence').value) * 50);
+$('end-silence').oninput = event => {
+  const seconds = Number(event.target.value);
+  endSilenceFrames = Math.round(seconds * 50);
+  $('end-silence-value').textContent = `${seconds.toFixed(1)} s`;
+};
 $('noise-threshold').oninput = event => {
   detectionThreshold = Number(event.target.value) / 100;
   $('noise-threshold-value').textContent = `${Number(event.target.value).toFixed(1)}%`;
@@ -352,7 +358,7 @@ $('start').onclick = async () => {
       }
       send(data);
       silenceFrames = voice ? 0 : silenceFrames + 1;
-      if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; finishAudio(); }
+      if (silenceFrames >= endSilenceFrames) { speaking = false; silenceFrames = 0; responsePending = true; finishAudio(); }
     };
     if ($('experimental-aec').checked) {
       const { createEchoBridge } = await import('/echo-bridge.js');
