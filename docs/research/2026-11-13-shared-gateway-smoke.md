@@ -1,0 +1,5 @@
+# EXP-177: Shared-admission gateway startup
+
+A temporary gateway and sampler were started on port 18094 with the normal Windows demo script, reusing existing services. The resource endpoint reported `participating-gateways`, no hard limit, system-wide pagefile use of 4,822,401,024 bytes, 16,265,285,632 bytes dedicated GPU usage, 265,338,880 bytes shared GPU usage and 9,502,433,280 bytes available RAM. Its single-task estimate was insufficient because the configured 3 GiB estimate would leave less than the 6 GiB reserve. A local WebSocket connection reported cascade mode with speech review and task cancellation; no task, model inference, physical microphone or speaker was exercised. The shared ledger contained zero reservations at inspection.
+
+The temporary owned gateway and sampler were stopped with the ownership-checking script. Existing demos and model processes were not stopped. This validates startup wiring and one idle resource sample, not concurrent live admission, hard GPU limits, pagefile attribution or the absence of disk spill. Existing gateway processes do not participate in the new ledger until restarted with the shared configuration.

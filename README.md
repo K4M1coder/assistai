@@ -34,6 +34,8 @@ An optional sampled resource check can reject new background tasks when measured
 
 New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.
 
+A temporary real-service gateway started with the ledger and updated resource sampler; at that sample the configured agent-task estimate exceeded available RAM headroom. No task was submitted. See [EXP-177](docs/research/2026-11-13-shared-gateway-smoke.md).
+
 The updated Windows sampler can also report system-wide pagefile usage, and resource status warns above 256 MiB total shared GPU use. Pagefile usage cannot be attributed to this application from that number alone. Running samplers and gateways must be restarted to expose the new field. See [EXP-173](docs/research/2026-11-13-windows-memory-counters.md).
 
 An official Q4_K_M version of the current Q8 controller has been downloaded and hash-verified for a future controlled comparison. Its smaller file size is not a measured VRAM saving or evidence of equivalent French tool use. See [EXP-174](docs/research/2026-11-13-controller-q4-candidate.md).
