@@ -44,6 +44,8 @@ An existing quantized Voxtral Realtime checkpoint and a pinned Windows CPU/Vulka
 
 For this pinned API, the exposed encoder attention KV choices are automatic, FP16 and FP32; its generic context cap is documented as ineffective for Voxtral Realtime. Quantized KV and a bounded context for this candidate are therefore not established. See [EXP-157](docs/research/2026-11-13-voxtral-abi.md).
 
+Inspection of the pinned Voxtral streaming implementation and the local model metadata estimates 1,600 MiB for its FP32 encoder and FP16 decoder KV tensors alone. These are not quantized KV caches, and weights, buffers and other models are additional. No model allocation was measured. See [EXP-158](docs/research/2026-11-13-voxtral-kv.md).
+
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
 An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.

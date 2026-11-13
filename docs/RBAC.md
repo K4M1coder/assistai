@@ -74,6 +74,8 @@ The transcribe.cpp research setup downloads a pinned public runtime archive, che
 
 The research ABI probe checks the pinned library's version and selected structure sizes and alignments before invoking initializers. It does not load untrusted model files or establish resource isolation.
 
+The Voxtral cache estimator reads only bounded GGUF metadata from an explicitly selected file. It does not initialize the model or enforce any resource limit; its output must not be treated as authorization to allocate GPU memory.
+
 The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
 
 The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.
