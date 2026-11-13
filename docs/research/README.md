@@ -47,3 +47,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-180](2026-11-13-resumption-preflight.md) records the current service inventory, resource guard failure, controlled failure-path tests and the remaining physical French demonstration. Existing gateway health is not proof of a functioning audio conversation.
 
 [EXP-182](2026-11-14-current-gateway.md) records a new current-source gateway started after the operator freed memory, and the proposed physical test; startup is not an end-to-end result.
+
+[EXP-183](2026-11-14-physical-and-asr-failure.md) records the operator's physical French conversation and mixed interruption reports, plus an isolated actual ASR connection refusal.

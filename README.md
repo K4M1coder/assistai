@@ -12,7 +12,9 @@ The updated experimental client is currently available on this machine at [http:
 
 On the latest resumption preflight, service health checks passed but system resource readings exceeded the existing trial guard. Physical French conversation and audible playback were not tested in that preflight. Existing gateway processes may run older source. See [EXP-180](docs/research/2026-11-13-resumption-preflight.md) before starting a new trial or interpreting health as end-to-end readiness.
 
-After memory was freed, a current-source gateway was started on [http://127.0.0.1:18094/](http://127.0.0.1:18094/) with volatile history and existing local services. Its startup and a suggested physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md); the physical test remains outstanding.
+After memory was freed, a current-source gateway was started on [http://127.0.0.1:18094/](http://127.0.0.1:18094/) with volatile history and existing local services. Its startup and the physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md).
+
+In a subsequent physical trial, the operator reported a correct or corrected French transcript and an audible, relevant French response. Manual interruption initially failed by report but stopped speech on a repeat; the first failure is unexplained. An isolated refused ASR connection produced an explicit error and disconnect. These observations are limited; see [EXP-183](docs/research/2026-11-14-physical-and-asr-failure.md).
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
