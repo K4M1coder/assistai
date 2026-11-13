@@ -8,7 +8,7 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 ## Current local voice prototype
 
-The updated experimental client is available on this machine at [http://127.0.0.1:18089/](http://127.0.0.1:18089/) while its local services are running. The older gateway remains on port 18088. The updated demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
+The experimental client is currently available on this machine at [http://127.0.0.1:18091/](http://127.0.0.1:18091/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
@@ -16,7 +16,7 @@ Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech pat
 
 The Windows audio client has also been exercised against the native gateway using simulated devices and a mock inference server, including one manual-interruption and late-audio test. The client prints whether the gateway reports cascade or native speech mode. In native mode, the web service list identifies a configured parallel transcription engine separately from the speech-to-speech model; a physical-device test against the real native speech model remains outstanding.
 
-An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling. It is enabled in the updated port 18089 demonstration; the older port 18088 gateway does not use it.
+An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling.
 
 The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
 
@@ -45,6 +45,8 @@ An existing quantized Voxtral Realtime checkpoint and a pinned Windows CPU/Vulka
 For this pinned API, the exposed encoder attention KV choices are automatic, FP16 and FP32; its generic context cap is documented as ineffective for Voxtral Realtime. Quantized KV and a bounded context for this candidate are therefore not established. See [EXP-157](docs/research/2026-11-13-voxtral-abi.md).
 
 Inspection of the pinned Voxtral streaming implementation and the local model metadata estimates 1,600 MiB for its FP32 encoder and FP16 decoder KV tensors alone. These are not quantized KV caches, and weights, buffers and other models are additional. No model allocation was measured. See [EXP-158](docs/research/2026-11-13-voxtral-kv.md).
+
+Upstream llama.cpp and ExecuTorch document alternative streaming paths, but their Intel GPU support, cache behavior and memory use for this model need verification. See [EXP-159](docs/research/2026-11-13-voxtral-alternatives.md).
 
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
