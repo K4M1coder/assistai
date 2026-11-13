@@ -17,6 +17,8 @@ test('does not expose explicitly marked reasoning in visible or spoken output', 
     assert.doesNotMatch(formatTaskNotification(text), /private reasoning/);
   }
   assert.equal(visibleAnswer('<think>private reasoning'), '');
+  assert.equal(visibleAnswer('private reasoning</think'), '');
+  assert.doesNotMatch(formatTaskNotification('private reasoning</analysis'), /private reasoning/);
   assert.equal(visibleAnswer('Bonjour.'), 'Bonjour.');
   assert.equal(visibleAnswer('Je lance la tâche. (En attente du résultat...)</think>J’ai lancé la recherche.'), 'J’ai lancé la recherche.');
 });

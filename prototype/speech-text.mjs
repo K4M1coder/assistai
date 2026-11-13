@@ -4,6 +4,9 @@ export function visibleAnswer(input) {
   let text = input.replace(/<(think|analysis)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/gi, ' ');
   // Some backends omit the opening marker when a prompt already contains it.
   text = text.replace(/^[\s\S]*?<\/(?:think|analysis)\s*>/i, ' ');
+  // A truncated closing marker can follow reasoning when generation hits a limit.
+  // Do not speak the text before it; there is no confirmed answer after it.
+  text = text.replace(/^[\s\S]*?<\/(?:think|analysis)\s*$/i, ' ');
   text = text.replace(/<(?:think|analysis)(?:\s[^>]*)?(?:>|$)[\s\S]*$/i, ' ');
   return text.trim();
 }

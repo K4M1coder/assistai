@@ -58,10 +58,11 @@ async function turn(socket, text) {
 
 test('opt-in session resume isolates clients and restores bounded history after restart', { timeout: 30000 }, async t => {
   const prompts = [];
+  let modelResponse = '<think>PRIVATE REASONING</think>OK';
   const llm = http.createServer(async (req, res) => {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     prompts.push(JSON.parse(Buffer.concat(chunks).toString()).messages);
-    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: '<think>PRIVATE REASONING</think>OK' } }] }));
+    res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: modelResponse } }] }));
   });
   const llmPort = await listen(llm);
   const wav = Buffer.alloc(48); wav.write('RIFF', 0); wav.write('WAVE', 8); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt16LE(16, 34); wav.write('data', 36);
@@ -110,6 +111,16 @@ test('opt-in session resume isolates clients and restores bounded history after 
   await turn(a, marker);
   assert.equal(visibleResponse, 'OK');
   assert.equal(lastTtsText, 'OK');
+  // Regression from a real French task response with an omitted opening tag.
+  modelResponse = "Je vais rechercher les dernières nouvelles de jour à Nantes. Je lance la tâche correspondante. (En attente du résultat...)</think>J'ai lancé la recherche des dernières nouvelles de jour à Nantes. Je te dirai ce que j'en trouve !";
+  const expectedAnswer = "J'ai lancé la recherche des dernières nouvelles de jour à Nantes. Je te dirai ce que j'en trouve !";
+  await turn(a, 'reported unmatched thinking tag');
+  assert.equal(visibleResponse, expectedAnswer);
+  assert.equal(lastTtsText, visibleResponse);
+  modelResponse = '<think>PRIVATE REASONING</think>OK';
+  await turn(a, 'verify filtered history');
+  assert.ok(prompts.at(-1).some(message => message.content === expectedAnswer));
+  assert.ok(!prompts.at(-1).some(message => message.content?.includes('En attente du résultat')));
   const duplicate = new WebSocket(`ws://127.0.0.1:${port}/voice`, ['assistai-v1', `resume.${tokenA}`]);
   const [duplicateCode] = await once(duplicate, 'close');
   assert.equal(duplicateCode, 1008);

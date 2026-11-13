@@ -24,7 +24,7 @@ The browser reports detected playback gaps over 30 ms in the conversation log. T
 
 Playback scheduling now keeps consecutive audio chunks adjacent while a queue remains, avoiding a previously possible artificial pause. This correction has a mock-clock regression test; its effect on live speech remains to be heard.
 
-The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path.
+The cascade filters explicit `<think>` and `<analysis>` blocks from model answers before display, history and speech, including an unmatched closing tag and a truncated closing marker. An integration test covers the reported Nantes response through the gateway and TTS request. This is format-specific and cannot reliably detect unmarked reasoning; native speech generated directly by a model is not filtered by this text path. Running gateway processes need a restart to pick up changes to the filter.
 
 The guarded Windows coding experiment accepts separate agent and gateway ports, so an existing demo need not be stopped to run it. The experiment still requires its configured RAM and GPU headroom and uses a disposable fixture.
 
