@@ -21,7 +21,7 @@ function Sample-Resources($process) {
   return @{ at=[DateTimeOffset]::UtcNow.ToString('o'); dedicatedBytes=[long]$dedicated[0].CookedValue; sharedBytes=[long]$shared[0].CookedValue; availableRamBytes=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024; processWorkingSetBytes=if($p){$p.WorkingSet64}else{$null}; processPrivateBytes=if($p){$p.PrivateMemorySize64}else{$null}; pagefiles=@(Get-CimInstance Win32_PageFileUsage | ForEach-Object { @{ currentMiB=$_.CurrentUsage; allocatedMiB=$_.AllocatedBaseSize } }) }
 }
 $baseline=Sample-Resources $null
-if($baseline.availableRamBytes -lt 10GB -or $baseline.dedicatedBytes -gt 10GB){throw 'Insufficient preflight headroom'}
+if($baseline.availableRamBytes -lt 10GB -or $baseline.dedicatedBytes -gt 10GB -or $baseline.sharedBytes -gt 256MB){throw 'Insufficient preflight headroom'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $root ".cache/gemma-checkpoints-$Checkpoints-$stamp"
 $env:GGML_VK_DISABLE_COOPMAT='1'
@@ -38,7 +38,7 @@ try {
     ($sample | ConvertTo-Json -Compress -Depth 5) | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
     if($sample.availableRamBytes -lt 6GB){throw 'RAM reserve'}
     if($sample.dedicatedBytes -gt 22GB){throw 'Dedicated GPU threshold'}
-    if($sample.sharedBytes-$baseline.sharedBytes -gt 256MB){throw 'Shared GPU growth threshold'}
+    if($sample.sharedBytes -gt 256MB){throw 'Absolute shared GPU threshold'}
     if($null -eq $probe){
       try { $ready=(Invoke-RestMethod -Uri 'http://127.0.0.1:18093/health' -TimeoutSec 2).status -eq 'ok' } catch { $ready=$false }
       if($ready){

@@ -9,7 +9,7 @@ function Resources {
   return @{ at=[DateTimeOffset]::UtcNow.ToString('o'); dedicated=[long]$d[0].CookedValue; shared=[long]$s[0].CookedValue; availableRam=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024 }
 }
 $base=Resources
-if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB){throw 'Insufficient preflight headroom'}
+if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 256MB){throw 'Insufficient preflight headroom'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $root ".cache/notification-transcription-$stamp"
 $python=Join-Path $root '.venv-voice/Scripts/python.exe'
@@ -25,7 +25,7 @@ try {
     ($sample | ConvertTo-Json -Compress) | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
     if($sample.availableRam -lt 6GB){$reason='RAM reserve';break}
     if($sample.dedicated -gt 22GB){$reason='dedicated GPU threshold';break}
-    if($sample.shared-$base.shared -gt 256MB){$reason='shared GPU growth threshold';break}
+    if($sample.shared -gt 256MB){$reason='absolute shared GPU threshold';break}
     $p.Refresh(); if($p.HasExited){$reason=if($p.ExitCode -eq 0){'probe passed'}else{"probe failed: $($p.ExitCode)"};break}
   }
 } finally {

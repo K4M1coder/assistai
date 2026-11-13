@@ -33,7 +33,7 @@ function Read-Resources([int]$TrialPid = 0) {
     return $result
 }
 $baseline = Read-Resources
-if ($baseline.dedicated -gt 12GB -or $baseline.available_ram -lt 8GB) { throw 'Insufficient starting headroom for the native model.' }
+if ($baseline.dedicated -gt 12GB -or $baseline.available_ram -lt 8GB -or $baseline.shared -gt 256MB) { throw 'Insufficient starting headroom for the native model.' }
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $env:GGML_VK_DISABLE_COOPMAT = '1'
 $env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM = '1'
@@ -54,7 +54,7 @@ try {
         try { $r = Read-Resources -TrialPid $p.Id } catch { $reason = 'telemetry unavailable'; break }
         ($r | ConvertTo-Json -Compress) | Add-Content -LiteralPath $samples -Encoding utf8
         if ($r.dedicated -gt 22GB) { $reason = 'dedicated GPU threshold exceeded'; break }
-        if ($r.shared - $baseline.shared -gt 256MB) { $reason = 'shared GPU growth threshold exceeded'; break }
+        if ($r.shared -gt 256MB) { $reason = 'absolute shared GPU threshold exceeded'; break }
         if ($r.available_ram -lt 6GB) { $reason = 'available RAM below reserve'; break }
         $p.Refresh()
     }
