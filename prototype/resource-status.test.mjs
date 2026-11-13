@@ -36,8 +36,17 @@ test('projects one task using the admission budget without counting active reser
   const room = await make({ ...sample, availableRamBytes: 10 * GiB });
   assert.equal(room.single_task_estimate.status, 'headroom_observed');
   const shared = await make({ ...sample, availableRamBytes: 10 * GiB, sharedBytes: 257 * 1024 ** 2 });
+  assert.equal(shared.status, 'low');
   assert.equal(shared.single_task_estimate.status, 'insufficient');
   assert.match(shared.single_task_estimate.reasons.join(' '), /Shared GPU/);
+});
+
+test('reports optional system-wide pagefile usage without attributing it to the model', async () => {
+  const current = { ...sample, availableRamBytes: 9 * GiB, systemPagefileUsedBytes: 4 * GiB };
+  const make = value => createResourceStatus({ samplePath: 'sample', read: async () => JSON.stringify(value), now: clock })();
+  assert.equal((await make(current)).system_pagefile_used_bytes, 4 * GiB);
+  assert.equal((await make({ ...current, systemPagefileUsedBytes: -1 })).status, 'unavailable');
+  assert.equal((await make({ ...sample, availableRamBytes: 9 * GiB })).system_pagefile_used_bytes, undefined);
 });
 
 test('rejects stale, missing and malformed samples', async () => {

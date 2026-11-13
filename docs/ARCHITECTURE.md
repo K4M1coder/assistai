@@ -74,6 +74,8 @@ Automatic speech turns end after a configurable quiet interval, default 1.4 seco
 
 In experimental native speech mode, interrupting while a tool submission is pending replaces the realtime voice session, discards its late tool response and signals reconnection to the browser. Input arriving during session setup is buffered up to 32,000 PCM bytes and then flushed; overflow fails explicitly. The background task may already have been accepted and continues independently; interrupting voice does not cancel or undo it. This race is covered by mock tests, not yet by a live native model or physical audio test.
 
+The optional Windows resource sample can include total system pagefile usage. This is not attributed to a process, is not a hard memory limit, and does not prove where model data resides. Resource status warns above the conservative total shared-GPU threshold independently of whether task admission is configured.
+
 If prompt submission may have reached OpenCode or polling later fails, the gateway emits `task.uncertain`, retains the task ID and estimate, and refuses to resubmit the same normalized request in that session. It continues to accept cancellation requests for that ID. Status polling retries up to three consecutive failures and can recover; ambiguous submission and exhausted retries remain uncertain, and a restart loses this process-local task map even if external work continues.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.

@@ -16,6 +16,8 @@ export function createResourceStatus({ samplePath, admissionEnabled = false, tas
       const reasons = [];
       if (sample.availableRamBytes < DEFAULT_BUDGET.minAvailableRamBytes) reasons.push('Available system RAM is below the 6 GiB reserve');
       if (sample.dedicatedBytes > DEFAULT_BUDGET.maxDedicatedBytes - DEFAULT_BUDGET.dedicatedReserveBytes) reasons.push('Dedicated GPU use exceeds the 22 GiB planning threshold');
+      if (sample.sharedBytes > DEFAULT_BUDGET.maxSharedGrowthBytes) reasons.push('Total shared GPU use exceeds the conservative 256 MiB threshold');
+      if (sample.systemPagefileUsedBytes !== undefined && (!Number.isFinite(sample.systemPagefileUsedBytes) || sample.systemPagefileUsedBytes < 0)) throw Error('Invalid pagefile sample');
       let singleTaskEstimate;
       if (admissionEnabled && taskEstimate) {
         const decision = evaluateBudget({ ...sample, baselineSharedBytes: taskEstimate.baselineSharedBytes },
@@ -25,6 +27,7 @@ export function createResourceStatus({ samplePath, admissionEnabled = false, tas
       return { ...base, status: reasons.length ? 'low' : 'observed', observed_at: sample.observedAt,
         dedicated_bytes: sample.dedicatedBytes, shared_bytes: sample.sharedBytes,
         available_ram_bytes: sample.availableRamBytes, reasons,
+        ...(sample.systemPagefileUsedBytes !== undefined ? { system_pagefile_used_bytes: sample.systemPagefileUsedBytes } : {}),
         ...(singleTaskEstimate ? { single_task_estimate: singleTaskEstimate } : {}) };
     } catch { return { ...base, status: 'unavailable', reason: 'Resource sample is missing or invalid' }; }
   };

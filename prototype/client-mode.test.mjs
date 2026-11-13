@@ -137,7 +137,7 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
     class Socket { static OPEN = 1; constructor(url, protocols) { selectedProtocols = protocols; } }
     const context = vm.createContext({ document: { getElementById: id => elements[id] },
       fetch: async url => url === '/health' ? { ok: true, json: async () => ({ session_resume_enabled: true }) }
-        : url === '/resources' ? { ok: true, json: async () => ({ status: 'low', dedicated_bytes: 15 * 1024 ** 3, shared_bytes: 0, available_ram_bytes: 4 * 1024 ** 3, reasons: ['RAM below reserve'], admission: 'disabled' }) }
+        : url === '/resources' ? { ok: true, json: async () => ({ status: 'low', dedicated_bytes: 15 * 1024 ** 3, shared_bytes: 0, available_ram_bytes: 4 * 1024 ** 3, system_pagefile_used_bytes: 3 * 1024 ** 3, reasons: ['RAM below reserve'], admission: 'disabled' }) }
         : { ok: false },
       location: { host: 'localhost', reload() { reloads++; } }, WebSocket: Socket,
       localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
@@ -150,6 +150,7 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(first['session-memory'].disabled, false);
   assert.match(first.resources.textContent, /available RAM 4\.00 GiB/);
+  assert.match(first.resources.textContent, /system pagefile use 3\.00 GiB \(all processes\)/);
   assert.match(first.resources.textContent, /No hard limit is enforced/);
   assert.equal(selectedProtocols, undefined);
   first['session-memory'].onclick();

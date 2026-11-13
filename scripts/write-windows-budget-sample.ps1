@@ -16,7 +16,12 @@ while ($true) {
     dedicatedBytes = [long]$dedicated[0].CookedValue
     sharedBytes = [long]$shared[0].CookedValue
     availableRamBytes = [long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1024
-  } | ConvertTo-Json -Compress
-  [IO.File]::WriteAllText($temporary, $sample, [Text.UTF8Encoding]::new($false))
+  }
+  # System-wide pagefile occupancy is not attributable to this application.
+  try {
+    $pagefiles = @(Get-CimInstance Win32_PageFileUsage -ErrorAction Stop)
+    if ($pagefiles.Count -gt 0) { $sample.systemPagefileUsedBytes = [long](($pagefiles | Measure-Object -Property CurrentUsage -Sum).Sum * 1MB) }
+  } catch { }
+  [IO.File]::WriteAllText($temporary, ($sample | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
   Move-Item -LiteralPath $temporary -Destination $target -Force
 }

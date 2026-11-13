@@ -32,6 +32,8 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling.
 
+The updated Windows sampler can also report system-wide pagefile usage, and resource status warns above 256 MiB total shared GPU use. Pagefile usage cannot be attributed to this application from that number alone. Running samplers and gateways must be restarted to expose the new field. See [EXP-173](docs/research/2026-11-13-windows-memory-counters.md).
+
 Older Windows model-trial scripts now compare total observed shared GPU use against the 256 MiB guard, rather than permitting that amount of additional shared usage above their starting baseline. Sampling cannot guarantee no spill; see [EXP-163](docs/research/2026-11-13-absolute-shared-guard.md).
 
 The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
