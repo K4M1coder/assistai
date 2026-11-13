@@ -36,6 +36,8 @@ The updated Windows sampler can also report system-wide pagefile usage, and reso
 
 An official Q4_K_M version of the current Q8 controller has been downloaded and hash-verified for a future controlled comparison. Its smaller file size is not a measured VRAM saving or evidence of equivalent French tool use. See [EXP-174](docs/research/2026-11-13-controller-q4-candidate.md).
 
+A French text delegation probe now covers opposing operations, negation and ordinary conversation without executing tools. Semantic review remains mandatory; no Q4/Q8 result is claimed yet. See [EXP-175](docs/research/2026-11-13-controller-eval.md).
+
 Older Windows model-trial scripts now compare total observed shared GPU use against the 256 MiB guard, rather than permitting that amount of additional shared usage above their starting baseline. Sampling cannot guarantee no spill; see [EXP-163](docs/research/2026-11-13-absolute-shared-guard.md).
 
 The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
