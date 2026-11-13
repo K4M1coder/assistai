@@ -128,6 +128,7 @@ wss.on('connection', (client, req) => {
   let segments = [];
   let waitingForFinal = false;
   let spokenImage = null;
+  let reviewSpeech = false, pendingReview = null;
   let taskState = resumedSession && activeTaskSessions.get(session);
   if (!taskState) {
     taskState = { running: new Map(), completed: resumedSession && lfmRealtimeUrl ? restoreCompletedTasks(completedTaskHistory.all(session).reverse()) : new Map() };
@@ -144,7 +145,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -404,7 +405,8 @@ wss.on('connection', (client, req) => {
         const text = segments.join(' ').trim();
         segments = [];
         const image = spokenImage; spokenImage = null;
-        if (text && image) void respondToImage(text, image);
+        if (text && reviewSpeech) { pendingReview = { id: randomUUID(), image }; send({ type: 'speech.review', review_id: pendingReview.id, text, has_image: Boolean(image) }); }
+        else if (text && image) void respondToImage(text, image);
         else if (text) void respond(text);
         else send({ type: 'asr.empty' });
       }
@@ -417,6 +419,13 @@ wss.on('connection', (client, req) => {
     let event;
     try { event = JSON.parse(data.toString()); } catch { client.close(1003, 'Invalid JSON'); return; }
     if (event.type === 'interrupt') { cancel(event.reason === 'voice_activity' ? 'voice_activity' : 'manual'); return; }
+    if (event.type === 'speech.review.configure' && typeof event.enabled === 'boolean') { reviewSpeech = event.enabled; if (!reviewSpeech) pendingReview = null; return; }
+    if (event.type === 'speech.review.submit') {
+      if (!pendingReview || event.review_id !== pendingReview.id || typeof event.text !== 'string' || !event.text.trim() || event.text.trim().length > 4000) { send({ type: 'error', message: 'Speech review is no longer available or the text is invalid.' }); return; }
+      const image = pendingReview.image; pendingReview = null;
+      if (image) void respondToImage(event.text.trim(), image); else void respond(event.text.trim());
+      return;
+    }
     if (event.type === 'notification.speak' && typeof event.task_id === 'string') {
       const completed = taskHistory.all(session).filter(row => row.kind === 'task.completed').map(row => JSON.parse(row.payload)).find(payload => payload.task_id === event.task_id);
       if (!completed || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id, reason: completed ? 'busy' : 'unavailable' }); return; }

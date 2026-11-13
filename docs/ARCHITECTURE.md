@@ -48,6 +48,8 @@ A synthetic French audio variant reached ASR, task delegation and a distinct fol
 
 A later guarded synthetic spoken coding run recorded a distorted filename and lost operation distinction in the transcript; the controller delegated the opposite operation. The watchdog stopped the trial below the RAM reserve, with the fixture unchanged. This failure shows the current voice-to-harness path is not dependable for coding, and resource headroom remains inadequate for sustained combined operation.
 
+The cascade can optionally hold a recognized speech turn for transcript review before any controller or vision request. A connection-scoped review ID binds the edited text to a pending turn and its optional image; submission consumes it, while disabling review or disconnecting drops it. The browser pauses further capture while a review is pending. This mode is off by default, unavailable in native speech mode, and tested with mocks rather than live microphone use.
+
 A separate guarded ASR probe prepares fixed synthetic French cases for operation direction, negation and a filename without launching an agent. Its metrics include word error and token order but do not establish semantic equivalence or live-microphone accuracy. Its first preflight did not meet the 8 GiB RAM threshold.
 
 An existing quantized Kyutai French/English STT checkpoint is a research candidate. Its local model directory lacks the codec and tokenizer named in its configuration; upstream Rust source has a GGUF/CPU path, but an installed runtime, Windows execution, Intel acceleration and the complete memory footprint have not been verified.

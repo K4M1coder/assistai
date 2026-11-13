@@ -72,6 +72,7 @@ let playbackTime = 0, playbackSources = new Set(), carry = null;
 let speechHasAudio = false, playbackGapCount = 0, playbackGapMaxMs = 0;
 let asrReady = false;
 let textInputAvailable = true;
+let speechReviewAvailable = false, pendingReviewId = null;
 let spokenImageAvailable = false, preparedImage = null, imageVersion = 0, spokenImageSent = false;
 $('image').onchange = () => {
   const file = $('image').files?.[0], version = ++imageVersion;
@@ -111,6 +112,10 @@ $('noise-threshold').oninput = event => {
   $('noise-threshold-value').textContent = `${Number(event.target.value).toFixed(1)}%`;
 };
 const send = data => { if (ws.readyState === WebSocket.OPEN) ws.send(data); };
+$('speech-review').onchange = () => {
+  pendingReviewId = null;
+  if (speechReviewAvailable) send(JSON.stringify({ type: 'speech.review.configure', enabled: $('speech-review').checked }));
+};
 function announceWhenIdle() {
   if (!pendingNotifications.length || notificationPending || responsePending || speaking || pushToTalkActive || speechOpen || playbackSources.size || !playbackContext || ws.readyState !== WebSocket.OPEN) return;
   notificationPending = true;
@@ -169,6 +174,8 @@ function handleSocketMessage({ data }) {
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
     textInputAvailable = event.text_input === true;
+    speechReviewAvailable = event.speech_review === true;
+    $('speech-review').disabled = !speechReviewAvailable;
     spokenImageAvailable = event.spoken_image_input === true;
     taskCancelAvailable = event.task_cancel === true;
     refreshTaskButton();
@@ -177,7 +184,8 @@ function handleSocketMessage({ data }) {
     $('image').disabled = event.image_input !== true;
     $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
-  else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
+  else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; if (speechReviewAvailable) send(JSON.stringify({type:'speech.review.configure',enabled:$('speech-review').checked})); $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
+  else if (event.type === 'speech.review') { pendingReviewId = event.review_id; $('text').value = event.text; responsePending = false; status(event.has_image ? 'Review the transcript, then press Send. The spoken image is attached.' : 'Review the transcript, then press Send.'); }
   else if (event.type === 'asr.empty') { if (spokenImageSent) log('No speech was recognized. Select the image again to retry.'); spokenImageSent = false; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'transcript.empty') $('partial').textContent = '';
   else if (event.type === 'transcript.unavailable') { $('partial').textContent = ''; log('Parallel transcription unavailable for this turn.'); }
@@ -226,7 +234,7 @@ function connectGateway() {
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; spokenImageAvailable = false; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); refreshTaskButton(); stopPlayback();
+    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
@@ -248,6 +256,7 @@ $('push-to-talk').onchange = changeMicrophoneMode;
 $('speaker-safe').onchange = changeMicrophoneMode;
 function beginPushToTalk() {
   if (pushToTalkActive) return;
+  if (pendingReviewId) { status('Send the reviewed transcript or turn off speech review before recording again.'); return; }
   if (!$('push-to-talk').checked || !stream?.active || !asrReady || ws.readyState !== WebSocket.OPEN) return;
   if (speechOpen || playbackSources.size) interrupt('manual');
   send(JSON.stringify({ type: 'audio.reset' }));
@@ -278,6 +287,7 @@ $('form').onsubmit = async event => {
   if (!textInputAvailable) { status('Text and image input are unavailable in native speech mode.'); return; }
   const text = $('text').value.trim(), file = $('image').files?.[0];
   if (!text) return;
+  if (pendingReviewId && file) { status('Remove the newly selected image before sending the reviewed transcript.'); return; }
   if (file && (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 1024 * 1024)) { status('Choose a PNG or JPEG image under 1 MiB.'); return; }
   let image;
   if (file) {
@@ -287,7 +297,8 @@ $('form').onsubmit = async event => {
   playbackContext ??= new AudioContext(); await playbackContext.resume();
   if (ws.readyState !== WebSocket.OPEN) { status('Disconnected. Your message has not been sent.'); return; }
   interrupt(); responsePending = true;
-  send(JSON.stringify(file ? { type: 'image', text, image } : { type: 'text', text }));
+  send(JSON.stringify(pendingReviewId ? { type: 'speech.review.submit', review_id: pendingReviewId, text } : file ? { type: 'image', text, image } : { type: 'text', text }));
+  pendingReviewId = null;
   $('text').value = ''; $('image').value = ''; preparedImage = null; imageVersion++;
 };
 $('start').onclick = async () => {
@@ -311,6 +322,7 @@ $('start').onclick = async () => {
     const microphone = captureContext.createMediaStreamSource(stream);
     const handleAudio = data => {
       if (!asrReady || ws.readyState !== WebSocket.OPEN) return;
+      if (pendingReviewId) return;
       if ($('push-to-talk').checked) {
         if (pushToTalkActive) send(data);
         return;

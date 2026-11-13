@@ -60,6 +60,8 @@ Selecting separate trial ports does not change OpenCode's authority, authenticat
 
 In a later spoken coding trial, recognition and controller interpretation changed the requested operation before delegation. Any harness with write or command permissions could act on a similarly incorrect task. The current demo uses a read-only fixture; that observed failure does not validate broader permissions.
 
+Optional speech review allows a user to correct the recognized text before the cascade calls the controller or vision service. It is a user-interface feature, not authentication, authorization or proof of intent; it is disabled by default. Pending review text and an optional image are held in the connection's process memory until submission, disabling review or disconnection.
+
 The synthetic ASR coding probe sends fixed phrases only to loopback speech services and does not delegate tasks. Its word and token metrics are diagnostic, not a permission check or proof that an operation is safe to execute.
 
 The Kyutai STT inventory reads explicitly selected local model metadata and file sizes without loading weights or accessing the network. It rejects configured asset paths outside the selected model directory; this inspection does not validate model provenance or trustworthiness.

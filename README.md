@@ -30,6 +30,8 @@ The guarded Windows coding experiment accepts separate agent and gateway ports, 
 
 A later synthetic spoken coding attempt misrecognized the filename and operation, then the controller delegated the opposite change. Its watchdog stopped the trial below the RAM reserve; the fixture was unchanged. Spoken coding requests are therefore not yet dependable. See [EXP-144](docs/research/2026-11-12-spoken-coding-failure.md).
 
+The updated cascade offers an optional **Review speech before sending** mode: the user can edit the transcript before it reaches the controller. It is off by default and has mock coverage; it does not make recognition or task execution infallible. The running gateway must be restarted to enable it.
+
 A guarded synthetic ASR probe is prepared to compare recognition of operation direction, negation and a filename. Its first attempt did not meet the RAM preflight; no benchmark result is available yet.
 
 An existing quantized Kyutai French/English STT candidate has been inventoried without loading it. Its required codec, tokenizer and usable local runtime were not established, so it is not yet an alternative deployed in the demo. See [EXP-151](docs/research/2026-11-12-kyutai-stt-inventory.md).
