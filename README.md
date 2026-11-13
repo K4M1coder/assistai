@@ -42,6 +42,8 @@ The ASR coding probe compares both candidates on identical synthetic audio; its 
 
 An existing quantized Voxtral Realtime checkpoint and a pinned Windows CPU/Vulkan transcribe.cpp library are a further streaming-ASR candidate. The library has only been initialized in CPU discovery mode; Voxtral, B60 execution and coexistence with the agent remain untested. See [EXP-156](docs/research/2026-11-13-voxtral-runtime.md).
 
+For this pinned API, the exposed encoder attention KV choices are automatic, FP16 and FP32; its generic context cap is documented as ineffective for Voxtral Realtime. Quantized KV and a bounded context for this candidate are therefore not established. See [EXP-157](docs/research/2026-11-13-voxtral-abi.md).
+
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
 An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
