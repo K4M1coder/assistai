@@ -18,6 +18,7 @@ import { buildAgentPrompt } from './agent-context.mjs';
 import { resumeSessionId } from './session-resume.mjs';
 import { createResourceStatus } from './resource-status.mjs';
 import { speechText, visibleAnswer } from './speech-text.mjs';
+import { latestCompletedAssistant } from './agent-task-status.mjs';
 
 function validImage(image) {
   const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
@@ -242,8 +243,8 @@ wss.on('connection', (client, req) => {
             reservation.uncertain = false;
             sendTask({ type: 'task.status_restored', task_id: agentSession.id, message: 'Agent status monitoring resumed.' });
           }
-          const last = [...messages].reverse().find(item => item.info?.role === 'assistant' && item.info?.time?.completed);
-          if (!status[agentSession.id] && last) {
+          const last = latestCompletedAssistant(status, agentSession.id, messages);
+          if (last) {
             const text = (last.parts ?? []).filter(part => part.type === 'text' && !part.synthetic).map(part => part.text).join('\n').trim();
             if (last.info.error) { confirmedTerminal = true; throw new Error('Agent reported an error'); }
             if (!text) continue;

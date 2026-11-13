@@ -12,13 +12,17 @@ async function listen(server) { server.listen(0, '127.0.0.1'); await once(server
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
 
 test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
-  const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult=''; let nextToolOnResume=false; let agentBusy=false; let agentResult='BLUEBIRD';
+  const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult=''; let nextToolOnResume=false; let agentBusy=false; let agentResult='BLUEBIRD'; let messagePolls=0;
   const agent=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST' && req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
     if(req.method==='POST' && req.url==='/session/fixture-session/prompt_async'){const body=await fetchJson(req);calls.push(body.parts[0].text);res.statusCode=204;return res.end();}
     if(req.url==='/session/status')return res.end(JSON.stringify(agentBusy?{'fixture-session':{type:'busy'}}:{}));
-    if(req.url==='/session/fixture-session/message')return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:agentResult}]}]));
+    if(req.url==='/session/fixture-session/message') {
+      messagePolls++;
+      if(messagePolls===1)return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:'STALE INTERMEDIATE'}]},{info:{role:'assistant',time:{}},parts:[]}]));
+      return res.end(JSON.stringify([{info:{role:'assistant',time:{completed:1}},parts:[{type:'text',text:agentResult}]}]));
+    }
     res.statusCode=404;res.end('{}');
   });
   const agentPort=await listen(agent);
@@ -74,7 +78,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       if(e.type==='session.capabilities')capabilities=e;
       else if(e.type==='user.text')transcript=e;
       else if(e.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
-      else if(e.type==='task.completed'){completed=true;assert.equal(e.text,'BLUEBIRD');maybeNotify();}
+      else if(e.type==='task.completed'){completed=true;assert.ok(messagePolls>=2);assert.equal(e.text,'BLUEBIRD');maybeNotify();}
       else if(e.type==='speech.end'){if(notified){clearTimeout(timer);return resolve();}initialEnd=true;maybeNotify();}
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
