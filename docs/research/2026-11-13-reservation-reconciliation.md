@@ -1,0 +1,5 @@
+# EXP-178: Inspecting retained task reservations
+
+Shared reservations now record the OpenCode session ID after the harness creates it and before task submission. Recording failure rejects submission and preserves conservative handling. The read-only inspection command lists reservation ID, task ID when available, owner PID, timestamp and estimates; it does not infer task state. A separately invoked exact-UUID release command requires the operator to attest that the task has stopped. It does not stop work, undo changes, free memory, authenticate the operator or verify the attestation. Process IDs can be reused; a gateway exit does not prove an OpenCode task stopped. Reservations created before a session exists or by an earlier version can lack a task ID and need separate investigation.
+
+Tests cover a retained reservation, exact-ID release, rejected invalid IDs, subsequent admission, independent process coordination and migration of an older ledger without deleting its entries. A read-only check of the current research ledger returned no reservations. No live agent task, microphone or GPU model was started.

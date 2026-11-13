@@ -8,7 +8,7 @@ When configured, the read-only resource endpoint exposes aggregate memory teleme
 
 The optional one-task headroom projection is also unauthenticated telemetry, not an allocation or permission to execute a task.
 
-The optional shared task-reservation database is a local coordination mechanism, not an authorization boundary. Any process able to alter it can invalidate its estimates; it stores resource estimates, process IDs, timestamps and random reservation identifiers, not task content.
+The optional shared task-reservation database is a local coordination mechanism, not an authorization boundary. Any process able to alter it can invalidate its estimates; it stores resource estimates, process IDs, timestamps, OpenCode session IDs and random reservation identifiers, not task content.
 
 The experimental Windows native client opens the default microphone and speaker only when explicitly run; its synthetic tests and format checks do not open physical devices. A separate physical AEC probe opened them and retained aggregate levels only, without saving captured audio. A physical gateway-client test used a separate local SQLite database for transcripts; automatic cleanup was blocked by the execution environment, so that test database remains in `.cache/physical-native-probe-20261111/events.sqlite`. The client only accepts loopback gateway URLs and does not add authentication, change gateway permissions or provide an OS sandbox. Experimental AEC loads a pinned local research dependency.
 

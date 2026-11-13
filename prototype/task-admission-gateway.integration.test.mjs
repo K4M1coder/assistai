@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
+import { inspectReservations } from '../scripts/inspect-task-reservations.mjs';
 
 async function listen(server) { server.listen(0,'127.0.0.1'); await once(server,'listening'); return server.address().port; }
 
@@ -41,7 +42,8 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   await mkdir('.cache',{recursive:true});const temp=await mkdtemp(path.resolve('.cache/admission-concurrency-'));
   const samplePath=path.join(temp,'sample.json');
   await writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:20*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:':memory:',ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
+  const ledgerPath=path.join(temp,'reservations.sqlite');
+  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:':memory:',ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_SHARED_RESERVATIONS_PATH:ledgerPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
   delete env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:process.cwd(),env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',chunk=>{stderr+=chunk});
@@ -66,6 +68,7 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
     });
   }
   await request('task.started');
+  assert.equal(inspectReservations(ledgerPath)[0].taskId,'busy-task');
   const uncertain=new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Expected agent status failure')),5000);
     clients[0].on('message',(data,binary)=>{if(!binary&&JSON.parse(data).type==='task.uncertain'){clearTimeout(timer);resolve();}});

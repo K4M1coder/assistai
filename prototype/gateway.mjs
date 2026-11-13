@@ -201,6 +201,7 @@ wss.on('connection', (client, req) => {
         }
       }
       agentSession = await requestJson(`${opencodeUrl}/session`, { method: 'POST', headers, body: JSON.stringify({ title: task.slice(0, 100) }) });
+      releaseResource?.attachTask?.(agentSession.id);
       reservation.id = agentSession.id;
       promptAttempted = true;
       const agentPrompt = buildAgentPrompt(task, nativeHistory.all(session).reverse());
