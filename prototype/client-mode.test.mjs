@@ -34,6 +34,11 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   await elements.start.onclick();
   elements['push-to-talk'].checked = true;
   elements['push-to-talk'].onchange();
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'asr.reconnecting'})})", context);
+  assert.equal(elements.talk.disabled, true);
+  assert.match(elements.status.textContent, /Reconnecting/);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'asr.ready'})})", context);
+  assert.equal(elements.talk.disabled, false);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', sample_rate:24000})})", context);
   elements.talk.onpointerdown({ button: 0, pointerId: 1, preventDefault() {} });
   assert.equal(elements.talk.textContent, 'Release to send');

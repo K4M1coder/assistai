@@ -14,12 +14,18 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     tools: [{ type:'function', name:'delegate_task', description:'Delegate a substantive task to a background agent. Set rerun to true only if the user explicitly requests a fresh execution.', parameters:{type:'object',properties:{task:{type:'string'},rerun:{type:'boolean'}},required:['task']} }],
   }));
   let current, listening=false, ended=false, queued=[], queuedBytes=0, turnId=null, speech=false, text='', restored=resumed;
+  const bufferingInput = () => ['connecting','initializing','cancelling','cancel_on_create'].includes(current.state);
   const clearQueued = () => { queued=[]; queuedBytes=0; ended=false; };
+  const flushQueued = session => {
+    const frames=queued;const shouldEnd=ended;clearQueued();
+    for(const frame of frames)if(!session.appendAudio(frame)){fail('Realtime session is busy or unavailable');return;}
+    if(shouldEnd){listening=false;if(!frames.length||!session.endAudio())fail('No speech was captured');}
+  };
   const finishSpeech = () => { if (speech) { speech=false; send({type:'speech.end',turn_id:turnId}); } };
   const fail = (message, affectsTurn = false) => { listening=false; clearQueued(); send({type:'error',message,...(affectsTurn && turnId ? {turn_id:turnId} : {})}); };
   const makeSession = () => {
     const session=createSession(getContext()); current=session;
-    session.on('ready',()=>{ if(current===session) send({type:'asr.ready'}); });
+    session.on('ready',()=>{ if(current===session){flushQueued(session);send({type:'asr.ready'});} });
     session.on('responseStart',()=>{ if(current===session){text='';speech=false;} });
     session.on('text',value=>{if(current===session)text+=value;});
     session.on('audio',pcm=>{
@@ -31,9 +37,7 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     session.on('responseDone',()=>{if(current!==session)return;if(text)send({type:'assistant.text',turn_id:turnId,text});if(speech)finishSpeech();else send({type:'speech.end',turn_id:turnId});});
     session.on('cancelled',()=>{
       if(current!==session)return;
-      const frames=queued;const shouldEnd=ended;clearQueued();
-      for(const frame of frames)if(!session.appendAudio(frame))return;
-      if(shouldEnd&&frames.length){listening=false;session.endAudio();}
+      flushQueued(session);
     });
     session.on('toolCall',call=>{
       if(current!==session)return;finishSpeech();
@@ -59,7 +63,7 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
       if(!listening)return;
       const frame=Buffer.from(data);
       transcript?.append(frame);
-      if(['cancelling','cancel_on_create'].includes(current.state)){
+      if(bufferingInput()){
         if(queuedBytes+frame.length>32000){fail('Interrupted input buffer full');return;}
         queued.push(frame);queuedBytes+=frame.length;return;
       }
@@ -69,13 +73,18 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
     let event;try{event=JSON.parse(data.toString());}catch{return;}
     if(event.type==='interrupt'){
       listening=false;clearQueued();transcript?.stop();
-      if(current.cancel()){speech=false;send({type:'speech.cancelled',turn_id:turnId,reason:event.reason??'manual'});}
+      if(current.state==='awaiting_tool'){
+        // Discard the pending model tool exchange, not the independently submitted task.
+        const old=current;current=null;old.close();restored=true;speech=false;
+        send({type:'speech.cancelled',turn_id:turnId,reason:event.reason??'manual'});
+        send({type:'asr.reconnecting'});makeSession();
+      } else if(current.cancel()){speech=false;send({type:'speech.cancelled',turn_id:turnId,reason:event.reason??'manual'});}
     }else if(event.type==='audio.start'){
-      if(!['ready','cancelling','cancel_on_create'].includes(current.state)){fail('Realtime session is busy');return;}
+      if(current.state!=='ready'&&!bufferingInput()){fail('Realtime session is busy');return;}
       turnId=makeTurnId();listening=true;clearQueued();transcript?.start(turnId);
     }else if(event.type==='audio.end'&&listening){
       transcript?.end();
-      if(['cancelling','cancel_on_create'].includes(current.state)){ended=true;return;}
+      if(bufferingInput()){ended=true;return;}
       listening=false;if(!current.endAudio())fail('No speech was captured');
     }else if(event.type==='audio.reset'){
       if(listening)transcript?.stop();listening=false;clearQueued();

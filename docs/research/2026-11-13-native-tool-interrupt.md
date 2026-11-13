@@ -1,0 +1,5 @@
+# EXP-171: Interrupting native voice during tool submission
+
+The native realtime session could not cancel while in `awaiting_tool`, so an interrupt during a slow task submission left subsequent speech rejected as busy. The bridge now closes that voice session and creates another, ignores a late tool result for the old session, and informs the browser while reconnecting. Up to 32,000 bytes of immediately arriving PCM can be queued until the replacement is ready; overflow fails rather than growing unbounded. A background task that was submitted is independent and can continue. This does not request its cancellation or roll back its work.
+
+Mock tests cover interruption during a delayed submission, ignoring the stale result, queuing audio before readiness, and accepting the next turn. The existing bridge, realtime protocol, client and gateway mock integration tests passed. No native model, physical microphone or GPU was used; the running cascade gateway does not use this native bridge path.
