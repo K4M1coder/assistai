@@ -20,6 +20,8 @@ A headless Chrome test also sent synthetic French audio through the browser capt
 
 A single synthetic competing-voice test produced an extra word despite retaining most of the French question. Transcript review is useful for correcting such errors, but the browser path does not yet isolate the user's voice. See [EXP-168](docs/research/2026-11-13-browser-voice-interference.md).
 
+The CPU target-speaker extractor was also evaluated on that mixture with two different synthetic enrollments. The negative control still contained much of the French target phrase, so this does not establish reliable speaker selection; it remains outside the browser demo. See [EXP-169](docs/research/2026-11-13-extractor-browser-mixture.md).
+
 A headless Chrome smoke test confirmed that Speaker-safe, push-to-talk and the experimental echo-filter controls can be selected together, and that service names are displayed. It did not test microphone audio or filter effectiveness. See [EXP-164](docs/research/2026-11-13-browser-controls.md).
 
 Research prototypes separately tested MiniCPM-o and LFM3-Audio native speech paths, synthetic French delegation through a read-only fixture, and explicit cancellation. An opt-in LFM realtime gateway path now exists, but the running demonstration still uses the cascade; the new path has synthetic and mock-server integration tests, including a real-model synthetic completion notification. The 24 GB budget, full-duplex interruption, French native speech quality, sustained workloads and no memory spill are not yet proven. See [native duplex experiments](docs/research/2026-11-10-native-duplex.md) and [local prototype details](prototype/README.md).
