@@ -43,3 +43,12 @@ make delegation safe: the agent selected a file despite being given wrong
 identifiers. Additional confirmation of the controller's proposed task is
 needed before relying on consequential coding actions. This experiment does
 not prove that any particular confirmation design prevents all errors.
+
+The operator subsequently chose explicit approval before every delegated
+task. This is a requested behavior, not an implemented safeguard: the
+running gateway can still automatically submit tasks. A future implementation
+must cover both cascade and native paths, present the proposed task and the
+available original request, reject stale or duplicate approvals, handle
+disconnects and cancellation, and verify that no agent submission occurs
+without approval. The existing gateway should not be used for consequential
+delegation until this has been implemented and validated.
