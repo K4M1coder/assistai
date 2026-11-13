@@ -25,10 +25,24 @@ class AsrCodingProbeTests(unittest.TestCase):
                 path = Path(args[args.index('-f') + 1]); captured['path'] = path
                 self.assertTrue(path.read_bytes().startswith(b'RIFF'))
                 self.assertIn('-ng', args)
+                self.assertEqual(args[args.index('--lid-backend') + 1], 'off')
+                self.assertEqual(args[args.index('-l') + 1], 'fr')
+                self.assertEqual(kwargs['stdin'], probe.subprocess.DEVNULL)
                 return SimpleNamespace(returncode=0, stdout='Bonjour', stderr='')
             with patch.object(probe.subprocess, 'run', side_effect=fake_run):
                 text, _ = probe.recognize_crisp(b'\x00\x00' * 320, Path(sys.executable), model)
             self.assertEqual(text, 'Bonjour')
+            self.assertFalse(captured['path'].exists())
+
+    def test_timeout_preserves_diagnostics_and_removes_wav(self):
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder) / 'model.gguf'; model.write_bytes(b'model'); captured = {}
+            def fake_run(args, **kwargs):
+                captured['path'] = Path(args[args.index('-f') + 1])
+                raise probe.subprocess.TimeoutExpired(args, 45, stderr=b'missing model prompt')
+            with patch.object(probe.subprocess, 'run', side_effect=fake_run):
+                with self.assertRaisesRegex(RuntimeError, 'missing model prompt'):
+                    probe.recognize_crisp(b'\x00\x00' * 320, Path(sys.executable), model)
             self.assertFalse(captured['path'].exists())
 
 

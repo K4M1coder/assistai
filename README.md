@@ -32,13 +32,13 @@ A later synthetic spoken coding attempt misrecognized the filename and operation
 
 The updated cascade offers an optional **Review speech before sending** mode: the user can edit the transcript before it reaches the controller. It is off by default and has mock coverage; it does not make recognition or task execution infallible. The running gateway must be restarted to enable it.
 
-A guarded synthetic ASR probe is prepared to compare recognition of operation direction, negation and a filename. Its first attempt did not meet the RAM preflight; no benchmark result is available yet.
+A guarded synthetic ASR probe compares recognition of operation direction, negation and a filename. In one three-phrase run, both the Vosk baseline and a CPU FastConformer candidate missed the filename; this does not establish general accuracy.
 
 An existing quantized Kyutai French/English STT candidate has been inventoried without loading it. Its required codec, tokenizer and usable local runtime were not established, so it is not yet an alternative deployed in the demo. See [EXP-151](docs/research/2026-11-12-kyutai-stt-inventory.md).
 
-A pinned Windows CPU research runtime, CrispASR, has since been verified to start and lists Kyutai and FastConformer backends. An existing 117 MB French FastConformer checkpoint is a candidate for guarded comparison; no model inference, accuracy, memory or real-time performance has been verified with it.
+A pinned Windows CPU research runtime, CrispASR, has been tested with an existing 117 MB French FastConformer checkpoint. One small synthetic comparison is recorded; live streaming, broad accuracy and sustained resource use remain unverified.
 
-The ASR coding probe can now compare Vosk and this candidate on identical synthetic audio. Its first comparison attempt failed the RAM preflight, so no comparative results are available.
+The ASR coding probe compares both candidates on identical synthetic audio; its file-based and streaming timings are not directly comparable. See [EXP-155](docs/research/2026-11-13-asr-comparison.md).
 
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 

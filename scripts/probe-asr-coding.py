@@ -65,9 +65,15 @@ def recognize_crisp(pcm, executable, model):
         with wave.open(str(name), 'wb') as output:
             output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(pcm)
         started = time.monotonic()
-        result = subprocess.run([str(executable), '--backend', 'fastconformer-ctc', '-m', str(model), '-f', str(name),
-                                 '-ng', '-t', '2', '-nt', '-np'], capture_output=True, text=True, encoding='utf-8',
-                                errors='replace', timeout=45, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        try:
+            result = subprocess.run([str(executable), '--backend', 'fastconformer-ctc', '-m', str(model), '-f', str(name),
+                                     '-ng', '-t', '2', '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation'],
+                                    stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
+                                    errors='replace', timeout=45, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        except subprocess.TimeoutExpired as error:
+            diagnostic = error.stderr or b''
+            if isinstance(diagnostic, bytes): diagnostic = diagnostic.decode('utf-8', errors='replace')
+            raise RuntimeError(f'CrispASR timed out after 45 seconds; stderr: {diagnostic[-1000:]}') from error
         if result.returncode or not result.stdout.strip():
             raise RuntimeError(f'CrispASR failed ({result.returncode}): {result.stderr[-1000:]}')
         return result.stdout.strip(), round((time.monotonic()-started)*1000)
@@ -87,15 +93,16 @@ async def main(crisp_executable=None, crisp_model=None):
                               [tokens(hypothesis).index(marker) for marker in markers] == sorted(tokens(hypothesis).index(marker) for marker in markers),
                           'elapsed_ms':round((time.monotonic()-started)*1000),
                           'physical_devices_opened':False, 'permanent_audio_saved':False}
+        print(json.dumps(result, ensure_ascii=False), flush=True)
         if crisp_executable and crisp_model:
             candidate, elapsed = await asyncio.to_thread(recognize_crisp, pcm, crisp_executable, crisp_model)
             candidate_tokens = tokens(candidate)
-            result['candidate'] = {'engine':'CrispASR fastconformer-ctc CPU', 'hypothesis':candidate,
+            candidate_result = {'case':label, 'engine':'CrispASR fastconformer-ctc CPU', 'hypothesis':candidate,
                 'wer':round(word_error(reference, candidate), 3), 'elapsed_ms_including_model_load':elapsed,
                 'markers_present':{marker:marker in candidate_tokens for marker in markers},
                 'marker_order_matches':all(marker in candidate_tokens for marker in markers) and
                     [candidate_tokens.index(marker) for marker in markers] == sorted(candidate_tokens.index(marker) for marker in markers)}
-        print(json.dumps(result, ensure_ascii=False), flush=True)
+            print(json.dumps(candidate_result, ensure_ascii=False), flush=True)
 
 
 if __name__ == '__main__':
