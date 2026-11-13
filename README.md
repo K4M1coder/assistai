@@ -48,6 +48,8 @@ Inspection of the pinned Voxtral streaming implementation and the local model me
 
 Upstream llama.cpp and ExecuTorch document alternative streaming paths, but their Intel GPU support, cache behavior and memory use for this model need verification. See [EXP-159](docs/research/2026-11-13-voxtral-alternatives.md).
 
+The installed llama.cpp build's source allocates a separate FP16 Voxtral audio encoder state; its generic cache quantization options do not establish quantized encoder state. A compatible separate audio projector and actual device measurements are still needed. See [EXP-160](docs/research/2026-11-13-llama-voxtral-source.md).
+
 The running agent model retained substantial host memory after the stopped coding trial. A non-restarting idle-cache recovery attempt was rejected by the installed server, so a reliable low-memory recovery method remains unverified. See [EXP-150](docs/research/2026-11-12-idle-cache-recovery.md).
 
 An updated gateway offers a button to request cancellation of the latest background task started in that browser session. This is best effort: acceptance does not prove the task has stopped or undo changes. The current running demo needs a gateway restart to enable it.
