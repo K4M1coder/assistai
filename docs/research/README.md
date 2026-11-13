@@ -49,3 +49,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-182](2026-11-14-current-gateway.md) records a new current-source gateway started after the operator freed memory, and the proposed physical test; startup is not an end-to-end result.
 
 [EXP-183](2026-11-14-physical-and-asr-failure.md) records the operator's physical French conversation and mixed interruption reports, plus an isolated actual ASR connection refusal.
+
+[EXP-184](2026-11-14-spoken-coding-followup.md) records a guarded synthetic coding trial that edited its fixture but failed its delegated-filename assertion, plus a fix to its transcript measurement.

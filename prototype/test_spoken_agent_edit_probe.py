@@ -21,6 +21,7 @@ class FakeSocket:
         self.events = iter([
             {'type':'asr.ready'}, {'type':'user.text','text':'synthetic request','turn_id':'task-turn'},
             {'type':'task.started','task':'Fix calculator.py','turn_id':'task-turn'},
+            {'type':'user.text','text':'synthetic follow-up','turn_id':'followup-turn'},
             {'type':'assistant.text','text':'Bonjour','turn_id':'followup-turn'},
             b'\x01\x00', {'type':'task.completed'},
         ])

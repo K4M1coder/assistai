@@ -16,6 +16,8 @@ After memory was freed, a current-source gateway was started on [http://127.0.0.
 
 In a subsequent physical trial, the operator reported a correct or corrected French transcript and an audible, relevant French response. Manual interruption initially failed by report but stopped speech on a repeat; the first failure is unexplained. An isolated refused ASR connection produced an explicit error and disconnect. These observations are limited; see [EXP-183](docs/research/2026-11-14-physical-and-asr-failure.md).
 
+A guarded synthetic spoken coding trial changed the disposable fixture and generated notification audio, but failed because recognition and delegation misstated the requested filename and function. It does not establish reliable coding delegation; see [EXP-184](docs/research/2026-11-14-spoken-coding-followup.md).
+
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
 In automatic detection mode, the browser keeps a bounded 200 ms pre-roll locally and starts sending it to recognition only when the threshold detects speech. This avoids accumulating unlimited below-threshold background audio, but cannot distinguish the user from a television or another person above the threshold. Push-to-talk remains the more controlled option in noisy rooms. This change has a simulated browser-frame test; physical recognition and barge-in need further testing.

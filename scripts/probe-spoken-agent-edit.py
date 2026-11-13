@@ -32,7 +32,7 @@ async def main():
     phrase = "Dans le fichier calculator point py, corrige la fonction add pour faire une addition au lieu d'une soustraction. Ne change rien d'autre."
     started = time.monotonic()
     pcm = await asyncio.to_thread(spoken_recall.synthesize, phrase)
-    transcript = ''; task = ''; task_turn = None; followup = None; audio_bytes = 0; tasks = 0
+    transcript = ''; transcript_recorded = False; task = ''; task_turn = None; followup = None; audio_bytes = 0; tasks = 0
     check_notification = os.environ.get('ASSISTAI_PROBE_NOTIFICATION') == '1'
     completed = None; task_end = None; followup_finished = False; notification_requested = False
     notification_started = False; notification_audio_bytes = 0
@@ -61,7 +61,9 @@ async def main():
                 if kind == 'task.started': trace['synthetic_task'] = event.get('task', '')[:2000]
                 if kind == 'assistant.text': trace['synthetic_response'] = event.get('text', '')[:2000]
                 print(json.dumps(trace, ensure_ascii=False), file=sys.stderr, flush=True)
-            if kind == 'user.text': transcript = event.get('text', '')
+            if kind == 'user.text' and not transcript_recorded:
+                transcript = event.get('text', '')
+                transcript_recorded = True
             elif kind == 'task.started':
                 tasks += 1; task = event.get('task', ''); task_turn = event.get('turn_id')
                 await ws.send(json.dumps({'type':'text', 'text':'Dis-moi bonjour en français.'}))
