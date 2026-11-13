@@ -2,9 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { DEFAULT_BUDGET, evaluateBudget } from './resource-budget.mjs';
 
 // Snapshot reporting only. It cannot enforce limits or attribute allocations.
-export function createResourceStatus({ samplePath, admissionEnabled = false, taskEstimate, maxAgeMs = 5000, read = readFile, now = Date.now } = {}) {
+export function createResourceStatus({ samplePath, admissionEnabled = false, taskEstimate, sharedCoordination = false, maxAgeMs = 5000, read = readFile, now = Date.now } = {}) {
   return async () => {
-    const base = { admission: admissionEnabled ? 'advisory' : 'disabled', hard_limit_enforced: false };
+    const base = { admission: admissionEnabled ? 'advisory' : 'disabled', coordination: !admissionEnabled ? 'disabled' : sharedCoordination ? 'participating-gateways' : 'process-local', hard_limit_enforced: false };
     if (!samplePath) return { ...base, status: 'unavailable', reason: 'Resource sampling is not configured' };
     try {
       const sample = JSON.parse(await read(samplePath, 'utf8'));

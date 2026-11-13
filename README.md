@@ -32,6 +32,8 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling.
 
+New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.
+
 The updated Windows sampler can also report system-wide pagefile usage, and resource status warns above 256 MiB total shared GPU use. Pagefile usage cannot be attributed to this application from that number alone. Running samplers and gateways must be restarted to expose the new field. See [EXP-173](docs/research/2026-11-13-windows-memory-counters.md).
 
 An official Q4_K_M version of the current Q8 controller has been downloaded and hash-verified for a future controlled comparison. Its smaller file size is not a measured VRAM saving or evidence of equivalent French tool use. See [EXP-174](docs/research/2026-11-13-controller-q4-candidate.md).

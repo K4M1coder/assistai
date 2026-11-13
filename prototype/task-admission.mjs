@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { DEFAULT_BUDGET, evaluateBudget } from './resource-budget.mjs';
 
 // Advisory admission: a current snapshot and estimates cannot reserve memory.
-export function createTaskAdmission({ samplePath, baselineSharedBytes, requestedVramBytes, requestedRamBytes, maxAgeMs = 5000, read = readFile, now = Date.now } = {}) {
+export function createTaskAdmission({ samplePath, baselineSharedBytes, requestedVramBytes, requestedRamBytes, maxAgeMs = 5000, read = readFile, now = Date.now, sharedReservations } = {}) {
   if (!samplePath || ![baselineSharedBytes, requestedVramBytes, requestedRamBytes, maxAgeMs].every(Number.isFinite) ||
       baselineSharedBytes < 0 || requestedVramBytes <= 0 || requestedRamBytes <= 0 || maxAgeMs <= 0) {
     throw new Error('Task admission requires a sample path, baseline and positive allocation estimates');
@@ -18,8 +18,13 @@ export function createTaskAdmission({ samplePath, baselineSharedBytes, requested
       const sample = JSON.parse(await read(samplePath, 'utf8'));
       const age = now() - Date.parse(sample.observedAt);
       if (!Number.isFinite(age) || age < 0 || age > maxAgeMs) throw new Error('Resource sample is stale or invalid');
-      const decision = evaluateBudget({ ...sample, baselineSharedBytes }, { vramBytes: requestedVramBytes * (active + 1), ramBytes: requestedRamBytes * (active + 1) }, DEFAULT_BUDGET);
-      if (!decision.allowed) throw new Error(decision.reasons.join('; '));
+      const check = estimate => {
+        if (now() - Date.parse(sample.observedAt) > maxAgeMs) throw Error('Resource sample is stale');
+        const decision = evaluateBudget({ ...sample, baselineSharedBytes }, estimate, DEFAULT_BUDGET);
+        if (!decision.allowed) throw new Error(decision.reasons.join('; '));
+      };
+      if (sharedReservations) return sharedReservations.reserve({ vramBytes: requestedVramBytes, ramBytes: requestedRamBytes }, check);
+      check({ vramBytes: requestedVramBytes * (active + 1), ramBytes: requestedRamBytes * (active + 1) });
       active++;
       let released = false;
       return () => { if (!released) { released = true; active--; } };

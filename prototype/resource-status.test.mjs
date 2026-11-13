@@ -22,7 +22,14 @@ test('reports fresh snapshot as observed without promising future headroom', asy
   const status = await createResourceStatus({ samplePath: 'sample', admissionEnabled: true, read: async () => JSON.stringify(current), now: clock })();
   assert.equal(status.status, 'observed');
   assert.equal(status.admission, 'advisory');
+  assert.equal(status.coordination, 'process-local');
   assert.equal(status.hard_limit_enforced, false);
+});
+
+test('labels shared coordination as limited to participating gateways', async () => {
+  const status = await createResourceStatus({ samplePath: 'sample', admissionEnabled: true, sharedCoordination: true,
+    read: async () => JSON.stringify({ ...sample, availableRamBytes: 9 * GiB }), now: clock })();
+  assert.equal(status.coordination, 'participating-gateways');
 });
 
 test('projects one task using the admission budget without counting active reservations', async () => {

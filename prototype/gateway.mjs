@@ -19,6 +19,7 @@ import { resumeSessionId } from './session-resume.mjs';
 import { createResourceStatus } from './resource-status.mjs';
 import { speechText, visibleAnswer } from './speech-text.mjs';
 import { latestCompletedAssistant } from './agent-task-status.mjs';
+import { openSharedTaskReservations } from './shared-task-reservations.mjs';
 
 function validImage(image) {
   const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
@@ -44,9 +45,12 @@ const admissionConfig = process.env.ASSISTAI_BUDGET_SAMPLE_PATH ? {
   requestedVramBytes: Number(process.env.ASSISTAI_TASK_VRAM_ESTIMATE_BYTES ?? NaN),
   requestedRamBytes: Number(process.env.ASSISTAI_TASK_RAM_ESTIMATE_BYTES ?? NaN),
 } : null;
-const admitTask = admissionConfig ? createTaskAdmission(admissionConfig) : null;
+const sharedReservations = admissionConfig && process.env.ASSISTAI_SHARED_RESERVATIONS_PATH
+  ? openSharedTaskReservations(resolve(process.env.ASSISTAI_SHARED_RESERVATIONS_PATH)) : undefined;
+const admitTask = admissionConfig ? createTaskAdmission({ ...admissionConfig, sharedReservations }) : null;
 const resourceSamplePath = process.env.ASSISTAI_RESOURCE_STATUS_PATH || process.env.ASSISTAI_BUDGET_SAMPLE_PATH;
 const getResources = createResourceStatus({ samplePath: resourceSamplePath, admissionEnabled: Boolean(admitTask),
+  sharedCoordination: Boolean(sharedReservations),
   taskEstimate: resourceSamplePath === admissionConfig?.samplePath ? admissionConfig : undefined });
 if (lfmWorkspaceContext.length > 2000) throw new Error('Workspace context is too long');
 if (lfmRealtimeUrl && !['ws:', 'wss:'].includes(new URL(lfmRealtimeUrl).protocol)) throw new Error('Realtime URL must use WebSocket');

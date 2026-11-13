@@ -29,7 +29,8 @@ async function refreshResources() {
       const projection = estimate?.status === 'insufficient' ? ` Current sample: insufficient estimated headroom for one task. ${(estimate.reasons ?? []).join(' ')}` :
         estimate?.status === 'headroom_observed' ? ' Current sample: estimated headroom for one task; active tasks and later changes may still cause rejection.' : '';
       const pagefile = Number.isFinite(data.system_pagefile_used_bytes) ? `, system pagefile use ${gib(data.system_pagefile_used_bytes)} GiB (all processes)` : '';
-      $('resources').textContent = `Resources: ${data.status}; GPU dedicated ${gib(data.dedicated_bytes)} GiB, GPU shared ${gib(data.shared_bytes)} GiB, available RAM ${gib(data.available_ram_bytes)} GiB${pagefile}. ${(data.reasons ?? []).join(' ')} Task admission: ${data.admission}.${projection} No hard limit is enforced.`;
+      const coordination = data.coordination ? ` Coordination: ${data.coordination}.` : '';
+      $('resources').textContent = `Resources: ${data.status}; GPU dedicated ${gib(data.dedicated_bytes)} GiB, GPU shared ${gib(data.shared_bytes)} GiB, available RAM ${gib(data.available_ram_bytes)} GiB${pagefile}. ${(data.reasons ?? []).join(' ')} Task admission: ${data.admission}.${coordination}${projection} No hard limit is enforced.`;
     } else $('resources').textContent = `Resource status: ${data.status}. ${data.reason ?? ''} Task admission: ${data.admission}. No hard limit is enforced.`;
   } catch { $('resources').textContent = 'Resource status unavailable. No hard limit is enforced.'; }
 }

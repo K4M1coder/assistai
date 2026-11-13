@@ -24,6 +24,7 @@ try {
   $env:ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1'; $env:ASSISTAI_VISION_URL='http://127.0.0.1:18080/v1'
   $env:ASSISTAI_TTS_URL='http://127.0.0.1:18081'; $env:ASSISTAI_ASR_URL='ws://127.0.0.1:18082/asr'
   $env:ASSISTAI_BUDGET_SAMPLE_PATH=$sample; $env:ASSISTAI_RESOURCE_STATUS_PATH=$sample
+  $env:ASSISTAI_SHARED_RESERVATIONS_PATH=Join-Path $runtime 'task-reservations.sqlite'
   # Absolute shared use is compared to 256 MiB, since a clean pre-model baseline is unavailable.
   $env:ASSISTAI_BUDGET_BASELINE_SHARED_BYTES='0'; $env:ASSISTAI_TASK_VRAM_ESTIMATE_BYTES=[string](512MB); $env:ASSISTAI_TASK_RAM_ESTIMATE_BYTES=[string](3GB)
   $gateway=Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @((Join-Path $root 'prototype/gateway.mjs')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtime "demo-$Port-gateway.stdout") -RedirectStandardError (Join-Path $runtime "demo-$Port-gateway.stderr") -PassThru
