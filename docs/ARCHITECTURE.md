@@ -68,6 +68,8 @@ The gateway can request OpenCode cancellation for an active task ID belonging to
 
 Task polling considers a result only when the session has no active status and the latest message is a completed assistant message. It does not fall back to an older completed assistant message when a newer message is unfinished. A `tool-calls` or unknown finish remains pending; an output-limit `length` finish is reported as an error rather than success. This avoids several false-completion cases after interruption; missing status is not proof that an upstream task succeeded, and stuck or incomplete messages remain uncertain.
 
+In the browser's automatic speech mode, idle capture remains local in a ten-frame pre-roll until the energy detector starts a turn; the pre-roll is then sent before subsequent frames. This bounds idle audio sent to ASR but is not target-speaker separation. Speaker-safe and push-to-talk discard the automatic-mode pre-roll when their gates are active.
+
 If prompt submission may have reached OpenCode or polling later fails, the gateway emits `task.uncertain`, retains the task ID and estimate, and refuses to resubmit the same normalized request in that session. It continues to accept cancellation requests for that ID. Status polling retries up to three consecutive failures and can recover; ambiguous submission and exhausted retries remain uncertain, and a restart loses this process-local task map even if external work continues.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.

@@ -1,0 +1,7 @@
+# EXP-165: Bound idle audio sent to recognition
+
+The automatic browser capture path previously forwarded every frame to the ASR service, including audio before the energy threshold had started a turn. Vosk can produce segments during that idle period, and the gateway collects segment text for the next final result. This gives below-threshold background audio an opportunity to contaminate a later request. This is a code-path hypothesis, not proof of the cause of every noisy-room failure.
+
+The browser now retains at most ten 20 ms frames locally before a detected turn, sends that pre-roll after `audio.start`, and forwards subsequent frames until the end of the turn. It clears the pre-roll when speaker-safe or push-to-talk gating applies, while speech review is pending, or when ASR is unavailable. The ending frame is sent before `audio.end`. The browser-frame test checks idle suppression, the ten-frame bound, onset frames, and end ordering; existing mode tests still pass. No microphone or inference model was used.
+
+The 200 ms pre-roll still includes any background audio in that interval. Loud television, music or nearby speech can exceed the threshold and start a turn. The detector does not identify the user, and physical speech recognition, real barge-in and missed-onset rates require testing. Reload the page to load the updated client script; this change does not restart the gateway.

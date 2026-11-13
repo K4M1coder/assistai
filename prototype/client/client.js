@@ -320,28 +320,39 @@ $('start').onclick = async () => {
     await captureContext.audioWorklet.addModule('/capture-worklet.js');
     const lowpass = captureContext.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 7200;
     const microphone = captureContext.createMediaStreamSource(stream);
+    // Preserve the start of speech without streaming unbounded idle background audio to ASR.
+    let preRoll = [];
     const handleAudio = data => {
-      if (!asrReady || ws.readyState !== WebSocket.OPEN) return;
-      if (pendingReviewId) return;
+      if (!asrReady || ws.readyState !== WebSocket.OPEN || pendingReviewId) { preRoll = []; return; }
       if ($('push-to-talk').checked) {
+        preRoll = [];
         if (pushToTalkActive) send(data);
         return;
       }
       // Avoid feeding loudspeaker echo to ASR. Manual interruption immediately reopens the microphone.
       if ($('speaker-safe').checked && (speechOpen || playbackSources.size)) {
-        speaking = false; voiceFrames = 0; silenceFrames = 0;
+        preRoll = []; speaking = false; voiceFrames = 0; silenceFrames = 0;
         return;
       }
       const frame = new Int16Array(data);
       let power = 0; for (const value of frame) power += (value / 32768) ** 2;
       const voice = Math.sqrt(power / frame.length) > detectionThreshold;
       voiceFrames = voice ? voiceFrames + 1 : 0;
-      if (!speaking && voiceFrames >= 3) { speaking = true; silenceFrames = 0; if (speechOpen || playbackSources.size) interrupt('voice_activity'); send(JSON.stringify({ type: 'audio.start' })); }
-      if (speaking) {
-        silenceFrames = voice ? 0 : silenceFrames + 1;
-        if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; finishAudio(); }
+      if (!speaking) {
+        preRoll.push(data);
+        if (preRoll.length > 10) preRoll.shift();
+        if (voiceFrames >= 3) {
+          speaking = true; silenceFrames = 0;
+          if (speechOpen || playbackSources.size) interrupt('voice_activity');
+          send(JSON.stringify({ type: 'audio.start' }));
+          for (const frame of preRoll) send(frame);
+          preRoll = [];
+        }
+        return;
       }
       send(data);
+      silenceFrames = voice ? 0 : silenceFrames + 1;
+      if (silenceFrames >= 35) { speaking = false; silenceFrames = 0; responsePending = true; finishAudio(); }
     };
     if ($('experimental-aec').checked) {
       const { createEchoBridge } = await import('/echo-bridge.js');

@@ -47,6 +47,27 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext('captureNode.port.onmessage', context)({ data: frame });
   assert.equal(sent.length, count);
   assert.equal(JSON.parse(sent.at(-1)).type, 'audio.end');
+  // Idle microphone frames stay local, but a bounded pre-roll reaches ASR on speech start.
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})}); responsePending = false", context);
+  elements['push-to-talk'].checked = false; elements['push-to-talk'].onchange();
+  elements['speaker-safe'].checked = false; elements['speaker-safe'].onchange();
+  const onAudio = vm.runInContext('captureNode.port.onmessage', context);
+  const quiet = new Int16Array(320).buffer;
+  const loud = new Int16Array(320).fill(10000).buffer;
+  const beforeIdle = sent.length;
+  for (let i = 0; i < 20; i++) onAudio({data: quiet});
+  assert.equal(sent.length, beforeIdle);
+  for (let i = 0; i < 3; i++) onAudio({data: loud});
+  const turnFrames = sent.slice(beforeIdle);
+  assert.equal(JSON.parse(turnFrames[0]).type, 'audio.start');
+  assert.equal(turnFrames.length, 11);
+  assert.equal(turnFrames.filter(item => item === loud).length, 3);
+  for (let i = 0; i < 35; i++) onAudio({data: quiet});
+  assert.equal(sent.at(-2), quiet);
+  assert.equal(JSON.parse(sent.at(-1)).type, 'audio.end');
+  elements['push-to-talk'].checked = true; elements['push-to-talk'].onchange();
+  elements['speaker-safe'].checked = true; elements['speaker-safe'].onchange();
+  vm.runInContext("responsePending = false; ws.onmessage({data: JSON.stringify({type:'speech.start', sample_rate:24000})})", context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.completed', task_id:'task-1', text:'done'})})", context);
   assert.ok(!sent.some(item => typeof item === 'string' && JSON.parse(item).type === 'notification.speak'));
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end'})})", context);
