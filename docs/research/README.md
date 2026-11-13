@@ -51,3 +51,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-183](2026-11-14-physical-and-asr-failure.md) records the operator's physical French conversation and mixed interruption reports, plus an isolated actual ASR connection refusal.
 
 [EXP-184](2026-11-14-spoken-coding-followup.md) records a guarded synthetic coding trial that edited its fixture but failed its delegated-filename assertion, plus a fix to its transcript measurement.
+
+[EXP-185](2026-11-14-spoken-coding-repeat.md) verifies that measurement fix with real models and records a repeated delegated-identifier failure.
