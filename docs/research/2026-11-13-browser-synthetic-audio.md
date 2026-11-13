@@ -1,0 +1,5 @@
+# EXP-166: Browser capture through the real French recognizer
+
+With a disposable headless Chrome profile, the browser used Chrome's fake audio input backed by an existing synthetic 16 kHz PCM fixture. The fixture contained two seconds of silence, the first five one-second French research chunks, and three seconds of silence. The test enabled **Review speech before sending** and started the microphone UI. The updated browser audio worklet and capture gate fed the running local Vosk service; review displayed `bonjour assistant` and no user turn was submitted. No physical audio device was used and no controller or task was invoked.
+
+This is a narrow positive browser-path smoke test, not an accuracy benchmark: it did not compare the transcription with a reference, so complete recognition and onset preservation are not established. The fixture and disposable browser profile remain in local temporary storage because automatic command review rejected their cleanup; they contain synthetic test data. The probe reports its profile path to support later cleanup. It does not remove browser profiles automatically.
