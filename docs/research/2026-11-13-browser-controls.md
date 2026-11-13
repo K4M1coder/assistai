@@ -1,0 +1,5 @@
+# EXP-164: Browser control smoke test
+
+The connected browser automation host was unavailable. A separate temporary headless Chrome profile was therefore launched with GPU acceleration disabled and connected to `http://127.0.0.1:18092/`. The page reported four local service entries and reached `Ready. Start the microphone to speak French.` The speech-review control was enabled after capability negotiation. Programmatic clicks left Speaker-safe, push-to-talk, and the experimental playback-reference echo filter checked simultaneously. The temporary browser process and profile were removed after the test.
+
+This verifies that the controls can be combined in that browser session; it does not validate microphone capture, sound quality, echo cancellation, background voice suppression, or the effectiveness of simultaneous modes. The echo filter is experimental and is not enrolled-speaker identification. The gateway on port 18092 was started before the latest agent-completion changes; it shares the current static frontend files but does not automatically reload backend code.
