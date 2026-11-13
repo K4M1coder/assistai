@@ -70,6 +70,8 @@ The research-only CrispASR setup downloads a pinned public release archive, veri
 
 The optional ASR comparison writes only generated synthetic speech to a temporary `.cache` WAV for the file-oriented CLI and removes it on normal exit. A forced termination can leave that synthetic temporary file behind. It runs the candidate with an explicit local model path, CPU and French language flags and non-interactive input. Two earlier attempts stalled at an optional language-model download prompt; the corrected run completed, but network isolation was not independently measured.
 
+The transcribe.cpp research setup downloads a pinned public runtime archive, checks its expected length, SHA-256 and archive entries, and extracts to a new local cache directory. The CPU-only discovery probe loads the native library but no model or audio device; it is not an assessment of binary trust or a sandbox.
+
 The cancellation request checks membership in the gateway's current session task map before calling OpenCode. That is task scoping, not authentication or an RBAC boundary. Cancellation is best effort, can race completion and cannot undo actions. The gateway does not release an advisory memory estimate solely on an abort acknowledgment.
 
 The browser's concurrent-task list is a local view of events received on its current connection, not authoritative task status or an access-control mechanism.
