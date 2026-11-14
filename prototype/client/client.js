@@ -182,8 +182,13 @@ function stopPlayback() {
   playbackTime = 0;
   carry = null;
 }
+function deferCurrentNotification() {
+  if (currentNotification) pendingNotifications.unshift(currentNotification);
+  currentNotification = null;
+}
 function interrupt(reason = 'manual') {
   const wasPlaying = speechOpen || playbackSources.size > 0;
+  if (wasPlaying) deferCurrentNotification();
   stopPlayback();
   responsePending = false;
   if (reason === 'voice_activity' && wasPlaying) log('Playback interrupted: microphone detected speech.');
@@ -212,7 +217,11 @@ function play(data, rate) {
   playbackTime = continuingSpeech && playbackTime >= playbackContext.currentTime
     ? playbackTime : Math.max(playbackTime, playbackContext.currentTime + 0.04);
   source.start(playbackTime); playbackTime += buffer.duration;
-  playbackSources.add(source); source.onended = () => { playbackSources.delete(source); announceWhenIdle(); };
+  playbackSources.add(source); source.onended = () => {
+    if (!playbackSources.delete(source)) return;
+    if (!speechOpen && !playbackSources.size) currentNotification = null;
+    announceWhenIdle();
+  };
 }
 let outputRate = 24000;
 function handleSocketMessage({ data }) {
@@ -286,8 +295,8 @@ function handleSocketMessage({ data }) {
   }
   else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; currentNotification = null; responsePending = false; announceWhenIdle(); }
-  else if (event.type === 'speech.cancelled') { if (currentNotification) pendingNotifications.unshift(currentNotification); currentNotification = null; stopPlayback(); }
+  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) currentNotification = null; responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'speech.cancelled') { deferCurrentNotification(); stopPlayback(); }
 }
 function connectGateway() {
   const socket = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);

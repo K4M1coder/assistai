@@ -107,6 +107,19 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.rejected', task_id:'task-1', reason:'busy'})})", context);
   assert.match(elements.log.textContent, /Could not speak/);
   assert.equal(timers.length, 0);
+  // The gateway can finish sending while audio is still queued in the browser.
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.completed', task_id:'task-playback', text:'done'})}); ws.onmessage({data: JSON.stringify({type:'notification.started', task_id:'task-playback'})}); ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'notification-turn', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end', turn_id:'notification-turn'})})", context);
+  assert.equal(vm.runInContext('currentNotification', context), 'task-playback');
+  const stoppedSource = vm.runInContext('[...playbackSources][0]', context);
+  elements.interrupt.onclick();
+  assert.deepEqual(Array.from(vm.runInContext('pendingNotifications', context)), ['task-playback']);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.cancelled', turn_id:'notification-turn'})})", context);
+  assert.deepEqual(Array.from(vm.runInContext('pendingNotifications', context)), ['task-playback']);
+  vm.runInContext("currentNotification = 'next-notification'", context);
+  stoppedSource.onended();
+  assert.equal(vm.runInContext('currentNotification', context), 'next-notification');
+  vm.runInContext("pendingNotifications.length = 0; currentNotification = 'completed'; ws.onmessage({data: JSON.stringify({type:'speech.start', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end'})}); [...playbackSources][0].onended()", context);
+  assert.equal(vm.runInContext('currentNotification', context), null);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), true);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);
