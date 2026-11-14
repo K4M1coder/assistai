@@ -9,6 +9,12 @@ export function createNativeTranscript({ url, send, socketFactory = address => n
     const state = { turnId, socket: socketFactory(url), frames: [], bytes: 0, ended: false, segments: [], ready: false };
     active = state;
     const fail = () => { if (active !== state) return; send({ type: 'transcript.unavailable', turn_id: turnId }); stop(); };
+    const transmit = (data, options) => {
+      if (active !== state) return false;
+      try { state.socket.send(data, options); return true; }
+      catch { fail(); return false; }
+    };
+    state.transmit = transmit;
     state.timer = setTimeout(fail, 30000);
     state.socket.on('error', fail);
     state.socket.on('close', () => { if (active === state) fail(); });
@@ -17,9 +23,9 @@ export function createNativeTranscript({ url, send, socketFactory = address => n
       let event; try { event = JSON.parse(raw.toString()); } catch { fail(); return; }
       if (event.type === 'ready') {
         state.ready = true;
-        for (const frame of state.frames) state.socket.send(frame, { binary: true });
+        for (const frame of state.frames) if (!transmit(frame, { binary: true })) return;
         state.frames = []; state.bytes = 0;
-        if (state.ended) state.socket.send(JSON.stringify({ type: 'end' }));
+        if (state.ended) transmit(JSON.stringify({ type: 'end' }));
       } else if (event.type === 'partial') send({ type: 'asr.partial', turn_id: turnId, text: event.text ?? '' });
       else if (event.type === 'segment' && event.text) state.segments.push(event.text);
       else if (event.type === 'final') {
@@ -34,12 +40,12 @@ export function createNativeTranscript({ url, send, socketFactory = address => n
     if (!active || active.ended) return;
     if (active.ready) {
       if (active.socket.bufferedAmount > 32000) { send({ type: 'transcript.unavailable', turn_id: active.turnId }); stop(); return; }
-      active.socket.send(frame, { binary: true });
+      active.transmit(frame, { binary: true });
     } else {
       if (active.bytes + frame.length > 32000) { send({ type: 'transcript.unavailable', turn_id: active.turnId }); stop(); return; }
       active.frames.push(Buffer.from(frame)); active.bytes += frame.length;
     }
   };
-  const end = () => { if (!active) return; active.ended = true; if (active.ready) active.socket.send(JSON.stringify({ type: 'end' })); };
+  const end = () => { if (!active) return; active.ended = true; if (active.ready) active.transmit(JSON.stringify({ type: 'end' })); };
   return { start, append, end, stop };
 }

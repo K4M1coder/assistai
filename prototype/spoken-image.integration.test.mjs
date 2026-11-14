@@ -20,7 +20,9 @@ test('reviewed spoken image waits for edited transcript before sending to vision
   const tts = http.createServer((req, res) => { req.resume(); res.end(wav); }); const ttsPort = await listen(tts);
   const asr = http.createServer(); const asrSockets = new WebSocketServer({ server: asr });
   asrSockets.on('connection', socket => { socket.send(JSON.stringify({ type: 'ready' })); socket.on('message', data => {
-    if (JSON.parse(data.toString()).type === 'end') socket.send(JSON.stringify({ type: 'final', text: 'Quelle couleur ?' }));
+    const type = JSON.parse(data.toString()).type;
+    if (type === 'reset') { socket.send(JSON.stringify({ type: 'segment', text: 'OLD CANCELLED SPEECH' })); socket.send(JSON.stringify({ type: 'reset' })); }
+    if (type === 'end') socket.send(JSON.stringify({ type: 'final', text: 'Quelle couleur ?' }));
   }); });
   const asrPort = await listen(asr);
   const reservation = http.createServer(); const port = await listen(reservation); await close(reservation);
@@ -39,7 +41,7 @@ test('reviewed spoken image waits for edited transcript before sending to vision
     socket.on('error', reject); socket.on('message', (data, binary) => { if (binary) return;
       const event = JSON.parse(data.toString());
       if (event.type === 'session.capabilities') capability = event.spoken_image_input;
-      if (event.type === 'asr.ready') { socket.send(JSON.stringify({ type: 'speech.review.configure', enabled: true })); socket.send(JSON.stringify({ type: 'audio.end', image })); }
+      if (event.type === 'asr.ready') { socket.send(JSON.stringify({ type: 'speech.review.configure', enabled: true })); socket.send(JSON.stringify({ type: 'audio.reset' })); socket.send(JSON.stringify({ type: 'audio.end', image })); }
       if (event.type === 'speech.review') { assert.equal(visionRequest, undefined); assert.equal(event.has_image, true); assert.equal(event.text, 'Quelle couleur ?'); pendingReview = event.review_id; socket.send(JSON.stringify({ type:'speech.review.submit', review_id:'wrong-id', text:'Wrong request' })); }
       if (event.type === 'error' && pendingReview) { assert.match(event.message, /review/); assert.equal(visionRequest, undefined); socket.send(JSON.stringify({ type:'speech.review.submit', review_id:pendingReview, text:'Quelle couleur exactement ?' })); pendingReview = null; }
       else if (event.type === 'error') { clearTimeout(timer); reject(Error(event.message)); }

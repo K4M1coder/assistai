@@ -38,3 +38,17 @@ test('native mode reports only the configured parallel transcription engine', as
   assert.deepEqual(withoutTranscript.map(item => item.role), ['Speech-to-speech model', 'Agent model']);
   assert.ok(!requested.some(url => url.includes(':18081') || url.includes(':18082')));
 });
+
+test('redacts URL credentials, query parameters and fragments in reported endpoints', async () => {
+  const fetcher = async url => {
+    if (url.includes('/config')) return {ok:true,json:async()=>({model:'local/gemma',provider:{local:{options:{baseURL:'http://user:secret@127.0.0.1:18080/v1?token=secret#secret'}}}})};
+    if (url.includes('/models')) return {ok:true,json:async()=>({data:[]})};
+    return {ok:true,json:async()=>({status:'ready'})};
+  };
+  const services = await getServiceStatus({voiceUrl:'http://user:secret@127.0.0.1:18084/v1?token=secret', asrUrl:'ws://user:secret@127.0.0.1:18082/asr?token=secret', ttsUrl:'http://user:secret@127.0.0.1:18081', opencodeUrl:'http://user:secret@127.0.0.1:18085'}, fetcher);
+  assert.equal(services[0].server,'http://127.0.0.1:18084/v1');
+  assert.equal(services[1].server,'http://127.0.0.1:18080/v1');
+  assert.equal(services[1].harness,'http://127.0.0.1:18085');
+  assert.equal(services[2].server,'http://127.0.0.1:18082/health');
+  assert.ok(!JSON.stringify(services).includes('secret'));
+});

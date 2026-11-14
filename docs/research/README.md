@@ -53,3 +53,23 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-184](2026-11-14-spoken-coding-followup.md) records a guarded synthetic coding trial that edited its fixture but failed its delegated-filename assertion, plus a fix to its transcript measurement.
 
 [EXP-185](2026-11-14-spoken-coding-repeat.md) verifies that measurement fix with real models and records a repeated delegated-identifier failure.
+
+[EXP-186](2026-11-14-task-approval.md) records the new explicit approval flow, real-controller decline and mock-backed enforcement tests.
+
+[EXP-194](2026-11-14-aec-detector-replay.md) replays synthetic echo-filter outputs through an approximate speech-onset rule; it does not establish real-room interruption performance.
+
+[EXP-195](2026-11-14-agent-status-context.md) preserves uncertain task monitoring state in bounded session context and records monitoring recovery.
+
+[EXP-196](2026-11-14-asr-reset-order.md) tests a late ASR segment across a reset acknowledgement and prevents it from contaminating the next reviewed utterance.
+
+[EXP-197](2026-11-14-notification-lookup.md) tests session-scoped notification lookup after later progress events displace a completion from bounded prompt context.
+
+[EXP-198](2026-11-14-current-demo-18096.md) records a current-source cascade endpoint and a synthetic browser speech-review check; physical conversation and the hardware budget remain unverified.
+
+[EXP-199](2026-11-14-audio-cpp-native-comparison.md) reviews an alternative LFM3-Audio runtime against French conversation, tool calls, duplex behavior and the memory budget; it was not run locally.
+
+[EXP-200](2026-11-14-native-disconnect.md) covers recovery signaling when an experimental native speech backend unexpectedly closes.
+
+[EXP-201](2026-11-14-service-url-redaction.md) checks redaction of credentials embedded in service-discovery addresses.
+
+[EXP-202](2026-11-14-haru-native-candidate.md) evaluates Haru-4B as an untested French full-duplex candidate and records its tool-use, Intel and memory uncertainties.

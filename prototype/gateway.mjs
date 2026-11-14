@@ -20,6 +20,8 @@ import { createResourceStatus } from './resource-status.mjs';
 import { speechText, visibleAnswer } from './speech-text.mjs';
 import { latestCompletedAssistant } from './agent-task-status.mjs';
 import { openSharedTaskReservations } from './shared-task-reservations.mjs';
+import { createTaskApproval } from './task-approval.mjs';
+import { agentProgress } from './agent-progress.mjs';
 
 function validImage(image) {
   const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
@@ -67,10 +69,11 @@ const db = new DatabaseSync(dbPath);
 db.exec('CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, turn_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)');
 const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
 const history = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text') ORDER BY rowid DESC LIMIT 20");
-const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
-const taskSnapshot = db.prepare("SELECT kind, payload, created_at FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const taskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.progress', 'task.uncertain', 'task.status_restored', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const completedTask = db.prepare("SELECT payload FROM events WHERE session_id = ? AND kind = 'task.completed' AND CASE WHEN json_valid(payload) THEN json_extract(payload, '$.task_id') END = ? ORDER BY rowid DESC LIMIT 1");
+const taskSnapshot = db.prepare("SELECT kind, payload, created_at FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.uncertain', 'task.status_restored', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const completedTaskHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 400");
-const nativeHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text', 'task.started', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
+const nativeHistory = db.prepare("SELECT kind, payload FROM events WHERE session_id = ? AND kind IN ('user.text', 'assistant.text', 'task.started', 'task.progress', 'task.uncertain', 'task.status_restored', 'task.completed', 'task.error') ORDER BY rowid DESC LIMIT 20");
 const record = (session, turn, kind, payload) => insert.run(randomUUID(), session, turn, kind, JSON.stringify(payload), new Date().toISOString());
 const clientRoot = fileURLToPath(new URL('./client/', import.meta.url));
 const aecRoot = fileURLToPath(new URL('../node_modules/@ennuicastr/webrtcaec3.js/dist/', import.meta.url));
@@ -150,7 +153,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -170,9 +173,10 @@ wss.on('connection', (client, req) => {
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`);
     return response.status === 204 ? null : response.json();
   };
-  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false } = {}) => {
+  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false, originalRequest = null } = {}) => {
     if (!opencodeUrl) throw new Error('OpenCode is not configured');
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
+    // Deduplicate by proposed task regardless of how the user phrased the request.
     const taskKey = normalizeTask(task);
     const prior = runningTasks.get(taskKey);
     if (prior?.uncertain) return { accepted: false, status: 'uncertain', error: 'A matching task may still be running; it was not submitted again.', ...(prior.id ? { task_id: prior.id } : {}) };
@@ -204,7 +208,7 @@ wss.on('connection', (client, req) => {
       releaseResource?.attachTask?.(agentSession.id);
       reservation.id = agentSession.id;
       promptAttempted = true;
-      const agentPrompt = buildAgentPrompt(task, nativeHistory.all(session).reverse());
+      const agentPrompt = buildAgentPrompt(task, nativeHistory.all(session).reverse(), 1800, originalRequest);
       await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/prompt_async`, { method: 'POST', headers, body: JSON.stringify({ parts: [{ type: 'text', text: agentPrompt }] }) });
     } catch (error) {
       if (!promptAttempted) releaseResource?.();
@@ -223,7 +227,7 @@ wss.on('connection', (client, req) => {
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
     void (async () => {
-      let confirmedTerminal = false, pollFailures = 0;
+      let confirmedTerminal = false, pollFailures = 0, previousProgress = JSON.stringify({ state: 'running' });
       try {
         for (let i = 0; i < 300; i++) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -246,7 +250,16 @@ wss.on('connection', (client, req) => {
           pollFailures = 0;
           if (reservation.uncertain) {
             reservation.uncertain = false;
-            sendTask({ type: 'task.status_restored', task_id: agentSession.id, message: 'Agent status monitoring resumed.' });
+            const restored = { task_id: agentSession.id, message: 'Agent status monitoring resumed; the task outcome is not yet confirmed.' };
+            record(session, turnId, 'task.status_restored', restored);
+            sendTask({ type: 'task.status_restored', ...restored });
+          }
+          const progress = agentProgress(status[agentSession.id]);
+          if (progress && JSON.stringify(progress) !== previousProgress) {
+            previousProgress = JSON.stringify(progress);
+            record(session, turnId, 'task.progress', { task_id: agentSession.id, ...progress,
+              message: progress.state === 'retrying' ? 'The agent is retrying.' : 'The agent resumed work.' });
+            sendTask({ type: 'task.progress', task_id: agentSession.id, ...progress });
           }
           const last = latestCompletedAssistant(status, agentSession.id, messages);
           if (last) {
@@ -277,9 +290,19 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
+  const approvals = createTaskApproval({ send, execute: launchTask });
+  const proposeTask = async (task, turnId, options = {}) => {
+    if (!opencodeUrl) throw Error('OpenCode is not configured');
+    return approvals.propose(task, turnId, options);
+  };
+  client.once('close', () => approvals.clear());
   client.on('message', (data, binary) => {
     if (binary) return;
     let event; try { event = JSON.parse(data.toString()); } catch { return; }
+    if (event.type === 'task.approval') {
+      void approvals.decide(event.approval_id, event.approved);
+      return;
+    }
     if (event.type !== 'task.cancel') return;
     const owned = typeof event.task_id === 'string' && [...runningTasks.values()].some(task => task.id === event.task_id);
     if (!owned || !opencodeUrl) { send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Task is not running in this session.' }); return; }
@@ -289,12 +312,12 @@ wss.on('connection', (client, req) => {
       .catch(() => send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Could not request cancellation; task status is uncertain.' }));
   });
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask: proposeTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
       getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),
       getCompletedTask: taskId => {
       if (typeof taskId !== 'string') return null;
-      const row = taskHistory.all(session).find(item => item.kind === 'task.completed' && JSON.parse(item.payload).task_id === taskId);
+      const row = completedTask.get(session, taskId);
       return row ? JSON.parse(row.payload).text : null;
     } });
     return;
@@ -349,7 +372,7 @@ wss.on('connection', (client, req) => {
         const payload = JSON.parse(row.payload);
         tasks.set(payload.task_id, { ...tasks.get(payload.task_id), ...payload, status: row.kind });
       }
-      const taskSummary = [...tasks.values()].map(task => `${task.task_id}: ${task.status}${task.task ? `; request: ${task.task}` : ''}${task.text ? `; result: ${task.text.slice(0, 500)}` : ''}`).join('\n');
+      const taskSummary = [...tasks.values()].map(task => `${task.task_id}: ${task.status}${task.status === 'task.progress' && task.state ? ` (${task.state})` : ''}${task.task ? `; request: ${task.task}` : ''}${task.text ? `; result: ${task.text.slice(0, 500)}` : ''}${['task.uncertain', 'task.status_restored', 'task.error'].includes(task.status) && task.message ? `; status detail: ${task.message.slice(0, 500)}` : ''}`).join('\n');
       messages.unshift({ role: 'system', content: `You are a concise local voice assistant. Reply in French. Delegate substantive work using the available tool. Never claim an action was performed unless its result is available. Answer the most recent user message; do not repeat or re-delegate tasks already listed below. Task state:\n${taskSummary || 'No tasks.'}` });
       const complete = async (withTools) => {
         const response = await fetch(`${llmUrl}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: turn.controller.signal, body: JSON.stringify({ model: 'local', messages, ...(withTools ? { tools: [tool], tool_choice: 'auto' } : {}), max_tokens: 256, temperature: 0.3, chat_template_kwargs: { enable_thinking: false } }) });
@@ -360,18 +383,19 @@ wss.on('connection', (client, req) => {
       if (active !== turn) return;
       if (message?.tool_calls?.length) {
         messages.push(message);
-        let resourceRejected = false;
+        let approvalRequested = false;
         for (const call of message.tool_calls) {
           let result;
           try {
             if (call.function?.name !== 'delegate_task') throw new Error('Unknown tool');
             const args = JSON.parse(call.function.arguments);
-            result = await launchTask(args.task, turn.id);
-          } catch (error) { if (error.code === 'RESOURCE_ADMISSION_REJECTED') resourceRejected = true; result = { accepted: false, error: String(error) }; }
+            result = await proposeTask(args.task, turn.id, { originalRequest: text });
+            approvalRequested ||= result.awaiting_approval === true;
+          } catch (error) { result = { accepted: false, error: String(error) }; }
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
         if (active !== turn) return;
-        message = resourceRejected ? { content: 'La t\u00e2che a \u00e9t\u00e9 refus\u00e9e car les ressources disponibles ne peuvent pas \u00eatre v\u00e9rifi\u00e9es ou sont insuffisantes.' } : await complete(false);
+        message = approvalRequested ? { content: 'La t\u00e2che attend votre confirmation et n\u2019a pas encore \u00e9t\u00e9 lanc\u00e9e.' } : await complete(false);
       }
       const answer = visibleAnswer(message?.content);
       if (!answer) throw new Error('LLM returned no spoken text');
@@ -405,6 +429,9 @@ wss.on('connection', (client, req) => {
     try {
       const event = JSON.parse(data.toString());
       send({ type: `asr.${event.type}`, text: event.text });
+      // A segment generated before a reset can arrive after the reset request.
+      // The recognizer's acknowledgement is ordered after those stale segments.
+      if (event.type === 'reset') segments = [];
       if (event.type === 'segment' && event.text) segments.push(event.text);
       if (event.type === 'final' && waitingForFinal) {
         waitingForFinal = false;
@@ -434,7 +461,8 @@ wss.on('connection', (client, req) => {
       return;
     }
     if (event.type === 'notification.speak' && typeof event.task_id === 'string') {
-      const completed = taskHistory.all(session).filter(row => row.kind === 'task.completed').map(row => JSON.parse(row.payload)).find(payload => payload.task_id === event.task_id);
+      const row = completedTask.get(session, event.task_id);
+      const completed = row ? JSON.parse(row.payload) : null;
       if (!completed || active || waitingForFinal) { send({ type: 'notification.rejected', task_id: event.task_id, reason: completed ? 'busy' : 'unavailable' }); return; }
       const turn = { id: randomUUID(), controller: new AbortController() };
       active = turn;

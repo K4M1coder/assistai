@@ -27,3 +27,18 @@ test('drops older entries to fit the limit and ignores malformed rows', () => {
   assert.match(prompt, /new/);
   assert.equal(buildAgentPrompt('Task', [], 80), 'Task');
 });
+
+test('keeps the complete original user request when a controller reverses the task', () => {
+  const original = `Dans calculator.py, corrige la soustraction en addition. ${'précision '.repeat(40)}Ne change rien d’autre.`;
+  const prompt = buildAgentPrompt('Change addition to subtraction in calculator.py.', [], 80, original);
+  assert.ok(prompt.includes(JSON.stringify(original)));
+  assert.match(prompt, /operation direction, negation and scope/);
+  assert.match(prompt, /ask for clarification/);
+  assert.throws(() => buildAgentPrompt('Task', [], 80, ''), /Invalid original request/);
+});
+
+test('includes uncertain task state in background context', () => {
+  const prompt = buildAgentPrompt('Report status', [{kind:'task.uncertain', payload:JSON.stringify({task:'Read a file',message:'Status unknown; task may still be running.'})}]);
+  assert.match(prompt, /task\.uncertain/);
+  assert.match(prompt, /may still be running/);
+});

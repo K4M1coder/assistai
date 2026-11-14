@@ -29,3 +29,20 @@ test('drops late results after a new turn and bounds startup buffering', () => {
   assert.equal(events.length,0); transcript.append(Buffer.alloc(32001));
   assert.deepEqual(events,[{type:'transcript.unavailable',turn_id:'new'}]);
 });
+test('reports unavailable instead of throwing when the ASR socket fails during queued flush', () => {
+  const { sockets, events, transcript }=setup();
+  transcript.start('turn'); transcript.append(Buffer.alloc(2)); transcript.end();
+  sockets[0].send=()=>{throw Error('socket closed');};
+  assert.doesNotThrow(()=>sockets[0].event({type:'ready'}));
+  assert.deepEqual(events,[{type:'transcript.unavailable',turn_id:'turn'}]);
+  assert.equal(sockets[0].closed,true);
+});
+test('reports unavailable if a live audio or end send fails', () => {
+  for (const duringEnd of [false,true]) {
+    const { sockets, events, transcript }=setup();
+    transcript.start('turn'); sockets[0].event({type:'ready'});
+    sockets[0].send=()=>{throw Error('socket closed');};
+    assert.doesNotThrow(()=>duringEnd ? transcript.end() : transcript.append(Buffer.alloc(2)));
+    assert.deepEqual(events,[{type:'transcript.unavailable',turn_id:'turn'}]);
+  }
+});

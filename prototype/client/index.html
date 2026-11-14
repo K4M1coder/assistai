@@ -15,11 +15,23 @@
   <h1>Local Voice Prototype</h1>
   <p>Spoken language: French. This experimental client uses local services.</p>
   <p id="mode">Detecting voice mode...</p>
+  <p id="approval-safety" role="status">Checking task approval protection...</p>
   <p><button id="session-memory" type="button" disabled>Checking session memory…</button> <span id="session-memory-status">Session history is stored by the gateway.</span></p>
   <details open><summary>Local inference services</summary><ul id="services"><li>Checking services…</li></ul><button id="refresh-services" type="button">Refresh</button></details>
   <p id="resources" role="status">Resource status: checking…</p>
+  <p><label for="microphone-device">Microphone</label> <select id="microphone-device"><option value="">System default</option></select>
+    <button id="refresh-microphones" type="button">Refresh microphones</button><br>
+    Device names may appear after microphone permission is granted. Changes apply when the microphone is restarted.</p>
   <button id="start">Start microphone</button><button id="stop" disabled>Stop microphone</button><button id="interrupt">Interrupt</button>
   <button id="stop-task" type="button" disabled>Stop latest agent task</button>
+  <section id="task-approval" hidden aria-live="polite">
+    <h2>Confirm agent task</h2>
+    <p>Original request: <span id="approval-original"></span></p>
+    <p>Proposed task: <span id="approval-task"></span></p>
+    <p>Check filenames, direction, negation and scope. Approval does not sandbox the agent.</p>
+    <button id="approve-task" type="button">Approve task</button>
+    <button id="decline-task" type="button">Decline task</button>
+  </section>
   <fieldset><legend>Microphone options</legend>
     <label><input type="checkbox" id="speaker-safe" checked> Speaker-safe</label> — use Interrupt while the assistant speaks.<br>
     <label><input type="checkbox" id="push-to-talk"> Push-to-talk</label> — hold the button while speaking; pressing it interrupts playback.<br>

@@ -38,6 +38,8 @@ The native client maintains a bounded queue of task-completion notifications. It
 
 Gateway service discovery identifies native speech inference and an optional parallel transcription service separately. The status endpoint queries the configured transcription sidecar, rather than assuming the cascade's default ASR server; this is health reporting rather than a transcript provenance or authentication guarantee.
 
+Reported endpoint URLs omit userinfo, query strings and fragments; this does not redact arbitrary provider metadata or URL path components and is not an authentication boundary. The service checks do not establish actual generation quality or memory residency.
+
 An experimental coding probe targets a separately configured disposable workspace and validates a narrow arithmetic fixture without executing generated code. One guarded real cascade run delegated and completed the fix while producing a separate follow-up response and audio; an earlier run was stopped below the RAM reserve. Input was synthetic text, the audio was not listened to, and these results do not establish general coding quality or an OS sandbox.
 
 The Windows trial accepts explicit distinct agent and gateway ports, checks they are free, and tracks its own processes. This permits a trial alongside existing demo listeners when resource preflight succeeds; port separation does not isolate memory or grant filesystem confinement.
@@ -70,6 +72,10 @@ Task polling considers a result only when the session has no active status and t
 
 In the browser's automatic speech mode, idle capture remains local in a ten-frame pre-roll until the energy detector starts a turn; the pre-roll is then sent before subsequent frames. This bounds idle audio sent to ASR but is not target-speaker separation. Speaker-safe and push-to-talk discard the automatic-mode pre-roll when their gates are active.
 
+For the cascade recognizer, the gateway clears accumulated transcript segments on the ordered ASR reset acknowledgement as well as on the reset request, so a late segment from before the reset is not carried into the next utterance. This assumes the local recognizer's acknowledgement ordering; it does not correct recognition or delegation errors. See EXP-196.
+
+The browser can enumerate available audio inputs and request a selected input by device ID; the choice takes effect on the next capture start. Device availability and labels depend on browser permission and the operating system. No virtual audio device or external echo canceller is installed by this selector.
+
 Automatic speech turns end after a configurable quiet interval, default 1.4 seconds; push-to-talk ends on release. Longer intervals tolerate pauses at the cost of response latency and do not separate nearby speakers.
 
 In experimental native speech mode, interrupting while a tool submission is pending replaces the realtime voice session, discards its late tool response and signals reconnection to the browser. Input arriving during session setup is buffered up to 32,000 PCM bytes and then flushed; overflow fails explicitly. The background task may already have been accepted and continues independently; interrupting voice does not cancel or undo it. This race is covered by mock tests, not yet by a live native model or physical audio test.
@@ -78,7 +84,11 @@ The optional Windows resource sample can include total system pagefile usage. Th
 
 An optional shared SQLite reservation ledger serializes estimated task admission among gateways configured with the same path. It stores reservation IDs, process IDs, timestamps, estimated RAM/VRAM and, once created, the OpenCode session ID; it does not store conversation text. Estimates remain after a crash or uncertain task and require deliberate reconciliation after independently confirming work has stopped. Older gateways, direct inference clients and services outside that ledger remain unaccounted for; measured snapshots and reservations do not enforce physical memory limits.
 
+During polling, transitions between OpenCode's busy and retry states are sent as sanitized task-progress events and added to the bounded session context. The browser displays them without interrupting speech; the assistant may use them in a later response. Raw provider error messages and agent reasoning are not included in these events. Polling can miss short transitions and is not proof of ongoing execution.
+
 If prompt submission may have reached OpenCode or polling later fails, the gateway emits `task.uncertain`, retains the task ID and estimate, and refuses to resubmit the same normalized request in that session. It continues to accept cancellation requests for that ID. Status polling retries up to three consecutive failures and can recover; ambiguous submission and exhausted retries remain uncertain, and a restart loses this process-local task map even if external work continues.
+
+Uncertainty and subsequent monitoring recovery are also recorded in bounded conversation and resumed task history. Recovery means polling resumed, not that the task succeeded; older context can still be evicted. This is reporting, not authorization or durable reconciliation. See EXP-195.
 
 The guarded probe can now request a completion notification in that spoken-input variant, after the follow-up speech finishes and the task completes. Mock tests cover this ordering; the first real-run preflight failed the 10 GiB available-RAM threshold, so the combined path remains unverified with real inference.
 
@@ -110,11 +120,15 @@ Native task notifications retrieve only a completed task from the current gatewa
 
 Cascade task notifications retrieve a completed event from the same session and send a normalized excerpt of at most 300 Unicode characters directly to TTS. The notification is labeled as an excerpt and the full result remains in the client. Mock-service tests cover the TTS request and rejection of another session's task ID. One real-agent synthetic text run produced notification audio after completing a fixture task. A separate synthetic TTS-to-ASR check recognized two of three marker words; audible quality and general synthesis accuracy remain unverified.
 
+The native and cascade paths look up requested completed notifications by session and task ID in retained history, independently of the limited context window. This avoids losing a queued result when later progress events fill the window; it does not replay historical notifications automatically or guarantee storage retention. See EXP-197.
+
 The browser retries a notification rejected as busy up to three times with a short delay, then reports the failure and keeps the written result in the conversation. Unavailable results and unclassified rejections are reported without retry. This is a bounded best-effort queue, not a delivery guarantee; the retry behavior has mock coverage, not a live browser validation.
 
 The cascade gateway validates its expected mono PCM16 WAV stream and treats empty or odd-byte PCM output as an error. A turn-scoped speech error clears browser playback for that turn; unrelated errors do not stop the current audio. This detects malformed or empty streams, not semantically truncated speech or arbitrary WAV variants.
 
 The browser retries a dropped gateway WebSocket with a capped backoff, except after a policy rejection. It pauses audio transmission while disconnected, resets a held push-to-talk press, preserves text submitted while disconnected, and resumes an already enabled microphone when recognition is ready. If cascade ASR disconnects, the gateway closes the client connection to trigger reconnection. Without a resume capability, the new connection has a new session. Mock tests do not establish physical microphone or browser behavior under real network faults.
+
+The experimental native bridge also closes the client connection when its active realtime backend unexpectedly closes, enabling browser reconnect. Intentional replacement of a native session for a reset or interruption does not close the client. A native terminal client's recovery is not established. See EXP-200.
 
 ### Research-only speech-to-speech paths
 

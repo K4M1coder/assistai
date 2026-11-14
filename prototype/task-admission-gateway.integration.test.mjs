@@ -7,17 +7,18 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
 import { inspectReservations } from '../scripts/inspect-task-reservations.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 async function listen(server) { server.listen(0,'127.0.0.1'); await once(server,'listening'); return server.address().port; }
 
 test('gateway retains uncertain tasks and recovers polling before releasing estimates', {timeout:15000}, async t => {
-  let agentSessions=0, aborts=0, recover=false;
+  let agentSessions=0, aborts=0, recover=false, retrying=false;
   const agent=http.createServer((req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST'&&req.url==='/session'){agentSessions++;return res.end(JSON.stringify({id:'busy-task'}));}
     if(req.method==='POST'&&req.url==='/session/busy-task/prompt_async'){res.statusCode=204;return res.end();}
     if(req.method==='POST'&&req.url==='/session/busy-task/abort'){aborts++;return res.end('true');}
-    if(req.url==='/session/status'){if(!recover)res.statusCode=500;return res.end('{}');}
+    if(req.url==='/session/status'){if(!recover)res.statusCode=500;return res.end(JSON.stringify(recover&&retrying?{'busy-task':{type:'retry',attempt:2,message:'PRIVATE PROVIDER MESSAGE'}}:{}));}
     if(req.url==='/session/busy-task/message')return res.end(JSON.stringify(recover ? [{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:'Done'}]}] : []));
     res.statusCode=404;res.end('{}');
   });
@@ -43,7 +44,8 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   const samplePath=path.join(temp,'sample.json');
   await writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:20*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
   const ledgerPath=path.join(temp,'reservations.sqlite');
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:':memory:',ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_SHARED_RESERVATIONS_PATH:ledgerPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
+  const historyPath=path.join(temp,'history.sqlite');
+  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:historyPath,ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_SHARED_RESERVATIONS_PATH:ledgerPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
   delete env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:process.cwd(),env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',chunk=>{stderr+=chunk});
@@ -62,6 +64,7 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
       ws.on('message',(data,binary)=>{
         if(binary)return;const event=JSON.parse(data);
         if(event.type==='asr.ready'){ws.send(JSON.stringify({type:'audio.start'}));ws.send(Buffer.alloc(3200));ws.send(JSON.stringify({type:'audio.end'}));}
+        else if(event.type==='task.approval_requested'){ws.send(JSON.stringify({type:'task.approval',approval_id:event.approval_id,approved:true}));}
         else if(event.type===expected){clearTimeout(timer);resolve(event);}
         else if(event.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(event)));}
       });
@@ -89,16 +92,29 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /may already have made changes/);
   assert.equal(aborts,1);
   await uncertain;
+  const db=new DatabaseSync(historyPath, {readOnly:true});
+  t.after(()=>db.close());
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE kind='task.uncertain'").get().n,1);
   assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /Cancellation requested/);
   assert.equal(aborts,2);
   const afterError=await request('task.rejected');
   assert.match(afterError.message,/budget/);
   assert.equal(agentSessions,1);
   const completed = new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(Error('Recovered completion timed out')),5000);
+    const timer=setTimeout(()=>reject(Error('Recovered completion timed out')),8000);
     clients[0].on('message',function handler(data,binary){if(binary)return;const event=JSON.parse(data);if(event.type==='task.completed'){clearTimeout(timer);clients[0].off('message',handler);resolve(event);}});
   });
+  const progress = new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Retry progress timed out')),5000);
+    clients[0].on('message',function handler(data,binary){if(binary)return;const event=JSON.parse(data);if(event.type==='task.progress'){clearTimeout(timer);clients[0].off('message',handler);resolve(event);}});
+  });
+  retrying=true;
   recover=true;
+  const retry = await progress;
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE kind='task.status_restored'").get().n,1);
+  assert.equal(retry.state,'retrying');assert.equal(retry.attempt,2);
+  assert.doesNotMatch(JSON.stringify(retry),/PRIVATE PROVIDER MESSAGE/);
+  retrying=false;
   assert.equal((await completed).text,'Done');
   await writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:20*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
   await request('task.started');

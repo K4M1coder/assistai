@@ -1,0 +1,5 @@
+# EXP-188: Deduplication after preserving the original request
+
+An uncommitted change preserved the full original cascade request alongside a controller-proposed agent task. Its initial task key also included that original request. Consequently, two differently worded user requests producing the same task could bypass the existing in-session duplicate check and create two agent sessions, including when an earlier submission remained uncertain.
+
+The key again uses the normalized proposed task alone; the original request remains separate in the agent prompt. A mock cascade gateway test submits the same task from two differently worded requests, approves both proposals and verifies that only one agent session is created and the second response reports the existing task. Existing context and completed-task-cache tests also pass. Exact normalized text is not semantic deduplication, and identical wording can represent an intentional repeated request; this does not prove that all duplicates or false matches are handled correctly. No live agent task or model was run.

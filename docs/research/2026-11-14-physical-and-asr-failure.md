@@ -13,6 +13,10 @@ independent recording, transcript, latency measurement or audible-quality
 score was retained. The gateway used volatile session storage; this is not a
 claim about storage by the browser, providers or operating system.
 
+The operator subsequently confirmed that interruption works. This is
+additional user-reported confirmation, not a measured interruption latency
+or evidence of automatic barge-in.
+
 ## ASR connection failure
 
 Hypothesis: with the speech recognizer unreachable, the gateway should report

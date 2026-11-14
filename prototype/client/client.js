@@ -1,6 +1,19 @@
 const $ = id => document.getElementById(id);
 const status = text => { $('status').textContent = text; };
 const log = text => { $('log').textContent += `${text}\n`; };
+async function refreshMicrophones() {
+  if (!globalThis.navigator?.mediaDevices?.enumerateDevices) return;
+  try {
+    const selected = $('microphone-device').value;
+    const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'audioinput' && device.deviceId && device.deviceId !== 'default');
+    const defaultOption = document.createElement('option'); defaultOption.value = ''; defaultOption.textContent = 'System default';
+    const options = devices.map((device, index) => { const option = document.createElement('option'); option.value = device.deviceId; option.textContent = device.label || `Microphone ${index + 1}`; return option; });
+    $('microphone-device').replaceChildren(defaultOption, ...options);
+    $('microphone-device').value = devices.some(device => device.deviceId === selected) ? selected : '';
+  } catch { status('Could not list microphones; the system default remains available.'); }
+}
+$('refresh-microphones').onclick = refreshMicrophones;
+void refreshMicrophones();
 async function refreshServices() {
   const list = $('services');
   try {
@@ -97,6 +110,18 @@ function finishAudio() {
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null;
 let taskCancelAvailable = false;
+let pendingApproval = null;
+function clearApproval() {
+  pendingApproval = null;
+  $('task-approval').hidden = true;
+}
+function decideApproval(approved) {
+  if (!pendingApproval || ws.readyState !== WebSocket.OPEN) return;
+  send(JSON.stringify({ type: 'task.approval', approval_id: pendingApproval, approved }));
+  clearApproval();
+}
+$('approve-task').onclick = () => decideApproval(true);
+$('decline-task').onclick = () => decideApproval(false);
 const activeTaskIds = new Set(), cancellationRequested = new Set();
 function latestCancellableTask() { return [...activeTaskIds].reverse().find(id => !cancellationRequested.has(id)); }
 function refreshTaskButton() { $('stop-task').disabled = !taskCancelAvailable || !latestCancellableTask(); }
@@ -135,6 +160,19 @@ function finishPushToTalk() {
   $('talk').textContent = 'Hold to talk';
   responsePending = true;
   finishAudio();
+}
+function echoFilterFailed(message) {
+  $('speaker-safe').checked = true;
+  pushToTalkActive = false; speaking = false; voiceFrames = 0; silenceFrames = 0;
+  $('talk').textContent = 'Hold to talk';
+  captureNode?.disconnect(); stream?.getTracks().forEach(track => track.stop());
+  stream = undefined; captureNode = undefined; captureContext = undefined;
+  echoBridge?.close(); echoBridge = undefined; referenceNode = undefined;
+  send(JSON.stringify({ type: 'audio.reset' }));
+  $('experimental-aec').disabled = false;
+  $('start').disabled = false; $('stop').disabled = true; $('talk').disabled = true;
+  $('echo-status').textContent = 'Echo cancellation: filter stopped; microphone stopped.';
+  status(`Echo filter stopped: ${message}. Restart the microphone.`);
 }
 function stopPlayback() {
   speechOpen = false;
@@ -181,6 +219,9 @@ function handleSocketMessage({ data }) {
   if (data instanceof ArrayBuffer) { play(data, outputRate); return; }
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
+    $('approval-safety').textContent = event.task_approval === true
+      ? 'Agent tasks require explicit approval before submission.'
+      : 'Warning: this gateway does not confirm agent tasks before submission. Do not delegate consequential work.';
     textInputAvailable = event.text_input === true;
     speechReviewAvailable = event.speech_review === true;
     $('speech-review').disabled = !speechReviewAvailable;
@@ -201,15 +242,29 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { spokenImageSent = false; $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
+  else if (event.type === 'task.approval_requested') {
+    pendingApproval = event.approval_id;
+    $('approval-original').textContent = event.original_request ?? 'Unavailable in native speech mode.';
+    $('approval-task').textContent = event.task;
+    $('task-approval').hidden = false;
+    status('Agent task requires your approval; it has not started.');
+  }
+  else if (event.type === 'task.approval_submitted' || event.type === 'task.approval_declined' || event.type === 'task.approval_expired' || event.type === 'task.approval_rejected' || event.type === 'task.approval_result') {
+    if (!event.approval_id || event.approval_id === pendingApproval) clearApproval();
+    status(event.message ?? (event.type === 'task.approval_submitted' ? 'Approval received; submitting the task.' : 'Task was not approved or approval expired.'));
+  }
   else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
     log('Recent task history (past events; started does not confirm current status):');
     for (const item of event.events) {
       if (item.kind === 'task.started') log(`Previous task started: ${item.text}`);
       else if (item.kind === 'task.completed') log(`Previous task completed: ${item.text}`);
       else if (item.kind === 'task.error') log(`Previous task error: ${item.text}`);
+      else if (item.kind === 'task.uncertain') log(`Previous task status uncertain: ${item.text}`);
+      else if (item.kind === 'task.status_restored') log(`Previous monitoring update: ${item.text}`);
     }
   }
   else if (event.type === 'task.started') { if (event.task_id) activeTaskIds.add(event.task_id); refreshTaskButton(); log(`Agent started: ${event.task}`); }
+  else if (event.type === 'task.progress') { if (event.state === 'retrying') log(`Agent is retrying${Number.isSafeInteger(event.attempt) ? ` (attempt ${event.attempt})` : ''}.`); else if (event.state === 'running') log('Agent resumed work.'); }
   else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
   else if (event.type === 'task.uncertain') { if (event.task_id) { activeTaskIds.add(event.task_id); cancellationRequested.delete(event.task_id); } refreshTaskButton(); log(`Agent task status uncertain: ${event.message}`); }
@@ -243,7 +298,7 @@ function connectGateway() {
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); refreshTaskButton(); stopPlayback();
+    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); clearApproval(); $('approval-safety').textContent = 'Disconnected; task approval protection is unavailable.'; refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
@@ -313,7 +368,9 @@ $('form').onsubmit = async event => {
 $('start').onclick = async () => {
   if (!asrReady) { status('Speech recognition is not ready.'); return; }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: !$('experimental-aec').checked, noiseSuppression: true, autoGainControl: true } });
+    const deviceId = $('microphone-device').value;
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: !$('experimental-aec').checked, noiseSuppression: true, autoGainControl: true } });
+    void refreshMicrophones();
     const echoSetting = stream.getAudioTracks()[0]?.getSettings().echoCancellation;
     $('echo-status').textContent = echoSetting === undefined
       ? 'Echo cancellation: requested; browser did not report its status.'
@@ -370,12 +427,13 @@ $('start').onclick = async () => {
       await captureContext.audioWorklet.addModule('/echo-reference-worklet.js');
       const worker = new Worker('/echo-canceller-worker.js');
       let pending = null;
+      let filterStarted = false;
       echoBridge = await new Promise((resolve, reject) => {
         let bridge;
         const timeout = setTimeout(() => { bridge?.close(); reject(new Error('Echo filter initialization timed out')); }, 10000);
         bridge = createEchoBridge(worker, {
           onReady: () => { clearTimeout(timeout); resolve(bridge); },
-          onError: message => { clearTimeout(timeout); $('speaker-safe').checked = true; status(`Echo filter stopped: ${message}. Restart the microphone.`); stream?.getTracks().forEach(track => track.stop()); captureNode?.disconnect(); reject(new Error(message)); },
+          onError: message => { clearTimeout(timeout); $('speaker-safe').checked = true; if (filterStarted) echoFilterFailed(message); else reject(new Error(message)); },
           onAudio: ({ capture }) => {
             const reduced = decimator.process(capture);
             if (!pending) pending = reduced;
@@ -386,6 +444,7 @@ $('start').onclick = async () => {
       referenceNode = captureNode = new AudioWorkletNode(captureContext, 'echo-reference-processor', { numberOfInputs: 2 });
       captureNode.port.onmessage = ({ data }) => echoBridge?.send(data);
       microphone.connect(lowpass).connect(captureNode, 0, 0);
+      filterStarted = true;
       $('echo-status').textContent += ' Experimental playback-reference filter active.';
     } else {
       captureNode = new AudioWorkletNode(captureContext, 'capture-processor');

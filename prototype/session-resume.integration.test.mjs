@@ -131,6 +131,11 @@ test('opt-in session resume isolates clients and restores bounded history after 
   writer.close();
   const resumed = await connect(port, tokenA);
   assert.ok(resumed.taskHistory.some(event => event.kind === 'task.completed' && event.text === 'OFFLINE RESULT'));
+  // Progress from other tasks must not evict the queued completion lookup.
+  const progressWriter = new DatabaseSync(db);
+  const addEvent = progressWriter.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?)');
+  for (let i = 0; i < 21; i++) addEvent.run(`progress-${i}`, resumeSessionId(`assistai-v1, resume.${tokenA}`, true), 'progress-turn', 'task.progress', JSON.stringify({task_id:'other-task',message:'still running'}), new Date().toISOString());
+  progressWriter.close();
   await new Promise((resolve, reject) => {
     let started = false;
     const timer = setTimeout(() => reject(Error('Notification timed out')), 5000);

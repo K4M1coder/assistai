@@ -20,9 +20,11 @@ A guarded synthetic spoken coding trial changed the disposable fixture and gener
 
 The corrected measurement was verified in a second real-model synthetic trial, which again delegated incorrect identifiers despite editing the fixture. See [EXP-185](docs/research/2026-11-14-spoken-coding-repeat.md).
 
-The operator requested explicit approval before every agent task. This approval mechanism is **not implemented** in the running gateway; it can still submit tasks automatically. Do not use it for consequential delegation until that behavior is implemented and verified.
+The current-source gateway on [http://127.0.0.1:18095/](http://127.0.0.1:18095/) requires explicit approval before agent submission. Compare the original request and proposed task before approving; approval does not sandbox the agent. The older port 18094 gateway does not enforce approval. The approval flow has mock coverage and a real-controller decline test, but human-approved real-agent completion remains unverified. See [EXP-186](docs/research/2026-11-14-task-approval.md).
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
+
+The browser can select an available microphone or virtual input; changing it takes effect after restarting microphone capture. Selection and restart passed a synthetic browser-device test; physical and virtual devices remain unverified. A possible system-reference echo-cancellation tool was compared offline on one synthetic path but is not installed or validated in a room. See [EXP-191](docs/research/2026-11-14-echoless.md), [EXP-192](docs/research/2026-11-14-microphone-selector-browser.md) and [EXP-193](docs/research/2026-11-14-echoless-offline.md).
 
 In automatic detection mode, the browser keeps a bounded 200 ms pre-roll locally and starts sending it to recognition only when the threshold detects speech. This avoids accumulating unlimited below-threshold background audio, but cannot distinguish the user from a television or another person above the threshold. Push-to-talk remains the more controlled option in noisy rooms. This change has a simulated browser-frame test; physical recognition and barge-in need further testing.
 
@@ -57,6 +59,8 @@ A sparse agent-process page inspection could not resolve which allocations resid
 An official Q4_K_M version of the current Q8 controller has been downloaded and hash-verified for a future controlled comparison. Its smaller file size is not a measured VRAM saving or evidence of equivalent French tool use. See [EXP-174](docs/research/2026-11-13-controller-q4-candidate.md).
 
 A French text delegation probe now covers opposing operations, negation and ordinary conversation without executing tools. Semantic review remains mandatory; no Q4/Q8 result is claimed yet. See [EXP-175](docs/research/2026-11-13-controller-eval.md).
+
+A guarded baseline runner checks the existing controller, memory samples and configured demo connections before running that probe. It refused the current preflight because demo connections were active; no real comparison was started. See [EXP-190](docs/research/2026-11-14-controller-baseline-guard.md).
 
 Older Windows model-trial scripts now compare total observed shared GPU use against the 256 MiB guard, rather than permitting that amount of additional shared usage above their starting baseline. Sampling cannot guarantee no spill; see [EXP-163](docs/research/2026-11-13-absolute-shared-guard.md).
 
