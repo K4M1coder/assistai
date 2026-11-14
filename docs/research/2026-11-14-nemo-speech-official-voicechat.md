@@ -1,0 +1,21 @@
+# EXP-204: Official NeMo-Speech.cpp VoiceChat implementation
+
+## Hypothesis
+
+NVIDIA's official GGML-based VoiceChat implementation may provide a better reference for local speech-to-speech and asynchronous agent tools than the community fork in EXP-203. It must still meet French, Intel B60, concurrent-memory and interruption requirements before being a product candidate.
+
+## Sources and inspection
+
+The [official repository](https://github.com/NVIDIA/NeMo-Speech.cpp/tree/e790e463b2913cff9f989a3df224c587f14b4c5c) was cloned without weights or submodules and inspected at `e790e463b2913cff9f989a3df224c587f14b4c5c`. The general runtime lists Windows and Vulkan support, but its [VoiceChat guide](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/e790e463b2913cff9f989a3df224c587f14b4c5c/docs/s2s/README.md) specifically recommends CUDA and at least 16 GB of GPU-accessible memory for its Q4_K_M model. The provided focused preset is `cuda-s2s`. The S2S CMake target conditionally links the CUDA driver, rather than declaring CUDA mandatory in that file, and the project requires patched GGML for its normal S2S build. These source observations do not establish that an S2S Vulkan build works, that all operations are supported, or that memory remains in dedicated VRAM on B60.
+
+The [model card](https://huggingface.co/nvidia/NVIDIA-NemotronLabs-VoiceChat-11B) labels the model English and instructs users to keep system prompts and tool responses ASCII-only. French conversation and faithful transmission of French task results are therefore not established. The model is under OpenMDW 1.1; its terms and access conditions need independent review before use or redistribution. Its [published research](https://arxiv.org/abs/2609.21967) evaluates native full-duplex and tool calling; those are not B60 or French results.
+
+The [client protocol](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/e790e463b2913cff9f989a3df224c587f14b4c5c/docs/s2s/clients.md) provides structured function-call events and `function_call_output` messages on the same WebSocket, and requires continued input or silence to advance inference. This is a closer integration reference than Haru's audio-only live `step`, but compatibility with this project's session, approval and cancellation semantics remains untested. The provided client can save audio, transcripts, calls and a conversation log; a local-first integration must explicitly control retention.
+
+In the pinned [pipeline source](https://github.com/NVIDIA/NeMo-Speech.cpp/blob/e790e463b2913cff9f989a3df224c587f14b4c5c/src/s2s/pipeline.cpp), `process_chunk` returns silence without adding incoming audio while `extracting_tool` or `injecting_response` is set. This is evidence of a possible listening gap during those specific phases, not proof of its duration, frequency, or behavior throughout an entire background task. The source also keeps a growing per-stream audio vector despite using only a recent window for perception; its lifetime and capacity need measurement and privacy review before integration. Token and step budgets also constrain the stream. No source was compiled or executed, no checkpoint downloaded, and no audio or GPU inference run.
+
+## Decision and next experiment
+
+The official implementation is worth retaining as a tool-protocol comparator, but it does not displace the French candidate or establish the requested Intel solution. The guide's 16 GB minimum is not an observed B60 footprint and must not be added to the current 11.5 GB system snapshot as though they were equivalent measurements. Before running a model, establish a supported or experimentally buildable Vulkan S2S path, inspect operator coverage and memory ownership, use an isolated guarded run with no model oversubscription, and evaluate tool-phase audio loss. A French-capable model and Unicode-preserving tool results still need evidence. None of the cited benchmarks establishes real-time performance or concurrent agent operation on this machine.
+
+A local tool inventory found CMake, Ninja and `g++` on PATH, but no `cl`, `glslc` or `glslangValidator` on PATH; the cloned llama.cpp submodule was not initialized. This is not a complete Windows toolchain search or proof that a build is impossible. No build was attempted, and the running services were left alone.

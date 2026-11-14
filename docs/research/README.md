@@ -75,3 +75,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-202](2026-11-14-haru-native-candidate.md) evaluates Haru-4B as an untested French full-duplex candidate and records its tool-use, Intel and memory uncertainties.
 
 [EXP-203](2026-11-14-voicechat-gguf-fork.md) reviews a community GGUF VoiceChat implementation, including its documented language and tool-call limitations.
+
+[EXP-204](2026-11-14-nemo-speech-official-voicechat.md) inspects NVIDIA's official VoiceChat runtime, its tool-result protocol, CUDA-focused guide, French limitations and source-level audio handling.
