@@ -132,6 +132,16 @@ $('stop-task').onclick = () => {
   send(JSON.stringify({ type: 'task.cancel', task_id: taskId }));
 };
 const pendingNotifications = [];
+let latestCompletedTask = null;
+$('replay-task').onclick = async () => {
+  const task = latestCompletedTask, socket = ws;
+  if (!task || socket.readyState !== WebSocket.OPEN) return;
+  try { playbackContext ??= new AudioContext(); await playbackContext.resume(); }
+  catch { status('Could not start audio playback.'); return; }
+  if (socket !== ws || socket.readyState !== WebSocket.OPEN || task !== latestCompletedTask) return;
+  if (!pendingNotifications.includes(task) && currentNotification !== task) pendingNotifications.push(task);
+  announceWhenIdle();
+};
 let notificationRetries = 0;
 let detectionThreshold = Number($('noise-threshold').value) / 100;
 let endSilenceFrames = Math.round(Number($('end-silence').value) * 50);
@@ -267,7 +277,7 @@ function handleSocketMessage({ data }) {
     log('Recent task history (past events; started does not confirm current status):');
     for (const item of event.events) {
       if (item.kind === 'task.started') log(`Previous task started: ${item.text}`);
-      else if (item.kind === 'task.completed') log(`Previous task completed: ${item.text}`);
+      else if (item.kind === 'task.completed') { log(`Previous task completed: ${item.text}`); if (typeof item.task_id === 'string' && item.task_id) { latestCompletedTask = item.task_id; $('replay-task').disabled = false; } }
       else if (item.kind === 'task.error') log(`Previous task error: ${item.text}`);
       else if (item.kind === 'task.uncertain') log(`Previous task status uncertain: ${item.text}`);
       else if (item.kind === 'task.status_restored') log(`Previous monitoring update: ${item.text}`);
@@ -279,7 +289,7 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
   else if (event.type === 'task.uncertain') { if (event.task_id) { activeTaskIds.add(event.task_id); cancellationRequested.delete(event.task_id); } refreshTaskButton(); log(`Agent task status uncertain: ${event.message}`); }
   else if (event.type === 'task.status_restored') log(event.message);
-  else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
+  else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); if (typeof event.task_id === 'string' && event.task_id) { latestCompletedTask = event.task_id; $('replay-task').disabled = false; pendingNotifications.push(event.task_id); announceWhenIdle(); } }
   else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
   else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; currentNotificationTurn = event.turn_id ?? null; notificationPending = false; responsePending = true; }
   else if (event.type === 'notification.rejected') {
@@ -315,6 +325,7 @@ function connectGateway() {
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; currentNotificationTurn = null; pendingNotifications.length = 0;
+    latestCompletedTask = null; $('replay-task').disabled = true;
     if (event?.code === 1008) { status('Connection rejected. Check session settings and reload.'); return; }
     const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempts++, 4), 15000);
     status(`Disconnected. Reconnecting in ${delay / 1000} seconds.`);
