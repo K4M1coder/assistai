@@ -1,0 +1,54 @@
+param([ValidateRange(10,180)][int]$TimeoutSeconds=90)
+$ErrorActionPreference='Stop'
+$root=Split-Path -Parent $PSScriptRoot
+$adapter='luid_0x00000000_0x00013269_phys_0'
+$shapes=@('1024x2560','2560x4096','4096x2560','8192x2560','2560x9216','9216x2560')
+function Sample {
+  $counters=@((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
+  $dedicated=@($counters | Where-Object Path -like '*\dedicated usage'); $shared=@($counters | Where-Object Path -like '*\shared usage')
+  if($dedicated.Count -ne 1 -or $shared.Count -ne 1){throw 'GPU telemetry unavailable or ambiguous'}
+  $busy=$false
+  foreach($port in @(18080,18084)){
+    $slots=@(Invoke-RestMethod "http://127.0.0.1:$port/slots" -TimeoutSec 3)
+    if($slots.Count -ne 1 -or $slots[0].is_processing -ne $false){$busy=$true}
+  }
+  return @{at=[DateTimeOffset]::UtcNow.ToString('o');dedicatedBytes=[long]$dedicated[0].CookedValue;
+    sharedBytes=[long]$shared[0].CookedValue;availableRamBytes=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024;modelBusy=$busy}
+}
+function Assert-Sample($sample,[long]$ram){
+  if($sample.modelBusy){throw 'Existing inference slot is busy or unavailable'}
+  if($sample.dedicatedBytes -gt 18GB){throw 'Dedicated GPU threshold exceeded'}
+  if($sample.sharedBytes -gt 256MB){throw 'Shared GPU threshold exceeded'}
+  if($sample.availableRamBytes -lt $ram){throw 'Available RAM threshold exceeded'}
+}
+$runtime=Join-Path $root '.cache/assistant'
+$stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
+$prefix=Join-Path $runtime "haru-int4-shapes-$stamp"
+$python=Join-Path $root '.cache/haru-xpu-env/Scripts/python.exe'
+if(!(Test-Path -LiteralPath $python)){throw 'Isolated XPU Python is unavailable'}
+$env:ASSISTAI_SHAPE_WATCHDOG='1'
+foreach($shape in $shapes){
+  $sample=Sample; Assert-Sample $sample 10GB
+  $sample | ConvertTo-Json -Compress | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
+  $process=Start-Process -FilePath $python -ArgumentList @('-u',(Join-Path $root 'scripts/probe-haru-int4-shape.py'),'--shape',$shape) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.$shape.stdout" -RedirectStandardError "$prefix.$shape.stderr" -PassThru
+  $null=$process.Handle; $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds); $reason='timeout'
+  try {
+    while([DateTime]::UtcNow -lt $deadline){
+      $process.Refresh(); if($process.HasExited){$reason=if($process.ExitCode -eq 0){'passed'}else{"exit $($process.ExitCode)"};break}
+      try {
+        $sample=Sample
+        $sample | ConvertTo-Json -Compress | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
+        Assert-Sample $sample 8GB
+      } catch { $reason=$_.Exception.Message; break }
+    }
+  } finally {
+    $process.Refresh()
+    if(!$process.HasExited){
+      # Windows venv Python can launch the base interpreter as a child.
+      & taskkill.exe /PID $process.Id /T /F | Out-Null
+      $process.WaitForExit()
+    }
+  }
+  @{shape=$shape;reason=$reason;stdout="$prefix.$shape.stdout";stderr="$prefix.$shape.stderr";samples="$prefix.samples.jsonl"}|ConvertTo-Json -Compress
+  if($reason -ne 'passed'){exit 1}
+}
