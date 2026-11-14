@@ -16,6 +16,19 @@ spoken_recall = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(spoken_recall)
 
 
+def ask_probe_approval(event):
+    if not sys.stdin.isatty() or not isinstance(event.get('approval_id'), str) or not isinstance(event.get('task'), str):
+        return False
+    def safe(value):
+        return ''.join(char if ord(char) >= 32 and not 127 <= ord(char) <= 159 else ' ' for char in str(value or 'Unavailable'))
+    print(f"\nOriginal request: {safe(event.get('original_request'))}\nProposed task: {safe(event['task'])}", file=sys.stderr, flush=True)
+    print('Approve only after checking the disposable workspace, filename, operation and scope.', file=sys.stderr, flush=True)
+    try:
+        return input('Approve this fixture task? [y/N] ').strip().lower() == 'y'
+    except (EOFError, OSError):
+        return False
+
+
 async def main():
     root = Path(__file__).resolve().parents[1]
     cache = (root / '.cache').resolve()
@@ -55,6 +68,11 @@ async def main():
                 continue
             event = json.loads(message); kind = event.get('type')
             elapsed = round((time.monotonic() - started) * 1000)
+            if kind == 'task.approval_requested':
+                approved = await asyncio.to_thread(ask_probe_approval, event)
+                await ws.send(json.dumps({'type': 'task.approval', 'approval_id': event.get('approval_id'), 'approved': approved}))
+                if not approved: raise RuntimeError('Task was declined or interactive approval was unavailable')
+                continue
             if kind in ('user.text', 'task.started', 'task.completed', 'assistant.text', 'error', 'task.error', 'task.rejected'):
                 trace = {'event': kind, 'elapsed_ms': elapsed, 'turn_id': event.get('turn_id')}
                 if kind == 'user.text': trace['synthetic_transcript'] = event.get('text', '')[:2000]

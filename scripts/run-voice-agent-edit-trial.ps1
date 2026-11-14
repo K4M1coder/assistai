@@ -5,7 +5,8 @@ param(
   [int]$TimeoutSeconds = 120,
   [switch]$PreflightOnly,
   [switch]$SpokenInput,
-  [switch]$Notification
+  [switch]$Notification,
+  [switch]$InteractiveApproval
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -78,12 +79,13 @@ try {
   if (!$healthy) { throw 'Gateway startup timeout' }
   $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL="ws://127.0.0.1:$GatewayPort/voice"
   $env:ASSISTAI_PROBE_NOTIFICATION=if($Notification){'1'}else{'0'}
-  if ($SpokenInput) {
-    $python = Join-Path $root '.venv-voice/Scripts/python.exe'
-    $probe = Start-Owned $python @((Join-Path $root 'scripts/probe-spoken-agent-edit.py')) $root 'probe'
-  } else {
-    $probe = Start-Owned $node @((Join-Path $root 'scripts/probe-voice-agent-edit.mjs')) $root 'probe'
-  }
+  $probeFile = if ($SpokenInput) { Join-Path $root '.venv-voice/Scripts/python.exe' } else { $node }
+  $probeScript = if ($SpokenInput) { Join-Path $root 'scripts/probe-spoken-agent-edit.py' } else { Join-Path $root 'scripts/probe-voice-agent-edit.mjs' }
+  if ($InteractiveApproval) {
+    # The probe shares this terminal so its operator can inspect and answer the proposal.
+    $probe = Start-Process -FilePath $probeFile -ArgumentList @($probeScript) -WorkingDirectory $root -NoNewWindow -PassThru
+    $null = $probe.Handle; $children.Add($probe)
+  } else { $probe = Start-Owned $probeFile @($probeScript) $root 'probe' }
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     $sample = Sample-Resources; Save-Sample $sample; Assert-Resources $sample 6GB
@@ -96,5 +98,5 @@ try {
 finally {
   foreach ($p in $children) { $p.Refresh(); if (!$p.HasExited) { Stop-Process -Id $p.Id -Force; $p.WaitForExit() } }
 }
-@{ reason=$reason; baseline=$initial; samples=$logPath; probe_stdout="$prefix.probe.stdout"; probe_stderr="$prefix.probe.stderr"; agent_stderr="$prefix.agent.stderr"; gateway_stderr="$prefix.gateway.stderr" } | ConvertTo-Json -Compress -Depth 4
+@{ reason=$reason; baseline=$initial; samples=$logPath; probe_stdout=if($InteractiveApproval){$null}else{"$prefix.probe.stdout"}; probe_stderr=if($InteractiveApproval){$null}else{"$prefix.probe.stderr"}; interactive_approval=[bool]$InteractiveApproval; agent_stderr="$prefix.agent.stderr"; gateway_stderr="$prefix.gateway.stderr" } | ConvertTo-Json -Compress -Depth 4
 if ($reason -ne 'probe passed') { exit 1 }
