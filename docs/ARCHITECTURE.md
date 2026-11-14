@@ -12,6 +12,8 @@ The browser detects when an audio chunk arrives more than 30 ms after the previo
 
 For a spoken task notification, the browser keeps the notification associated with the active playback until both the server's speech stream has ended and the queued audio sources have finished. If playback is interrupted before then, it puts the notification back in the pending queue. The Web Audio [`ended` event](https://developer.mozilla.org/en-US/docs/Web/API/AudioScheduledSourceNode/ended_event) also fires after a source is stopped, so callbacks for sources removed during interruption are ignored. A browser simulation covers interruption after `speech.end` while audio is still queued, and completion after the final source ends. This does not verify physical playback, audible delivery or persistence across a connection loss; reconnecting currently clears the pending queue.
 
+Cancellation events carrying a turn ID are ignored when they match neither the currently playing response nor the current notification, preventing a delayed cancellation from stopping newer playback. A notification interrupted before its first audio chunk is also requeued. The simulated client test covers both cases. Events without a turn ID retain the legacy unscoped behavior, and this does not establish correctness for every possible event ordering or a physical browser session.
+
 Consecutive chunks now start at the end of the existing playback queue while it remains ahead of the audio clock. A 40 ms lead is added at the beginning of a stream or following an underrun. The former unconditional lead could create a gap when less than 40 ms was queued; a mock-clock test verifies adjacency, while actual browser playback still needs listening validation.
 
 ```mermaid

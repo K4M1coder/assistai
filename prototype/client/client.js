@@ -108,7 +108,7 @@ function finishAudio() {
   send(JSON.stringify(image ? { type: 'audio.end', image } : { type: 'audio.end' }));
 }
 let pushToTalkActive = false;
-let responsePending = false, notificationPending = false, currentNotification = null;
+let responsePending = false, notificationPending = false, currentNotification = null, currentNotificationTurn = null;
 let taskCancelAvailable = false;
 let pendingApproval = null;
 function clearApproval() {
@@ -185,10 +185,11 @@ function stopPlayback() {
 function deferCurrentNotification() {
   if (currentNotification) pendingNotifications.unshift(currentNotification);
   currentNotification = null;
+  currentNotificationTurn = null;
 }
 function interrupt(reason = 'manual') {
   const wasPlaying = speechOpen || playbackSources.size > 0;
-  if (wasPlaying) deferCurrentNotification();
+  deferCurrentNotification();
   stopPlayback();
   responsePending = false;
   if (reason === 'voice_activity' && wasPlaying) log('Playback interrupted: microphone detected speech.');
@@ -219,7 +220,7 @@ function play(data, rate) {
   source.start(playbackTime); playbackTime += buffer.duration;
   playbackSources.add(source); source.onended = () => {
     if (!playbackSources.delete(source)) return;
-    if (!speechOpen && !playbackSources.size) currentNotification = null;
+    if (!speechOpen && !playbackSources.size) { currentNotification = null; currentNotificationTurn = null; }
     announceWhenIdle();
   };
 }
@@ -280,7 +281,7 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'task.status_restored') log(event.message);
   else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); pendingNotifications.push(event.task_id); announceWhenIdle(); }
   else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
-  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; notificationPending = false; responsePending = true; }
+  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; currentNotificationTurn = event.turn_id ?? null; notificationPending = false; responsePending = true; }
   else if (event.type === 'notification.rejected') {
     if (!notificationPending || pendingNotifications[0] !== event.task_id) return;
     notificationPending = false;
@@ -295,8 +296,11 @@ function handleSocketMessage({ data }) {
   }
   else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) currentNotification = null; responsePending = false; announceWhenIdle(); }
-  else if (event.type === 'speech.cancelled') { deferCurrentNotification(); stopPlayback(); }
+  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) { currentNotification = null; currentNotificationTurn = null; } responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'speech.cancelled') {
+    if (event.turn_id && event.turn_id !== activeSpeechTurn && event.turn_id !== currentNotificationTurn) return;
+    deferCurrentNotification(); stopPlayback();
+  }
 }
 function connectGateway() {
   const socket = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);
@@ -310,7 +314,7 @@ function connectGateway() {
     asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); clearApproval(); $('approval-safety').textContent = 'Disconnected; task approval protection is unavailable.'; refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
-    responsePending = false; notificationPending = false; currentNotification = null; pendingNotifications.length = 0;
+    responsePending = false; notificationPending = false; currentNotification = null; currentNotificationTurn = null; pendingNotifications.length = 0;
     if (event?.code === 1008) { status('Connection rejected. Check session settings and reload.'); return; }
     const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempts++, 4), 15000);
     status(`Disconnected. Reconnecting in ${delay / 1000} seconds.`);

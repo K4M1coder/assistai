@@ -118,6 +118,14 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext("currentNotification = 'next-notification'", context);
   stoppedSource.onended();
   assert.equal(vm.runInContext('currentNotification', context), 'next-notification');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.started',task_id:'new-task',turn_id:'new-turn'})}); ws.onmessage({data: JSON.stringify({type:'speech.start',turn_id:'new-turn',sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.cancelled',turn_id:'notification-turn'})})", context);
+  assert.equal(vm.runInContext('currentNotification', context), 'new-task');
+  assert.equal(vm.runInContext('speechOpen', context), true);
+  assert.equal(vm.runInContext('playbackSources.size', context), 1);
+  vm.runInContext('stopPlayback()', context);
+  vm.runInContext("pendingNotifications.length = 0; ws.onmessage({data: JSON.stringify({type:'notification.started',task_id:'waiting-task',turn_id:'waiting-turn'})})", context);
+  elements.interrupt.onclick();
+  assert.deepEqual(Array.from(vm.runInContext('pendingNotifications', context)), ['waiting-task']);
   vm.runInContext("pendingNotifications.length = 0; currentNotification = 'completed'; ws.onmessage({data: JSON.stringify({type:'speech.start', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end'})}); [...playbackSources][0].onended()", context);
   assert.equal(vm.runInContext('currentNotification', context), null);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
