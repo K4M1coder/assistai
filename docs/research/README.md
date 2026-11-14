@@ -77,3 +77,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-203](2026-11-14-voicechat-gguf-fork.md) reviews a community GGUF VoiceChat implementation, including its documented language and tool-call limitations.
 
 [EXP-204](2026-11-14-nemo-speech-official-voicechat.md) inspects NVIDIA's official VoiceChat runtime, its tool-result protocol, CUDA-focused guide, French limitations and source-level audio handling.
+
+[EXP-205](2026-11-14-gradium-phonon-tts.md) evaluates a small local French TTS comparator, its access conditions and the installed Windows CPU runtime; no French model has been tested.
