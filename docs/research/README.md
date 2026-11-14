@@ -73,3 +73,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [EXP-201](2026-11-14-service-url-redaction.md) checks redaction of credentials embedded in service-discovery addresses.
 
 [EXP-202](2026-11-14-haru-native-candidate.md) evaluates Haru-4B as an untested French full-duplex candidate and records its tool-use, Intel and memory uncertainties.
+
+[EXP-203](2026-11-14-voicechat-gguf-fork.md) reviews a community GGUF VoiceChat implementation, including its documented language and tool-call limitations.
