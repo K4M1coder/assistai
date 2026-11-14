@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 . (Join-Path $PSScriptRoot 'get-probe-gpu-memory.ps1')
+. (Join-Path $PSScriptRoot 'haru-shape-guard.ps1')
 $shapes=@('1024x2560','2560x4096','4096x2560','8192x2560','2560x9216','9216x2560')
 if($SmokeOnly -or $ImportOnly){$shapes=@('32x2560')}
 function Sample([int]$probeProcessId=0) {
@@ -18,12 +19,6 @@ function Sample([int]$probeProcessId=0) {
   return @{at=[DateTimeOffset]::UtcNow.ToString('o');dedicatedBytes=[long]$dedicated[0].CookedValue;
     sharedBytes=[long]$shared[0].CookedValue;availableRamBytes=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024;modelBusy=$busy;probeGpu=$probe}
 }
-function Assert-Sample($sample,[long]$ram){
-  if($sample.modelBusy){throw 'Existing inference slot is busy or unavailable'}
-  if($sample.dedicatedBytes -gt 18GB){throw 'Dedicated GPU threshold exceeded'}
-  if($sample.sharedBytes -gt 256MB){throw 'Shared GPU threshold exceeded'}
-  if($sample.availableRamBytes -lt $ram){throw 'Available RAM threshold exceeded'}
-}
 $runtime=Join-Path $root '.cache/assistant'
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $runtime "haru-int4-shapes-$stamp"
@@ -31,7 +26,9 @@ $python=Join-Path $root '.cache/haru-xpu-env/Scripts/python.exe'
 if(!(Test-Path -LiteralPath $python)){throw 'Isolated XPU Python is unavailable'}
 $env:ASSISTAI_SHAPE_WATCHDOG='1'
 foreach($shape in $shapes){
-  $sample=Sample; Assert-Sample $sample 10GB
+  $sample=Sample
+  $extraShared=if($ImportOnly){0}else{96MB}
+  Assert-HaruShapeSample $sample 10GB $extraShared
   $sample | ConvertTo-Json -Compress | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
   $arguments=@('-u',(Join-Path $root 'scripts/probe-haru-int4-shape.py'),'--shape',$shape)
   if($ImportOnly){$arguments+=@('--import-only')}
@@ -44,7 +41,7 @@ foreach($shape in $shapes){
       try {
         $sample=Sample $process.Id
         $sample | ConvertTo-Json -Compress -Depth 5 | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
-        Assert-Sample $sample 8GB
+        Assert-HaruShapeSample $sample 8GB
       } catch { $reason=$_.Exception.Message; break }
     }
   } finally {
