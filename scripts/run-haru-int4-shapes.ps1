@@ -1,8 +1,9 @@
-param([ValidateRange(10,180)][int]$TimeoutSeconds=90)
+param([ValidateRange(10,180)][int]$TimeoutSeconds=90, [switch]$SmokeOnly)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 $shapes=@('1024x2560','2560x4096','4096x2560','8192x2560','2560x9216','9216x2560')
+if($SmokeOnly){$shapes=@('32x2560')}
 function Sample {
   $counters=@((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
   $dedicated=@($counters | Where-Object Path -like '*\dedicated usage'); $shared=@($counters | Where-Object Path -like '*\shared usage')
@@ -45,7 +46,7 @@ foreach($shape in $shapes){
     $process.Refresh()
     if(!$process.HasExited){
       # Windows venv Python can launch the base interpreter as a child.
-      & taskkill.exe /PID $process.Id /T /F | Out-Null
+      & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null
       $process.WaitForExit()
     }
   }
