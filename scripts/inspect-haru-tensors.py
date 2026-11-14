@@ -27,6 +27,8 @@ def main():
         model = HaruModel(config)
     metadata = get_safetensors_metadata(REPOSITORY, revision=REVISION, timeout=30)
     tensors = metadata.files_metadata['model.safetensors'].tensors
+    model_keys = set(model.state_dict())
+    checkpoint_keys = set(tensors)
     targets = {}
     for name, module in model.lm.named_modules():
         if isinstance(module, torch.nn.Linear) and module.in_features % 32 == 0:
@@ -40,7 +42,11 @@ def main():
     count = sum(t.parameter_count for t in targets.values())
     total = sum(t.parameter_count for t in tensors.values())
     groups = sum(t.parameter_count // 32 for t in targets.values())
+    largest_key, largest_tensor = max(tensors.items(), key=lambda item: item[1].parameter_count)
     print(json.dumps({'revision': REVISION, 'tensor_count':len(tensors), 'total_bf16_parameter_bytes':total * 2,
+                      'model_keys_missing_from_checkpoint':sorted(model_keys - checkpoint_keys),
+                      'checkpoint_keys_missing_from_model':sorted(checkpoint_keys - model_keys),
+                      'largest_tensor':largest_key, 'largest_bf16_tensor_bytes':largest_tensor.parameter_count * 2,
                       'eligible_linear_tensors':len(targets), 'eligible_parameters':count,
                       'remaining_bf16_parameter_bytes':(total - count) * 2,
                       'ideal_int4_data_bytes':(count + 1) // 2,
