@@ -1,10 +1,10 @@
-param([ValidateRange(10,180)][int]$TimeoutSeconds=90, [switch]$SmokeOnly)
+param([ValidateRange(10,180)][int]$TimeoutSeconds=90, [switch]$SmokeOnly, [switch]$ImportOnly)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 . (Join-Path $PSScriptRoot 'get-probe-gpu-memory.ps1')
 $shapes=@('1024x2560','2560x4096','4096x2560','8192x2560','2560x9216','9216x2560')
-if($SmokeOnly){$shapes=@('32x2560')}
+if($SmokeOnly -or $ImportOnly){$shapes=@('32x2560')}
 function Sample([int]$probeProcessId=0) {
   $counters=@((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
   $dedicated=@($counters | Where-Object Path -like '*\dedicated usage'); $shared=@($counters | Where-Object Path -like '*\shared usage')
@@ -33,7 +33,10 @@ $env:ASSISTAI_SHAPE_WATCHDOG='1'
 foreach($shape in $shapes){
   $sample=Sample; Assert-Sample $sample 10GB
   $sample | ConvertTo-Json -Compress | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
-  $process=Start-Process -FilePath $python -ArgumentList @('-u',(Join-Path $root 'scripts/probe-haru-int4-shape.py'),'--shape',$shape) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.$shape.stdout" -RedirectStandardError "$prefix.$shape.stderr" -PassThru
+  $arguments=@('-u',(Join-Path $root 'scripts/probe-haru-int4-shape.py'),'--shape',$shape)
+  if($ImportOnly){$arguments+=@('--import-only')}
+  elseif($SmokeOnly){$arguments+=@('--hold-after','5')}
+  $process=Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.$shape.stdout" -RedirectStandardError "$prefix.$shape.stderr" -PassThru
   $null=$process.Handle; $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds); $reason='timeout'
   try {
     while([DateTime]::UtcNow -lt $deadline){

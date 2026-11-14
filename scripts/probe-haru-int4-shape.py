@@ -5,6 +5,7 @@ No checkpoint, speech or model is loaded. Larger shapes require the watchdog.
 import argparse
 import json
 import os
+import time
 import torch
 from torchao.quantization import Int4WeightOnlyConfig, quantize_
 
@@ -14,7 +15,13 @@ def main():
               (4096,2560), (8192,2560), (9216,2560)}
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--shape', default='32x2560')
+    parser.add_argument('--import-only', action='store_true', help='Hold after imports without initializing XPU')
+    parser.add_argument('--hold-after', type=int, choices=(0,5), default=0, help='Hold the synthetic result briefly for process accounting')
     args = parser.parse_args()
+    if args.import_only:
+        print(json.dumps({'phase':'imports complete', 'note':'No XPU initialization or tensor allocation requested.'}), flush=True)
+        time.sleep(4)
+        return
     try: shape = tuple(int(value) for value in args.shape.split('x'))
     except ValueError as error: raise ValueError('Invalid shape') from error
     if shape not in shapes: raise ValueError('Shape is not in the pinned checkpoint')
@@ -43,7 +50,9 @@ def main():
                   'torch_peak_allocated_bytes':torch.xpu.max_memory_allocated(),
                   'torch_peak_reserved_bytes':torch.xpu.max_memory_reserved(),
                   'note':'One synthetic linear layer only; not quality, performance, KV-cache or system peak evidence.'}
-    print(json.dumps(result))
+    print(json.dumps(result), flush=True)
+    if args.hold_after:
+        time.sleep(args.hold_after)
 
 
 if __name__ == '__main__':
