@@ -2,9 +2,10 @@ param([ValidateRange(10,180)][int]$TimeoutSeconds=90, [switch]$SmokeOnly)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
+. (Join-Path $PSScriptRoot 'get-probe-gpu-memory.ps1')
 $shapes=@('1024x2560','2560x4096','4096x2560','8192x2560','2560x9216','9216x2560')
 if($SmokeOnly){$shapes=@('32x2560')}
-function Sample {
+function Sample([int]$probeProcessId=0) {
   $counters=@((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage", "\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
   $dedicated=@($counters | Where-Object Path -like '*\dedicated usage'); $shared=@($counters | Where-Object Path -like '*\shared usage')
   if($dedicated.Count -ne 1 -or $shared.Count -ne 1){throw 'GPU telemetry unavailable or ambiguous'}
@@ -13,8 +14,9 @@ function Sample {
     $slots=@(Invoke-RestMethod "http://127.0.0.1:$port/slots" -TimeoutSec 3)
     if($slots.Count -ne 1 -or $slots[0].is_processing -ne $false){$busy=$true}
   }
+  $probe=if($probeProcessId -gt 0){Get-ProbeGpuMemory $probeProcessId $adapter}else{$null}
   return @{at=[DateTimeOffset]::UtcNow.ToString('o');dedicatedBytes=[long]$dedicated[0].CookedValue;
-    sharedBytes=[long]$shared[0].CookedValue;availableRamBytes=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024;modelBusy=$busy}
+    sharedBytes=[long]$shared[0].CookedValue;availableRamBytes=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024;modelBusy=$busy;probeGpu=$probe}
 }
 function Assert-Sample($sample,[long]$ram){
   if($sample.modelBusy){throw 'Existing inference slot is busy or unavailable'}
@@ -37,8 +39,8 @@ foreach($shape in $shapes){
     while([DateTime]::UtcNow -lt $deadline){
       $process.Refresh(); if($process.HasExited){$reason=if($process.ExitCode -eq 0){'passed'}else{"exit $($process.ExitCode)"};break}
       try {
-        $sample=Sample
-        $sample | ConvertTo-Json -Compress | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
+        $sample=Sample $process.Id
+        $sample | ConvertTo-Json -Compress -Depth 5 | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
         Assert-Sample $sample 8GB
       } catch { $reason=$_.Exception.Message; break }
     }
