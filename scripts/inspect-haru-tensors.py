@@ -3,6 +3,7 @@
 This does not download checkpoint weights, load a GPU model, or predict peak memory.
 """
 import json
+from collections import Counter
 import sys
 import urllib.request
 from pathlib import Path
@@ -43,11 +44,13 @@ def main():
     total = sum(t.parameter_count for t in tensors.values())
     groups = sum(t.parameter_count // 32 for t in targets.values())
     largest_key, largest_tensor = max(tensors.items(), key=lambda item: item[1].parameter_count)
+    shapes = Counter(tuple(t.shape) for t in targets.values())
     print(json.dumps({'revision': REVISION, 'tensor_count':len(tensors), 'total_bf16_parameter_bytes':total * 2,
                       'model_keys_missing_from_checkpoint':sorted(model_keys - checkpoint_keys),
                       'checkpoint_keys_missing_from_model':sorted(checkpoint_keys - model_keys),
                       'largest_tensor':largest_key, 'largest_bf16_tensor_bytes':largest_tensor.parameter_count * 2,
                       'eligible_linear_tensors':len(targets), 'eligible_parameters':count,
+                      'eligible_shapes':[{'out':shape[0], 'in':shape[1], 'count':frequency} for shape, frequency in sorted(shapes.items())],
                       'remaining_bf16_parameter_bytes':(total - count) * 2,
                       'ideal_int4_data_bytes':(count + 1) // 2,
                       'ideal_group_metadata_bytes_assuming_bf16_scale_int8_zero':groups * 3,
