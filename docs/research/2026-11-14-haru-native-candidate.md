@@ -98,6 +98,12 @@ The guard returned failure because its last sample reported 280,215,552 bytes wh
 
 The preflight now reserves 96 MiB of additional shared-memory headroom for an XPU operation, based on the approximately 75 MiB process usage observed in the held small test plus a margin. This is a conservative estimate from one run, not an enforced reservation or an upper bound; import-only controls do not request the extra headroom. A mocked Windows test checks that a 204 MiB baseline is rejected before an XPU process starts, while a 137 MiB baseline can pass this particular check. On the live system the updated `-SmokeOnly` preflight rejected the current baseline and no matching probe Python process remained. Runtime checks still use the absolute 256 MiB threshold and sampling can miss transient changes.
 
+## All distinct INT4 linear shapes with synthetic weights
+
+On a later lower baseline, the guarded runner completed the six remaining distinct shapes in separate processes. Each used random BF16 weights, group-32 `plain_int32` quantization and one synthetic input. Each returned finite output. The maximum observed absolute difference from the BF16 output across these six shapes ranged from 0.118 to 0.154; these values are not evaluated against a model-quality threshold. The largest PyTorch-reported process peak was 243,540,992 bytes allocated and 262,144,000 bytes reserved. The 32×2,560 shape had been tested separately above.
+
+Across 24 whole-system samples in this run, maximum dedicated GPU usage was 11,918,397,440 bytes, maximum shared GPU usage 215,859,200 bytes and minimum available RAM 12,593,029,120 bytes. The runner reported all six cases passed its sampled thresholds, but it did not observe any per-process GPU counter in these short runs. These are isolated layer operations, not the combined model; sampling can miss transients and cannot establish no spill. Full-checkpoint loading, nonlinear audio operations at model scale, long contexts, trained-model accuracy, concurrent task workload and real-time latency remain unverified. Logs remain under `.cache/assistant/haru-int4-shapes-20261114-215821-127.*`.
+
 ## Tied embedding quantization check
 
 Haru uses the same token-embedding weight for lookup, a full-vocabulary matrix multiplication, and an indexed FP32 calculation for two stream tokens. The full checkpoint's BF16 embedding is 1,271,398,400 bytes. Naively replacing it requires preserving all three operations; it cannot be treated as an ordinary independently quantized linear layer.
