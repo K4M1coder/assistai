@@ -67,7 +67,7 @@ From the repository root, start `python -m uvicorn prototype.asr_server:app --ho
 
 On this Windows machine, `scripts/start-windows-speech.ps1` starts the cached French Pocket TTS and Vosk services on ports 18081 and 18082 in offline mode, and `scripts/stop-windows-speech.ps1` stops the processes recorded by that launcher after checking their identities. Both ports and the ownership record must be free before starting. This controls only the speech services, not the language models, agent harness or gateway. A real start/stop/restart and synthetic TTS-to-ASR check are recorded in the [resumption notes](../docs/research/2026-11-15-resumption.md); real-room speech remains unverified.
 
-With the documented local model files and read-only fixture already installed, the Windows cascade can be started from the repository root in order:
+With the documented local model files and read-only fixture already installed, the Windows cascade can be started from the repository root in order. If `.cache/opencode-probe` does not exist, create the disposable read-only fixture first with `.\.venv-voice\Scripts\python.exe scripts\setup_opencode_readonly.py`; the setup refuses to overwrite an existing directory. Its application-level permissions are not an OS sandbox.
 
 ```powershell
 .\scripts\start-windows-speech.ps1
