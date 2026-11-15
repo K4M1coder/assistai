@@ -8,8 +8,8 @@ import numpy as np
 
 
 PROMPTS = (
-    'Bonjour, comment puis-je vous aider aujourd’hui ?',
-    'La tâche en arrière-plan est terminée. Le résultat est affiché.',
+    'Bonjour, je suis votre assistant vocal local.',
+    'La tâche en arrière-plan est terminée. Le fichier a été corrigé et le résultat est disponible dans la conversation.',
 )
 
 
