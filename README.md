@@ -8,7 +8,7 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 ## Current local voice prototype
 
-The updated experimental client is currently available on this machine at [http://127.0.0.1:18093/](http://127.0.0.1:18093/) while its local services are running. The demo uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names.
+The experimental client uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names. On the latest resumption, the gateway at [http://127.0.0.1:18096/](http://127.0.0.1:18096/) was running and its two CPU speech services were restored, but both model servers and OpenCode were unavailable. See the [resumption record](docs/research/2026-11-15-resumption.md) for the observed state and demonstration criteria; gateway health alone does not mean the assistant is ready.
 
 On the latest resumption preflight, service health checks passed but system resource readings exceeded the existing trial guard. Physical French conversation and audible playback were not tested in that preflight. Existing gateway processes may run older source. See [EXP-180](docs/research/2026-11-13-resumption-preflight.md) before starting a new trial or interpreting health as end-to-end readiness.
 

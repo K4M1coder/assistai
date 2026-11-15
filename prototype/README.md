@@ -65,6 +65,8 @@ Create a Python 3.11 or 3.12 environment, install the pinned direct dependencies
 
 From the repository root, start `python -m uvicorn prototype.asr_server:app --host 127.0.0.1 --port 18082`. `GET /health` reports readiness. The `/asr` WebSocket accepts binary mono 16 kHz little-endian PCM16 frames of at most one second. It emits JSON `partial` and `segment` events while audio arrives. Send `{"type":"end"}` to receive a `final` event and reset the recognizer, or `{"type":"reset"}` to discard the current utterance. Clients must collect `segment` events as well as the final text for longer utterances.
 
+On this Windows machine, `scripts/start-windows-speech.ps1` starts the cached French Pocket TTS and Vosk services on ports 18081 and 18082 in offline mode, and `scripts/stop-windows-speech.ps1` stops the processes recorded by that launcher after checking their identities. Both ports and the ownership record must be free before starting. This controls only the speech services, not the language models, agent harness or gateway. A real start/stop/restart and synthetic TTS-to-ASR check are recorded in the [resumption notes](../docs/research/2026-11-15-resumption.md); real-room speech remains unverified.
+
 `python scripts/test-asr-sidecar.py path/to/mono.wav` resamples a 16-bit mono WAV and replays it at real-time speed. With no argument, it expects `.cache/french-test.wav`, produced by the Pocket TTS experiment. This is an integration probe, not a benchmark of real microphones, accents, noise, or word error rate.
 
 ## Limitations
