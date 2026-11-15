@@ -67,6 +67,18 @@ From the repository root, start `python -m uvicorn prototype.asr_server:app --ho
 
 On this Windows machine, `scripts/start-windows-speech.ps1` starts the cached French Pocket TTS and Vosk services on ports 18081 and 18082 in offline mode, and `scripts/stop-windows-speech.ps1` stops the processes recorded by that launcher after checking their identities. Both ports and the ownership record must be free before starting. This controls only the speech services, not the language models, agent harness or gateway. A real start/stop/restart and synthetic TTS-to-ASR check are recorded in the [resumption notes](../docs/research/2026-11-15-resumption.md); real-room speech remains unverified.
 
+With the documented local model files and read-only fixture already installed, the Windows cascade can be started from the repository root in order:
+
+```powershell
+.\scripts\start-windows-speech.ps1
+.\scripts\start-windows-controller.ps1
+.\scripts\start-windows-controller.ps1 -Agent
+.\scripts\start-windows-harness.ps1
+.\scripts\start-windows-demo.ps1 -Port 18097
+```
+
+Visit `http://127.0.0.1:18097/` and check its service and resource status. Stop the gateway with `scripts/stop-windows-demo.ps1 -Port 18097`, then `scripts/stop-windows-harness.ps1`, `scripts/stop-windows-controller.ps1 -Agent`, `scripts/stop-windows-controller.ps1`, and `scripts/stop-windows-speech.ps1`. These scripts refuse occupied ports or existing ownership records instead of replacing processes. Controller startup samples resource thresholds, but no continuous hardware limit is enforced after startup; retained history in this gateway is volatile. The harness fixture is application-level read-only, not an OS sandbox. Physical French conversation, approved task completion and the strict memory requirement remain unverified.
+
 `python scripts/test-asr-sidecar.py path/to/mono.wav` resamples a 16-bit mono WAV and replays it at real-time speed. With no argument, it expects `.cache/french-test.wav`, produced by the Pocket TTS experiment. This is an integration probe, not a benchmark of real microphones, accents, noise, or word error rate.
 
 ## Limitations

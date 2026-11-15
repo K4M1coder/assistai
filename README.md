@@ -8,11 +8,11 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 ## Current local voice prototype
 
-The experimental client uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names. On the latest resumption, the gateway at [http://127.0.0.1:18096/](http://127.0.0.1:18096/) was running and its two CPU speech services were restored, but both model servers and OpenCode were unavailable. See the [resumption record](docs/research/2026-11-15-resumption.md) for the observed state and demonstration criteria; gateway health alone does not mean the assistant is ready.
+The experimental client uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a read-only research fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names. On the latest resumption, the gateway at [http://127.0.0.1:18097/](http://127.0.0.1:18097/) and its configured services reported available. See the [resumption record](docs/research/2026-11-15-resumption.md) for reproducible startup, observed results and demonstration criteria; service readiness alone does not establish a successful voice or agent session.
 
 On the latest resumption preflight, service health checks passed but system resource readings exceeded the existing trial guard. Physical French conversation and audible playback were not tested in that preflight. Existing gateway processes may run older source. See [EXP-180](docs/research/2026-11-13-resumption-preflight.md) before starting a new trial or interpreting health as end-to-end readiness.
 
-After memory was freed, a current-source gateway was started on [http://127.0.0.1:18094/](http://127.0.0.1:18094/) with volatile history and existing local services. Its startup and the physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md).
+An earlier gateway was started on port 18094 with volatile history and existing local services. Its startup and physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md). That gateway has since been stopped.
 
 In a subsequent physical trial, the operator reported a correct or corrected French transcript and an audible, relevant French response. Manual interruption initially failed by report but stopped speech on a repeat; the first failure is unexplained. An isolated refused ASR connection produced an explicit error and disconnect. These observations are limited; see [EXP-183](docs/research/2026-11-14-physical-and-asr-failure.md).
 
@@ -20,7 +20,7 @@ A guarded synthetic spoken coding trial changed the disposable fixture and gener
 
 The corrected measurement was verified in a second real-model synthetic trial, which again delegated incorrect identifiers despite editing the fixture. See [EXP-185](docs/research/2026-11-14-spoken-coding-repeat.md).
 
-The current-source gateway on [http://127.0.0.1:18095/](http://127.0.0.1:18095/) requires explicit approval before agent submission. Compare the original request and proposed task before approving; approval does not sandbox the agent. The older port 18094 gateway does not enforce approval. The approval flow has mock coverage and a real-controller decline test, but human-approved real-agent completion remains unverified. See [EXP-186](docs/research/2026-11-14-task-approval.md).
+The current-source gateway requires explicit approval before agent submission. Compare the original request and proposed task before approving; approval does not sandbox the agent. The approval flow has mock coverage and a real-controller decline test, but human-approved real-agent completion remains unverified. See [EXP-186](docs/research/2026-11-14-task-approval.md).
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
