@@ -33,6 +33,9 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.equal(elements['approval-original'].textContent, 'original request');
   assert.equal(elements['approval-task'].textContent, 'proposed task');
   assert.equal(elements['task-approval'].hidden, false);
+  assert.match(elements.status.textContent, /click Approve task or Decline task/);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.approval_rejected',message:'stale approval'})})", context);
+  assert.equal(elements['task-approval'].hidden, false, 'an unrelated rejection must not hide a pending approval');
   elements['approve-task'].onclick();
   assert.deepEqual(JSON.parse(sent.at(-1)), {type:'task.approval',approval_id:'approval-1',approved:true});
   assert.equal(elements['task-approval'].hidden, true);

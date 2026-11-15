@@ -395,7 +395,7 @@ wss.on('connection', (client, req) => {
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
         if (active !== turn) return;
-        message = approvalRequested ? { content: 'La t\u00e2che attend votre confirmation et n\u2019a pas encore \u00e9t\u00e9 lanc\u00e9e.' } : await complete(false);
+        message = approvalRequested ? { content: 'La t\u00e2che n\u2019a pas encore commenc\u00e9. V\u00e9rifiez la demande affich\u00e9e, puis cliquez sur Approve task pour l\u2019autoriser, ou sur Decline task pour la refuser. La confirmation vocale ne suffit pas.' } : await complete(false);
       }
       const answer = visibleAnswer(message?.content);
       if (!answer) throw new Error('LLM returned no spoken text');

@@ -267,10 +267,10 @@ function handleSocketMessage({ data }) {
     $('approval-original').textContent = event.original_request ?? 'Unavailable in native speech mode.';
     $('approval-task').textContent = event.task;
     $('task-approval').hidden = false;
-    status('Agent task requires your approval; it has not started.');
+    status('Review the task and click Approve task or Decline task. Spoken confirmation does not approve it.');
   }
   else if (event.type === 'task.approval_submitted' || event.type === 'task.approval_declined' || event.type === 'task.approval_expired' || event.type === 'task.approval_rejected' || event.type === 'task.approval_result') {
-    if (!event.approval_id || event.approval_id === pendingApproval) clearApproval();
+    if (event.approval_id === pendingApproval) clearApproval();
     status(event.message ?? (event.type === 'task.approval_submitted' ? 'Approval received; submitting the task.' : 'Task was not approved or approval expired.'));
   }
   else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
