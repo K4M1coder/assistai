@@ -1,5 +1,6 @@
 param(
   [Parameter(Mandatory=$true)][ValidateSet(0,32)][int]$Checkpoints,
+  [switch]$DisableHostVisible,
   [int]$TimeoutSeconds = 180
 )
 $ErrorActionPreference = 'Stop'
@@ -23,13 +24,19 @@ function Sample-Resources($process) {
 $baseline=Sample-Resources $null
 if($baseline.availableRamBytes -lt 10GB -or $baseline.dedicatedBytes -gt 10GB -or $baseline.sharedBytes -gt 256MB){throw 'Insufficient preflight headroom'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
-$prefix=Join-Path $root ".cache/gemma-checkpoints-$Checkpoints-$stamp"
+$prefix=Join-Path $root ".cache/gemma-checkpoints-$Checkpoints-hostvisible-$([int][bool]$DisableHostVisible)-$stamp"
 $env:GGML_VK_DISABLE_COOPMAT='1'
 Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
 $argsList=@('-m',$model,'--mmproj',$projector,'--host','127.0.0.1','--port','18093','-c','8192','-ngl','99','-np','1','-b','512','-ub','256','-fa','on','-ctk','q8_0','-ctv','q8_0','--load-mode','none','--no-host','--cache-ram','0','--ctx-checkpoints',"$Checkpoints")
 $server=$null; $probe=$null; $reason='not started'
 try {
-  $server=Start-Process -FilePath $engine -ArgumentList $argsList -WindowStyle Hidden -RedirectStandardOutput "$prefix.server.stdout" -RedirectStandardError "$prefix.server.stderr" -PassThru
+  $oldHostVisible=[Environment]::GetEnvironmentVariable('GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM','Process')
+  try {
+    if($DisableHostVisible){$env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM='1'}else{Remove-Item Env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM -ErrorAction SilentlyContinue}
+    $server=Start-Process -FilePath $engine -ArgumentList $argsList -WindowStyle Hidden -RedirectStandardOutput "$prefix.server.stdout" -RedirectStandardError "$prefix.server.stderr" -PassThru
+  } finally {
+    if($null -eq $oldHostVisible){Remove-Item Env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM -ErrorAction SilentlyContinue}else{$env:GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM=$oldHostVisible}
+  }
   $null=$server.Handle
   $deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   while([DateTime]::UtcNow -lt $deadline){
@@ -56,5 +63,5 @@ try {
 finally {
   foreach($p in @($probe,$server)){if($null -ne $p){$p.Refresh();if(!$p.HasExited){Stop-Process -Id $p.Id -Force;$p.WaitForExit()}}}
 }
-@{ reason=$reason; checkpoints=$Checkpoints; baseline=$baseline; samples="$prefix.samples.jsonl"; serverStderr="$prefix.server.stderr"; probeStdout="$prefix.probe.stdout" } | ConvertTo-Json -Compress -Depth 5
+@{ reason=$reason; checkpoints=$Checkpoints; disableHostVisible=[bool]$DisableHostVisible; baseline=$baseline; samples="$prefix.samples.jsonl"; serverStderr="$prefix.server.stderr"; probeStdout="$prefix.probe.stdout" } | ConvertTo-Json -Compress -Depth 5
 if($reason -ne 'tool-call probe passed'){exit 1}
