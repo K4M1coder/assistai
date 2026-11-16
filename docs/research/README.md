@@ -85,3 +85,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Approval visibility 2026-11-15](2026-11-15-approval-visibility.md) records the user report, visible-button changes, explicit spoken instructions and remaining browser verification.
 
 [Shared GPU admission 2026-11-16](2026-11-16-shared-gpu-admission.md) records a real rejection, per-process allocation snapshots, a guarded restart and the remaining no-spill uncertainty.
+
+[Spoken filename routing 2026-11-16](2026-11-16-spoken-filename-routing.md) records a user-reported filename recognition failure and a local comparison that rejected a prompt change because it introduced guessed extensions.
