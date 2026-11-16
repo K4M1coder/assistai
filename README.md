@@ -48,6 +48,8 @@ An optional sampled resource check can reject new background tasks when measured
 
 An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option can request cancellation of a running agent task after consecutive low-resource samples. It is reactive, cannot guarantee cancellation or prevent memory overshoot, and has only been exercised with simulated resources and harness responses.
 
+LFM3-Omni-2B is an additional native audio-and-vision research candidate. Its local Q4 weights and F16 projector match the publisher's hashes, but a guarded loading trial was refused at preflight and no capability has been demonstrated locally. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).
+
 Historical scripts that submit directly to OpenCode now require attended approval; they bypass the gateway's admission policy and are not sandboxed. See the [direct-probe notes](docs/research/2026-11-17-direct-probes.md) before using them.
 
 New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.

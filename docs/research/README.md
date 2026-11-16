@@ -95,3 +95,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Reactive pressure cancellation 2026-11-17](2026-11-17-pressure-cancellation.md) documents the opt-in, mock-tested cancellation request and its memory-enforcement limitations.
 
 [Historical direct probes 2026-11-17](2026-11-17-direct-probes.md) documents approval safeguards and static verification added to older experiments that bypass the gateway.
+
+[LFM3-Omni candidate 2026-11-17](2026-11-17-lfm3-omni-candidate.md) records primary-source claims, verified local file hashes, and a resource-gated idle trial that has not loaded the model.
