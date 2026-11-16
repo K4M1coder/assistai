@@ -50,7 +50,7 @@ An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option
 
 LFM3-Omni-2B is an additional native audio-and-vision research candidate. Its local Q4 weights and F16 projector match the publisher's hashes, but a guarded loading trial was refused at preflight and no capability has been demonstrated locally. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).
 
-The operator has reported one successfully approved read of the disposable `calculator.py` fixture; this was typed input and does not establish a completed voice or edit demonstration. See the [fixture notes](docs/research/2026-11-17-edit-fixture.md).
+The operator has reported one successfully approved read of the disposable `calculator.py` fixture and confirmed hearing an understandable result. This used typed input and does not establish a completed voice-input or edit demonstration. See the [fixture notes](docs/research/2026-11-17-edit-fixture.md).
 
 Historical scripts that submit directly to OpenCode now require attended approval; they bypass the gateway's admission policy and are not sandboxed. See the [direct-probe notes](docs/research/2026-11-17-direct-probes.md) before using them.
 
