@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 test('speaker-safe and held push-to-talk can work together', async () => {
-  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'send', 'mode', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'approval-workspace', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'send', 'mode', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false, setPointerCapture() {} }]));
   elements['noise-threshold'].value = '2.5'; elements['end-silence'].value = '1.4';
   elements['speaker-safe'].checked = true;
@@ -31,6 +31,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext(readFileSync(new URL('./client/client.js', import.meta.url), 'utf8'), context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.capabilities',workspace_label:'Disposable edit fixture'})})", context);
   assert.equal(elements['workspace-label'].textContent, 'Disposable edit fixture');
+  assert.equal(elements['approval-workspace'].textContent, 'Disposable edit fixture');
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.approval_requested',approval_id:'approval-1',original_request:'original request',task:'proposed task'})})", context);
   assert.equal(elements['approval-original'].textContent, 'original request');
   assert.equal(elements['approval-task'].textContent, 'proposed task');
@@ -185,7 +186,7 @@ test('speaker-safe and held push-to-talk can work together', async () => {
 });
 
 test('resumable memory is explicit and uses a browser-held capability', async () => {
-  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'approval-workspace', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const storage = new Map();
   let reloads = 0, selectedProtocols;
   function start() {
@@ -222,7 +223,7 @@ test('resumable memory is explicit and uses a browser-held capability', async ()
 });
 
 test('a dropped connection retries and preserves unsent text', async () => {
-  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
+  const names = ['microphone-device', 'refresh-microphones', 'approval-safety', 'workspace-label', 'approval-workspace', 'task-approval', 'approval-original', 'approval-task', 'approve-task', 'decline-task', 'status', 'log', 'noise-threshold', 'noise-threshold-value', 'end-silence', 'end-silence-value', 'talk', 'stop-task', 'replay-task', 'push-to-talk', 'speech-review', 'speaker-safe', 'interrupt', 'form', 'text', 'image', 'start', 'stop', 'echo-status', 'partial', 'experimental-aec', 'services', 'refresh-services', 'session-memory', 'session-memory-status', 'resources'];
   const elements = Object.fromEntries(names.map(name => [name, { value: '', checked: false, textContent: '', disabled: false }]));
   elements.text.value = 'keep this message';
   const sockets = [], timers = [];

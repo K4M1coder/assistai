@@ -89,3 +89,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Spoken filename routing 2026-11-16](2026-11-16-spoken-filename-routing.md) records a user-reported filename recognition failure and a local comparison that rejected a prompt change because it introduced guessed extensions.
 
 [Disposable coding demonstration 2026-11-17](2026-11-17-edit-fixture.md) records the separately configured editable fixture and the pending live approved-task check.
+
+[Opt-in web research 2026-11-17](2026-11-17-web-research-fixture.md) records the separate hosted-search configuration and its unverified live-search capability.
