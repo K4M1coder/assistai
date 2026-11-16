@@ -60,6 +60,8 @@ Real-model synthetic reset tests repeated an already completed task. After a nat
 
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 
+An opt-in `-EditFixture` harness and gateway use the disposable `.cache/agent-edit-demo` workspace with OpenCode edit permission, `external_directory` denied and other unspecified actions denied. The gateway displays an operator-provided workspace label and requires task approval. The label is informational, not independent verification of permissions or a security boundary; other local clients may access the unauthenticated services, and application rules do not sandbox the process. Do not use this fixture to modify unrelated or valuable files.
+
 The prepared voice-to-agent coding probe requires an explicitly selected `.cache` workspace and a separately configured gateway and harness. Its static arithmetic checker avoids executing the generated fixture but does not confine the harness. One synthetic text-driven real-agent edit passed; a synthetic spoken-input attempt stopped below the RAM reserve before completion. The current demo's read-only fixture remains unchanged.
 
 Selecting separate trial ports does not change OpenCode's authority, authenticate either service, or isolate the workspace at the operating-system level.

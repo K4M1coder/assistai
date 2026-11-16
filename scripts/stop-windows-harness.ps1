@@ -1,6 +1,7 @@
+param([switch]$EditFixture)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-$recordPath=Join-Path $root '.cache/assistant/harness-process.json'
+$recordPath=Join-Path $root $(if($EditFixture){'.cache/assistant/edit-harness-process.json'}else{'.cache/assistant/harness-process.json'})
 if(!(Test-Path -LiteralPath $recordPath)){throw 'No harness ownership record'}
 $record=Get-Content -Raw -LiteralPath $recordPath | ConvertFrom-Json
 if([int]$record.id -le 0 -or !$record.started -or !$record.command){throw 'Invalid harness ownership record'}

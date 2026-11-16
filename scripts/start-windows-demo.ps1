@@ -1,4 +1,4 @@
-param([int]$Port=18089)
+param([int]$Port=18089,[switch]$EditFixture)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 if($Port -lt 1024 -or $Port -gt 65535){throw 'Choose a port from 1024 to 65535'}
@@ -20,7 +20,8 @@ try {
   $sampler=Start-Process -FilePath $shell -ArgumentList @('-NoProfile','-File',(Join-Path $root 'scripts/write-windows-budget-sample.ps1'),'-Adapter',$adapter,'-OutputPath',$sample) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtime "demo-$Port-sampler.stdout") -RedirectStandardError (Join-Path $runtime "demo-$Port-sampler.stderr") -PassThru
   $null=$sampler.Handle
   $env:ASSISTAI_GATEWAY_PORT=[string]$Port; $env:ASSISTAI_DB_PATH=':memory:'; $env:ASSISTAI_ENABLE_SESSION_RESUME='1'
-  $env:ASSISTAI_LFM_REALTIME_URL=''; $env:ASSISTAI_LFM_TRANSCRIPT_ASR_URL=''; $env:ASSISTAI_OPENCODE_URL='http://127.0.0.1:18085'
+  $env:ASSISTAI_LFM_REALTIME_URL=''; $env:ASSISTAI_LFM_TRANSCRIPT_ASR_URL=''; $env:ASSISTAI_OPENCODE_URL=if($EditFixture){'http://127.0.0.1:18110'}else{'http://127.0.0.1:18085'}
+  $env:ASSISTAI_WORKSPACE_LABEL=if($EditFixture){'Disposable coding fixture: .cache/agent-edit-demo. File editing is enabled after approval. This is not an OS sandbox.'}else{'Read-only research fixture: .cache/opencode-probe. Web search and editing are disabled.'}
   $env:ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1'; $env:ASSISTAI_VISION_URL='http://127.0.0.1:18080/v1'
   $env:ASSISTAI_TTS_URL='http://127.0.0.1:18081'; $env:ASSISTAI_ASR_URL='ws://127.0.0.1:18082/asr'
   $env:ASSISTAI_BUDGET_SAMPLE_PATH=$sample; $env:ASSISTAI_RESOURCE_STATUS_PATH=$sample
@@ -43,7 +44,7 @@ try {
   if(!$ready){throw 'Demo readiness check failed'}
   $record=@{port=$Port;gatewayPid=$gateway.Id;gatewayStartedUtc=$gateway.StartTime.ToUniversalTime().ToString('o');samplerPid=$sampler.Id;samplerStartedUtc=$sampler.StartTime.ToUniversalTime().ToString('o');samplePath=$sample;history='volatile'}
   $record | ConvertTo-Json -Compress | Set-Content -LiteralPath $metadata -Encoding utf8
-  @{url="http://127.0.0.1:$Port/";gatewayPid=$gateway.Id;samplerPid=$sampler.Id;resources=$resources;history='volatile';agent='existing read-only fixture';record=$metadata} | ConvertTo-Json -Compress -Depth 4
+  @{url="http://127.0.0.1:$Port/";gatewayPid=$gateway.Id;samplerPid=$sampler.Id;resources=$resources;history='volatile';agent=if($EditFixture){'disposable editable fixture'}else{'read-only fixture'};record=$metadata} | ConvertTo-Json -Compress -Depth 4
 } catch {
   foreach($p in @($gateway,$sampler)){if($null -ne $p){$p.Refresh();if(!$p.HasExited){Stop-Process -Id $p.Id -Force;$p.WaitForExit()}}}
   throw

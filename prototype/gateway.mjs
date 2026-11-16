@@ -37,6 +37,7 @@ const llmUrl = process.env.ASSISTAI_LLM_URL ?? 'http://127.0.0.1:18084/v1';
 const visionUrl = process.env.ASSISTAI_VISION_URL ?? 'http://127.0.0.1:18080/v1';
 const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
+const workspaceLabel = (process.env.ASSISTAI_WORKSPACE_LABEL ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300);
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
 const lfmTranscriptUrl = process.env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
@@ -153,7 +154,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {

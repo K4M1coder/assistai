@@ -37,7 +37,7 @@ test('cascade submits no agent session before explicit one-use approval', { time
   const child = spawn(process.execPath, ['prototype/gateway.mjs'], {
     env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: ':memory:',
       ASSISTAI_LFM_REALTIME_URL: '', ASSISTAI_BUDGET_SAMPLE_PATH: '', ASSISTAI_OPENCODE_URL: `http://127.0.0.1:${agentPort}`,
-      ASSISTAI_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, ASSISTAI_ASR_URL: `ws://127.0.0.1:${asrPort}/asr` },
+      ASSISTAI_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, ASSISTAI_ASR_URL: `ws://127.0.0.1:${asrPort}/asr`, ASSISTAI_WORKSPACE_LABEL:'Disposable edit fixture' },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   let stderr = '';
@@ -63,6 +63,7 @@ test('cascade submits no agent session before explicit one-use approval', { time
     client.on('message', function handler(data, binary) {
       if (binary) return;
       const event = JSON.parse(data);
+      if (event.type === 'session.capabilities') assert.equal(event.workspace_label, 'Disposable edit fixture');
       if (event.type === 'asr.ready') client.send(JSON.stringify({ type: 'text', text: 'Read fixture.txt only' }));
       if (event.type === 'task.approval_requested') {
         approvalId = event.approval_id;

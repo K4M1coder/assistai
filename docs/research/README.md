@@ -87,3 +87,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Shared GPU admission 2026-11-16](2026-11-16-shared-gpu-admission.md) records a real rejection, per-process allocation snapshots, a guarded restart and the remaining no-spill uncertainty.
 
 [Spoken filename routing 2026-11-16](2026-11-16-spoken-filename-routing.md) records a user-reported filename recognition failure and a local comparison that rejected a prompt change because it introduced guessed extensions.
+
+[Disposable coding demonstration 2026-11-17](2026-11-17-edit-fixture.md) records the separately configured editable fixture and the pending live approved-task check.

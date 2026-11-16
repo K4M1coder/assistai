@@ -239,6 +239,7 @@ function handleSocketMessage({ data }) {
   if (data instanceof ArrayBuffer) { play(data, outputRate); return; }
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
+    $('workspace-label').textContent = event.workspace_label || 'Agent workspace and permissions were not reported; inspect the harness configuration.';
     $('approval-safety').textContent = event.task_approval === true
       ? 'Agent tasks require explicit approval before submission.'
       : 'Warning: this gateway does not confirm agent tasks before submission. Do not delegate consequential work.';
