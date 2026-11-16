@@ -45,7 +45,7 @@ test('projects one task using the admission budget without counting active reser
   const shared = await make({ ...sample, availableRamBytes: 10 * GiB, sharedBytes: 257 * 1024 ** 2 });
   assert.equal(shared.status, 'low');
   assert.equal(shared.single_task_estimate.status, 'insufficient');
-  assert.match(shared.single_task_estimate.reasons.join(' '), /Shared GPU/);
+  assert.match(shared.single_task_estimate.reasons.join(' '), /shared GPU/i);
 });
 
 test('reports optional system-wide pagefile usage without attributing it to the model', async () => {

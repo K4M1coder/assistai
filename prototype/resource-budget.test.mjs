@@ -16,6 +16,12 @@ test('rejects excessive shared-memory growth even when dedicated VRAM is under 2
   assert.match(decision.reasons.join(' '), /Shared GPU memory/);
 });
 
+test('explains the absolute shared-memory check when no baseline is known', () => {
+  const decision = evaluateBudget({ ...baseline, sharedBytes: 300 * MiB, baselineSharedBytes: 0 });
+  assert.equal(decision.allowed, false);
+  assert.match(decision.reasons.join(' '), /Total shared GPU memory is 300 MiB, above the 256 MiB limit/);
+});
+
 test('fails closed if telemetry is missing or the next allocation would consume reserves', () => {
   assert.equal(evaluateBudget(null).allowed, false);
   assert.equal(evaluateBudget(baseline, null).allowed, false);

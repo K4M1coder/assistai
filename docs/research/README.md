@@ -83,3 +83,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Resumption 2026-11-15](2026-11-15-resumption.md) records demonstration acceptance criteria, unavailable inference services, restoration of the two local speech services and a synthetic loopback.
 
 [Approval visibility 2026-11-15](2026-11-15-approval-visibility.md) records the user report, visible-button changes, explicit spoken instructions and remaining browser verification.
+
+[Shared GPU admission 2026-11-16](2026-11-16-shared-gpu-admission.md) records a real rejection, per-process allocation snapshots, a guarded restart and the remaining no-spill uncertainty.
