@@ -46,6 +46,8 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling.
 
+An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option can request cancellation of a running agent task after consecutive low-resource samples. It is reactive, cannot guarantee cancellation or prevent memory overshoot, and has only been exercised with simulated resources and harness responses.
+
 New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.
 
 Inspect retained estimates with `node scripts/inspect-task-reservations.mjs`. The ledger records the local OpenCode session ID when available; a missing or exited gateway PID does not prove that task stopped. After independently verifying the task has stopped in the correct harness, an operator can release a specific estimate with `node scripts/inspect-task-reservations.mjs .cache/assistant/task-reservations.sqlite --release UUID --confirmed-stopped`. This does not stop a task or free memory.

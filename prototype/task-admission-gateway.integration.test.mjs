@@ -11,15 +11,15 @@ import { DatabaseSync } from 'node:sqlite';
 
 async function listen(server) { server.listen(0,'127.0.0.1'); await once(server,'listening'); return server.address().port; }
 
-test('gateway retains uncertain tasks and recovers polling before releasing estimates', {timeout:15000}, async t => {
-  let agentSessions=0, aborts=0, recover=false, retrying=false;
+test('gateway retains uncertain tasks, requests pressure cancellation and recovers polling', {timeout:22000}, async t => {
+  let agentSessions=0, aborts=0, recover=false, retrying=false, complete=false;
   const agent=http.createServer((req,res)=>{
     res.setHeader('content-type','application/json');
     if(req.method==='POST'&&req.url==='/session'){agentSessions++;return res.end(JSON.stringify({id:'busy-task'}));}
     if(req.method==='POST'&&req.url==='/session/busy-task/prompt_async'){res.statusCode=204;return res.end();}
     if(req.method==='POST'&&req.url==='/session/busy-task/abort'){aborts++;return res.end('true');}
     if(req.url==='/session/status'){if(!recover)res.statusCode=500;return res.end(JSON.stringify(recover&&retrying?{'busy-task':{type:'retry',attempt:2,message:'PRIVATE PROVIDER MESSAGE'}}:{}));}
-    if(req.url==='/session/busy-task/message')return res.end(JSON.stringify(recover ? [{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:'Done'}]}] : []));
+    if(req.url==='/session/busy-task/message')return res.end(JSON.stringify(complete ? [{info:{role:'assistant',finish:'stop',time:{completed:1}},parts:[{type:'text',text:'Done'}]}] : []));
     res.statusCode=404;res.end('{}');
   });
   const agentPort=await listen(agent);
@@ -45,7 +45,7 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   await writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:20*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
   const ledgerPath=path.join(temp,'reservations.sqlite');
   const historyPath=path.join(temp,'history.sqlite');
-  const env={...process.env,ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:historyPath,ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_SHARED_RESERVATIONS_PATH:ledgerPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
+  const env={...process.env,ASSISTAI_CANCEL_ON_PRESSURE:'1',ASSISTAI_GATEWAY_PORT:String(gatewayPort),ASSISTAI_DB_PATH:historyPath,ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,ASSISTAI_BUDGET_SAMPLE_PATH:samplePath,ASSISTAI_SHARED_RESERVATIONS_PATH:ledgerPath,ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(1.5*1024**3),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(0.25*1024**3)};
   delete env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
   const child=spawn(process.execPath,['prototype/gateway.mjs'],{cwd:process.cwd(),env,stdio:['ignore','pipe','pipe'],windowsHide:true});
   let stderr='';child.stderr.on('data',chunk=>{stderr+=chunk});
@@ -97,6 +97,18 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events WHERE kind='task.uncertain'").get().n,1);
   assert.match((await cancel(clients[0], 'task.cancel_requested')).message, /Cancellation requested/);
   assert.equal(aborts,2);
+  recover=true;
+  const pressureNotice=new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('Pressure cancellation timed out')),7000);
+    clients[0].on('message',function handler(data,binary){if(binary)return;const event=JSON.parse(data);if(event.type==='task.cancel_requested' && event.message.startsWith('Resource pressure')){clearTimeout(timer);clients[0].off('message',handler);resolve(event);}});
+  });
+  const lowSample=()=>writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:23*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
+  await lowSample();
+  await new Promise(resolve=>setTimeout(resolve,2500));
+  await lowSample();
+  assert.match((await pressureNotice).message,/cancellation requested/);
+  assert.equal(aborts,3);
+  assert.equal(inspectReservations(ledgerPath)[0].taskId,'busy-task');
   const afterError=await request('task.rejected');
   assert.match(afterError.message,/budget/);
   assert.equal(agentSessions,1);
@@ -115,6 +127,7 @@ test('gateway retains uncertain tasks and recovers polling before releasing esti
   assert.equal(retry.state,'retrying');assert.equal(retry.attempt,2);
   assert.doesNotMatch(JSON.stringify(retry),/PRIVATE PROVIDER MESSAGE/);
   retrying=false;
+  complete=true;
   assert.equal((await completed).text,'Done');
   await writeFile(samplePath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:20*1024**3,sharedBytes:0,availableRamBytes:10*1024**3}));
   await request('task.started');

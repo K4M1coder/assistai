@@ -8,6 +8,8 @@ Service discovery strips URL userinfo, query strings and fragments from displaye
 
 When configured, the read-only resource endpoint exposes aggregate memory telemetry to clients that can reach the local gateway; it does not expose the sampler file path or apply a permission check. Resource reporting and advisory admission are not access-control or hard resource-isolation boundaries.
 
+The optional pressure-triggered cancellation requests an existing task stop without a new approval. It does not grant task execution, undo already performed actions, isolate the agent, or guarantee that cancellation succeeds. It is disabled by default and can interrupt an approved task if system-wide resource readings cross the configured thresholds.
+
 The optional one-task headroom projection is also unauthenticated telemetry, not an allocation or permission to execute a task.
 
 The optional shared task-reservation database is a local coordination mechanism, not an authorization boundary. Any process able to alter it can invalidate its estimates; it stores resource estimates, process IDs, timestamps, OpenCode session IDs and random reservation identifiers, not task content.

@@ -17,6 +17,7 @@ import { buildNativeContext } from './native-context.mjs';
 import { buildAgentPrompt } from './agent-context.mjs';
 import { resumeSessionId } from './session-resume.mjs';
 import { createResourceStatus } from './resource-status.mjs';
+import { createPressureDetector } from './resource-pressure.mjs';
 import { speechText, visibleAnswer } from './speech-text.mjs';
 import { latestCompletedAssistant } from './agent-task-status.mjs';
 import { openSharedTaskReservations } from './shared-task-reservations.mjs';
@@ -229,9 +230,19 @@ wss.on('connection', (client, req) => {
     send({ type: 'task.started', turn_id: turnId, ...event });
     void (async () => {
       let confirmedTerminal = false, pollFailures = 0, previousProgress = JSON.stringify({ state: 'running' });
+      const pressureCheck = process.env.ASSISTAI_CANCEL_ON_PRESSURE === '1' ? createPressureDetector() : null;
       try {
         for (let i = 0; i < 300; i++) {
           await new Promise(resolve => setTimeout(resolve, 2000));
+          if (pressureCheck && pressureCheck(await getResources())) {
+            let accepted = false;
+            try { accepted = await requestJson(`${opencodeUrl}/session/${encodeURIComponent(agentSession.id)}/abort`, { method: 'POST' }) === true; } catch { /* Outcome remains uncertain. */ }
+            const kind = accepted ? 'task.cancel_requested' : 'task.cancel_rejected';
+            const notice = { task_id: agentSession.id, message: accepted
+              ? 'Resource pressure: cancellation requested; the task may already have made changes.'
+              : 'Resource pressure: cancellation could not be confirmed; the task may still be running.' };
+            record(session, turnId, kind, notice); sendTask({ type: kind, ...notice });
+          }
           let status, messages;
           try {
             status = await requestJson(`${opencodeUrl}/session/status`);
