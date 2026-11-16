@@ -37,6 +37,8 @@ const asrUrl = process.env.ASSISTAI_ASR_URL ?? 'ws://127.0.0.1:18082/asr';
 const llmUrl = process.env.ASSISTAI_LLM_URL ?? 'http://127.0.0.1:18084/v1';
 const visionUrl = process.env.ASSISTAI_VISION_URL ?? 'http://127.0.0.1:18080/v1';
 const ttsUrl = process.env.ASSISTAI_TTS_URL ?? 'http://127.0.0.1:18081';
+const ttsStallMs = Number(process.env.ASSISTAI_TTS_STALL_MS ?? 15000);
+if (!Number.isSafeInteger(ttsStallMs) || ttsStallMs < 100 || ttsStallMs > 120000) throw Error('Invalid TTS inactivity timeout');
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const workspaceLabel = (process.env.ASSISTAI_WORKSPACE_LABEL ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300);
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
@@ -345,26 +347,36 @@ wss.on('connection', (client, req) => {
   const streamSpeech = async (text, turn) => {
     const form = new FormData();
     form.set('text', speechText(text) || 'La réponse est affichée.');
-    const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: turn.controller.signal });
-    if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
-    let header = Buffer.alloc(0), started = false, audioBytes = 0;
-    for await (const bytes of speech.body) {
-      if (active !== turn) return;
-      let chunk = Buffer.from(bytes);
-      if (!started) {
-        header = Buffer.concat([header, chunk]);
-        if (header.length < 44) continue;
-        if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WAVE' || header.toString('ascii', 36, 40) !== 'data' || header.readUInt16LE(20) !== 1 || header.readUInt16LE(22) !== 1 || header.readUInt16LE(34) !== 16) throw new Error('Unsupported TTS WAV format');
-        send({ type: 'speech.start', turn_id: turn.id, sample_rate: header.readUInt32LE(24), encoding: 'pcm_s16le' });
-        chunk = header.subarray(44);
-        started = true;
+    const stalled = new AbortController();
+    let timer;
+    const resetTimeout = () => { clearTimeout(timer); timer = setTimeout(() => stalled.abort(), ttsStallMs); };
+    resetTimeout();
+    try {
+      const speech = await fetch(`${ttsUrl}/tts`, { method: 'POST', body: form, signal: AbortSignal.any([turn.controller.signal, stalled.signal]) });
+      if (!speech.ok || !speech.body) throw new Error(`TTS HTTP ${speech.status}`);
+      let header = Buffer.alloc(0), started = false, audioBytes = 0;
+      for await (const bytes of speech.body) {
+        if (active !== turn) return;
+        resetTimeout();
+        let chunk = Buffer.from(bytes);
+        if (!started) {
+          header = Buffer.concat([header, chunk]);
+          if (header.length < 44) continue;
+          if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WAVE' || header.toString('ascii', 36, 40) !== 'data' || header.readUInt16LE(20) !== 1 || header.readUInt16LE(22) !== 1 || header.readUInt16LE(34) !== 16) throw new Error('Unsupported TTS WAV format');
+          send({ type: 'speech.start', turn_id: turn.id, sample_rate: header.readUInt32LE(24), encoding: 'pcm_s16le' });
+          chunk = header.subarray(44);
+          started = true;
+        }
+        audioBytes += chunk.length;
+        if (chunk.length && client.readyState === WebSocket.OPEN) client.send(chunk, { binary: true });
       }
-      audioBytes += chunk.length;
-      if (chunk.length && client.readyState === WebSocket.OPEN) client.send(chunk, { binary: true });
-    }
-    if (!started) throw new Error('TTS returned no WAV audio');
-    if (!audioBytes || audioBytes % 2) throw new Error('TTS returned empty or incomplete PCM16 audio');
-    if (active === turn) { active = undefined; send({ type: 'speech.end', turn_id: turn.id }); }
+      if (!started) throw new Error('TTS returned no WAV audio');
+      if (!audioBytes || audioBytes % 2) throw new Error('TTS returned empty or incomplete PCM16 audio');
+      if (active === turn) { active = undefined; send({ type: 'speech.end', turn_id: turn.id }); }
+    } catch (error) {
+      if (stalled.signal.aborted && !turn.controller.signal.aborted) throw new Error('TTS stream stalled; spoken output may be incomplete');
+      throw error;
+    } finally { clearTimeout(timer); }
   };
   const respond = async (text) => {
     cancel();

@@ -17,7 +17,7 @@ async function startGateway(port, db, llm, tts, asr) {
   const child = spawn(process.execPath, ['prototype/gateway.mjs'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: db, ASSISTAI_ENABLE_SESSION_RESUME: '1',
       ASSISTAI_LLM_URL: `http://127.0.0.1:${llm}/v1`, ASSISTAI_TTS_URL: `http://127.0.0.1:${tts}`,
-      ASSISTAI_ASR_URL: `ws://127.0.0.1:${asr}/asr`, ASSISTAI_OPENCODE_URL: '', ASSISTAI_LFM_REALTIME_URL: '' } });
+      ASSISTAI_TTS_STALL_MS: '500', ASSISTAI_ASR_URL: `ws://127.0.0.1:${asr}/asr`, ASSISTAI_OPENCODE_URL: '', ASSISTAI_LFM_REALTIME_URL: '' } });
   let error = '';
   child.stderr.on('data', data => { error += data; });
   await new Promise((resolve, reject) => {
@@ -66,11 +66,12 @@ test('opt-in session resume isolates clients and restores bounded history after 
   });
   const llmPort = await listen(llm);
   const wav = Buffer.alloc(48); wav.write('RIFF', 0); wav.write('WAVE', 8); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24000, 24); wav.writeUInt16LE(16, 34); wav.write('data', 36);
-  let ttsBytes = wav.length, lastTtsText = '';
+  let ttsBytes = wav.length, lastTtsText = '', stallTts = false;
   const tts = http.createServer(async (req, res) => {
     const parts = []; for await (const part of req) parts.push(part);
     const form = await new Response(Buffer.concat(parts), { headers: { 'content-type': req.headers['content-type'] } }).formData();
     lastTtsText = form.get('text');
+    if (stallTts) { res.write(wav); return; }
     res.end(wav.subarray(0, ttsBytes));
   });
   const ttsPort = await listen(tts);
@@ -106,6 +107,20 @@ test('opt-in session resume isolates clients and restores bounded history after 
     });
   }
   ttsBytes = wav.length;
+  stallTts = true;
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(Error('Stalled speech was not reported')), 5000);
+    let started = false;
+    const handler = (data, binary) => {
+      if (binary) return;
+      const event = JSON.parse(data.toString());
+      if (event.type === 'speech.start') started = true;
+      if (event.type === 'speech.end') { clearTimeout(timeout); reject(Error('Stalled speech was reported as complete')); }
+      if (event.type === 'error') { clearTimeout(timeout); a.off('message', handler); assert.ok(started); assert.match(event.message, /TTS stream stalled/); resolve(); }
+    };
+    a.on('message', handler); a.send(JSON.stringify({type:'text',text:'stalled speech test'}));
+  });
+  stallTts = false;
   let visibleResponse;
   a.on('message', (data, binary) => { if (!binary) { const event = JSON.parse(data.toString()); if (event.type === 'assistant.text') visibleResponse = event.text; } });
   await turn(a, marker);
