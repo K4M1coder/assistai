@@ -93,3 +93,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Opt-in web research 2026-11-17](2026-11-17-web-research-fixture.md) records the separate hosted-search configuration and its unverified live-search capability.
 
 [Reactive pressure cancellation 2026-11-17](2026-11-17-pressure-cancellation.md) documents the opt-in, mock-tested cancellation request and its memory-enforcement limitations.
+
+[Historical direct probes 2026-11-17](2026-11-17-direct-probes.md) documents approval safeguards and static verification added to older experiments that bypass the gateway.

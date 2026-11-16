@@ -2,6 +2,8 @@
 import {readFile} from 'node:fs/promises';
 import {setTimeout as sleep} from 'node:timers/promises';
 import WebSocket from 'ws';
+import {askProbeApproval} from './interactive-probe-approval.mjs';
+if (!process.stdin.isTTY) throw Error('An interactive terminal is required to review any agent task');
 const wav=await readFile('.cache/lfm3-fixture-french.wav');const pos=wav.indexOf('data');
 if(pos<0||wav.readUInt32LE(24)!==16000)throw Error('Expected 16 kHz WAV');
 const pcm=wav.subarray(pos+8,pos+8+wav.readUInt32LE(pos+4));
@@ -16,6 +18,8 @@ async function delegate(call) {
  const args=JSON.parse(call.arguments);toolTask=args.task??'';
  // Restrict the experiment to its disposable read-only fixture and intended secret-word query.
  if(!/fixture/i.test(toolTask)||!/secret/i.test(toolTask))throw Error(`Unexpected task: ${toolTask}`);
+ console.error('Direct OpenCode server: http://127.0.0.1:18085. Verify its workspace and permissions before approving.');
+ if(!await askProbeApproval({approval_id:call.call_id,original_request:'Synthetic French fixture question',task:toolTask}))throw Error('Task declined; no agent session was created');
  const agent=await json('/session',{method:'POST',headers,body:JSON.stringify({title:'Synthetic voice fixture probe'})});
  await json(`/session/${agent.id}/prompt_async`,{method:'POST',headers,body:JSON.stringify({parts:[{type:'text',text:toolTask}]})});
  for(let i=0;i<90;i++){

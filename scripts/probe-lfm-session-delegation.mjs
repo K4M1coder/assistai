@@ -3,6 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {setTimeout as sleep} from 'node:timers/promises';
 import WebSocket from 'ws';
 import {LfmRealtimeSession} from '../prototype/lfm-realtime-session.mjs';
+import {askProbeApproval} from './interactive-probe-approval.mjs';
+if (!process.stdin.isTTY) throw Error('An interactive terminal is required to review any agent task');
 const wav=await readFile('.cache/lfm3-fixture-french.wav');const pos=wav.indexOf('data');
 if(pos<0||wav.readUInt32LE(24)!==16000)throw Error('Expected 16 kHz WAV');
 const pcm=wav.subarray(pos+8,pos+8+wav.readUInt32LE(pos+4));
@@ -15,6 +17,8 @@ const json=async(path,opts={})=>{const r=await fetch(`http://127.0.0.1:18085${pa
 session.on('ready',()=>{for(let i=0;i<pcm.length;i+=3200)if(!session.appendAudio(pcm.subarray(i,i+3200)))return;session.endAudio()});
 session.on('toolCall',call=>{void(async()=>{
  task=JSON.parse(call.arguments).task??'';if(call.name!=='delegate_task'||!/fixture/i.test(task)||!/secret/i.test(task))throw Error(`Unexpected task: ${task}`);
+ console.error('Direct OpenCode server: http://127.0.0.1:18085. Verify its workspace and permissions before approving.');
+ if(!await askProbeApproval({approval_id:call.callId,original_request:'Synthetic French fixture question',task}))throw Error('Task declined; no agent session was created');
  const agent=await json('/session',{method:'POST',headers,body:JSON.stringify({title:'Adapter fixture probe'})});
  await json(`/session/${agent.id}/prompt_async`,{method:'POST',headers,body:JSON.stringify({parts:[{type:'text',text:task}]})});
  for(let i=0;i<90;i++){await sleep(1000);const status=await json('/session/status');const messages=await json(`/session/${agent.id}/message`);const last=[...messages].reverse().find(m=>m.info?.role==='assistant'&&m.info?.time?.completed);if(!status[agent.id]&&last){if(last.info.error)throw Error('Agent error');result=(last.parts??[]).filter(p=>p.type==='text').map(p=>p.text).join(' ');break;}}

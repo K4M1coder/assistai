@@ -10,6 +10,8 @@ When configured, the read-only resource endpoint exposes aggregate memory teleme
 
 The optional pressure-triggered cancellation requests an existing task stop without a new approval. It does not grant task execution, undo already performed actions, isolate the agent, or guarantee that cancellation succeeds. It is disabled by default and can interrupt an approved task if system-wide resource readings cross the configured thresholds.
 
+Four historical direct OpenCode probes now require an interactive terminal and explicit approval before creating an agent session. These scripts bypass the gateway approval panel and admission accounting; the operator must independently verify the actual harness workspace and permissions. Their terminal prompt is not authentication, a sandbox, or an access-control boundary for other local callers.
+
 The optional one-task headroom projection is also unauthenticated telemetry, not an allocation or permission to execute a task.
 
 The optional shared task-reservation database is a local coordination mechanism, not an authorization boundary. Any process able to alter it can invalidate its estimates; it stores resource estimates, process IDs, timestamps, OpenCode session IDs and random reservation identifiers, not task content.
