@@ -1,4 +1,4 @@
-param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly)
+param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly,[switch]$DisableHostVisibleVidmem)
 $ErrorActionPreference='Stop'
 if($Port -lt 1024 -or $Port -gt 65535 -or $Seconds -lt 1 -or $Seconds -gt 120){throw 'Invalid port or duration'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -21,10 +21,15 @@ if($PreflightOnly){@{allowed=$allowed;baseline=$baseline;sharedPreflightLimit=12
 if(!$allowed){throw 'Insufficient observed trial headroom; no process was started'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $root ".cache/assistant/lfm3-omni-idle-$stamp"
-$env:GGML_VK_DISABLE_COOPMAT='1'
-Remove-Item Env:GGML_VK_ALLOW_SYSMEM_FALLBACK -ErrorAction SilentlyContinue
-$argsList=@('-m',$model,'--mmproj',$projector,'--host','127.0.0.1','--port',[string]$Port,'-c','4096','-ngl','99','-np','1','-b','512','-ub','256','-fa','on','-ctk','q8_0','-ctv','q8_0','--load-mode','none','--no-host','--cache-ram','0')
-$process=Start-Process -FilePath $engine -ArgumentList $argsList -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+$argsList=@('-m',('"'+$model+'"'),'--mmproj',('"'+$projector+'"'),'--host','127.0.0.1','--port',[string]$Port,'-c','4096','-ngl','99','-np','1','-b','512','-ub','256','-fa','on','-ctk','q8_0','-ctv','q8_0','--load-mode','none','--no-host','--cache-ram','0')
+$envNames=@('GGML_VK_DISABLE_COOPMAT','GGML_VK_ALLOW_SYSMEM_FALLBACK','GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM')
+$savedEnv=@{};foreach($name in $envNames){$savedEnv[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
+try {
+  [Environment]::SetEnvironmentVariable('GGML_VK_DISABLE_COOPMAT','1','Process')
+  [Environment]::SetEnvironmentVariable('GGML_VK_ALLOW_SYSMEM_FALLBACK',$null,'Process')
+  [Environment]::SetEnvironmentVariable('GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM',$(if($DisableHostVisibleVidmem){'1'}else{$null}),'Process')
+  $process=Start-Process -FilePath $engine -ArgumentList $argsList -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+} finally {foreach($name in $envNames){[Environment]::SetEnvironmentVariable($name,$savedEnv[$name],'Process')}}
 $null=$process.Handle;$reason='duration elapsed';$ready=$false;$deadline=[DateTime]::UtcNow.AddSeconds($Seconds)
 try {
   while([DateTime]::UtcNow -lt $deadline){
@@ -37,5 +42,5 @@ try {
 } finally {
   $process.Refresh();if(!$process.HasExited){Stop-Process -Id $process.Id -Force;$process.WaitForExit()}
 }
-@{reason=$reason;ready=$ready;baseline=$baseline;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
+@{reason=$reason;ready=$ready;baseline=$baseline;disableHostVisibleVidmem=[bool]$DisableHostVisibleVidmem;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
 if($reason -ne 'duration elapsed' -or !$ready){exit 1}
