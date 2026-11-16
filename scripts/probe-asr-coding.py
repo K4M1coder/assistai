@@ -22,6 +22,10 @@ CASES = [
     ('negation', 'Ne supprime pas le fichier. Lis son contenu.', ('supprime', 'pas', 'fichier')),
     ('filename', 'Ouvre le fichier calculator point py et lis son contenu.', ('calculator', 'py')),
 ]
+FIXTURE_CASES = [
+    ('fixture-name', 'Quel est le mot écrit dans le fichier fixture point texte ?', ('fixture', 'texte')),
+    ('fixture-spelled', 'Lis le fichier f i x t u r e point t x t.', ('f', 'i', 'x', 't', 'u', 'r', 'e')),
+]
 
 
 def tokens(text):
@@ -81,8 +85,8 @@ def recognize_crisp(pcm, executable, model):
         name.unlink(missing_ok=True)
 
 
-async def main(crisp_executable=None, crisp_model=None):
-    for label, reference, markers in CASES:
+async def main(crisp_executable=None, crisp_model=None, cases=CASES):
+    for label, reference, markers in cases:
         pcm = await asyncio.to_thread(spoken.synthesize, reference)
         started = time.monotonic(); hypothesis = await recognize(pcm)
         found = set(tokens(hypothesis))
@@ -109,6 +113,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--crisp-executable', type=Path)
     parser.add_argument('--crisp-model', type=Path)
+    parser.add_argument('--fixture-only', action='store_true', help='Use synthetic filename-focused phrases')
     args = parser.parse_args()
     if bool(args.crisp_executable) != bool(args.crisp_model): parser.error('Provide both CrispASR executable and model')
-    asyncio.run(main(args.crisp_executable, args.crisp_model))
+    asyncio.run(main(args.crisp_executable, args.crisp_model, FIXTURE_CASES if args.fixture_only else CASES))

@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp)
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
@@ -13,6 +13,7 @@ if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/asr-coding-$stamp"
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
+if($FixtureOnly){$probeArgs+='--fixture-only'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
 $model=Join-Path $env:USERPROFILE '.lmstudio/models/cstr/stt-fr-fastconformer-hybrid-ctc-large-GGUF/stt-fr-fastconformer-hybrid-ctc-large-q8_0.gguf'
 if($CompareCrisp){
