@@ -1,7 +1,7 @@
 // Exercise synthetic microphone input in an isolated headless Chrome profile.
 // The WAV must be synthetic PCM; this probe does not capture a physical microphone.
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
@@ -12,6 +12,10 @@ const gateway = new URL(process.env.ASSISTAI_TEST_BROWSER_URL ?? 'http://127.0.0
 if (gateway.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(gateway.hostname) || gateway.username || gateway.password || gateway.pathname !== '/' || gateway.search || gateway.hash) throw Error('Browser probe requires a credential-free loopback gateway root');
 const health = await (await fetch(new URL('/health', gateway))).json();
 if (health.history_storage !== 'volatile') throw Error('Browser probe requires a gateway with volatile history');
+if (process.env.ASSISTAI_PROBE_REVIEW_TASK === '1') {
+  const resources = await (await fetch(new URL('/resources', gateway))).json();
+  if (resources.status !== 'observed' || resources.single_task_estimate?.status !== 'headroom_observed') throw Error('Insufficient observed resource headroom for the controller probe');
+}
 const profile = await mkdtemp(path.join(tmpdir(), 'assistai-audio-'));
 const processHandle = spawn(chrome, ['--headless', '--disable-gpu', '--disable-background-networking', '--no-first-run',
   '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${audio}`,
@@ -56,6 +60,29 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   const result = { reviewReached: state.status.includes('Review the transcript'), transcript: state.text, submitted: state.log.includes('You:'), inputOptions: state.inputCount };
+  if (process.env.ASSISTAI_PROBE_REVIEW_TASK === '1' && result.reviewReached && result.transcript && !result.submitted) {
+    const corrected = 'Quel est le mot écrit dans le fichier fixture.txt ?';
+    await evaluate(`document.querySelector('#stop').click(); document.querySelector('#text').value = ${JSON.stringify(corrected)}; document.querySelector('#form').requestSubmit(); true`);
+    let proposal;
+    for (let i = 0; i < 400; i++) {
+      proposal = await evaluate("({visible:!document.querySelector('#task-approval').hidden, original:document.querySelector('#approval-original').textContent, task:document.querySelector('#approval-task').textContent, log:document.querySelector('#log').textContent})");
+      if (proposal.visible) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (proposal.visible) await evaluate("document.querySelector('#decline-task').click(); true");
+    let after = {};
+    for (let i = 0; i < 50 && !after.declined; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      after = await evaluate("({declined:document.querySelector('#status').textContent === 'Task was not approved or approval expired.', log:document.querySelector('#log').textContent})");
+    }
+    result.reviewedRequest = corrected;
+    result.proposalVisible = proposal.visible;
+    result.original = proposal.original;
+    result.proposedTask = proposal.task;
+    result.declined = after.declined;
+    result.agentStarted = after.log.includes('Agent started:');
+    if (!proposal.visible || proposal.original !== corrected || !proposal.task.includes('fixture.txt') || !result.declined || result.agentStarted) process.exitCode = 1;
+  }
   if (process.env.ASSISTAI_PROBE_RESELECT === '1') {
     await evaluate("window.__captureRequest = null; const originalCapture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia = options => { window.__captureRequest = options.audio.deviceId?.exact ?? ''; return originalCapture(options); }; document.querySelector('#stop').click(); true");
     for (let i = 0; i < 50; i++) {
@@ -78,5 +105,6 @@ try {
   socket?.close();
   processHandle.kill();
   await new Promise(resolve => processHandle.once('exit', resolve));
-  console.error(`Temporary browser profile: ${profile}`);
+  try { await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }); }
+  catch { console.error(`Could not remove temporary browser profile: ${profile}`); }
 }
