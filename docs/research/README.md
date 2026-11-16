@@ -101,3 +101,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Cascade speech stall 2026-11-17](2026-11-17-tts-stall.md) records a real streaming WAV header observation and a simulated stalled-response test.
 
 [Spoken image follow-up 2026-11-17](2026-11-12-spoken-image.md) adds a second synthetic color against the running cascade, with sampled hardware observations.
+
+[Reported premature task start 2026-11-17](2026-11-17-reported-premature-task.md) documents an unresolved operator report, the observed harness state and a simulated review-and-approval check.

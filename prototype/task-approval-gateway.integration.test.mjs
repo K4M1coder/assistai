@@ -11,8 +11,8 @@ async function listen(server) {
   return server.address().port;
 }
 
-test('cascade submits no agent session before explicit one-use approval', { timeout: 15000 }, async t => {
-  let sessions = 0, prompt;
+test('reviewed speech submits no agent session before explicit one-use approval', { timeout: 15000 }, async t => {
+  let sessions = 0, prompt, modelCalls = 0;
   const agent = http.createServer(async (req, res) => {
     res.setHeader('content-type', 'application/json');
     if (req.method === 'POST' && req.url === '/session') { sessions++; return res.end(JSON.stringify({ id: 'test-task' })); }
@@ -26,18 +26,22 @@ test('cascade submits no agent session before explicit one-use approval', { time
     res.statusCode = 404; res.end('{}');
   });
   const model = http.createServer((req, res) => {
+    modelCalls++;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ choices: [{ message: { tool_calls: [{ id: 'call', function: { name: 'delegate_task', arguments: JSON.stringify({ task: 'Read fixture.txt' }) } }] } }] }));
   });
   const asr = http.createServer();
   const asrSockets = new WebSocketServer({ server: asr });
-  asrSockets.on('connection', socket => socket.send(JSON.stringify({ type: 'ready' })));
+  asrSockets.on('connection', socket => {
+    socket.send(JSON.stringify({ type: 'ready' }));
+    socket.on('message', raw => { if (JSON.parse(raw).type === 'end') socket.send(JSON.stringify({type:'final',text:'Read fixture dot text'})); });
+  });
   const [agentPort, modelPort, asrPort] = await Promise.all([listen(agent), listen(model), listen(asr)]);
   const reservation = http.createServer(); const port = await listen(reservation); await new Promise(resolve => reservation.close(resolve));
   const child = spawn(process.execPath, ['prototype/gateway.mjs'], {
     env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: ':memory:',
       ASSISTAI_LFM_REALTIME_URL: '', ASSISTAI_BUDGET_SAMPLE_PATH: '', ASSISTAI_OPENCODE_URL: `http://127.0.0.1:${agentPort}`,
-      ASSISTAI_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, ASSISTAI_ASR_URL: `ws://127.0.0.1:${asrPort}/asr`, ASSISTAI_WORKSPACE_LABEL:'Disposable edit fixture' },
+      ASSISTAI_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, ASSISTAI_TTS_URL: `http://127.0.0.1:${modelPort}`, ASSISTAI_ASR_URL: `ws://127.0.0.1:${asrPort}/asr`, ASSISTAI_WORKSPACE_LABEL:'Disposable edit fixture' },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   let stderr = '';
@@ -64,15 +68,27 @@ test('cascade submits no agent session before explicit one-use approval', { time
       if (binary) return;
       const event = JSON.parse(data);
       if (event.type === 'session.capabilities') assert.equal(event.workspace_label, 'Disposable edit fixture');
-      if (event.type === 'asr.ready') client.send(JSON.stringify({ type: 'text', text: 'Read fixture.txt only' }));
+      if (event.type === 'asr.ready') {
+        client.send(JSON.stringify({ type: 'speech.review.configure', enabled: true }));
+        client.send(JSON.stringify({ type: 'audio.end' }));
+      }
+      if (event.type === 'speech.review') {
+        assert.equal(event.text, 'Read fixture dot text');
+        assert.equal(modelCalls, 0); assert.equal(sessions, 0);
+        client.send(JSON.stringify({ type: 'speech.review.submit', review_id: event.review_id, text: 'Read fixture.txt only' }));
+      }
       if (event.type === 'task.approval_requested') {
         approvalId = event.approval_id;
         assert.equal(event.original_request, 'Read fixture.txt only');
         assert.equal(event.task, 'Read fixture.txt');
         assert.equal(sessions, 0);
         approvalCount++;
-        client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
-        client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
+        client.send(JSON.stringify({ type: 'task.approval', approval_id: 'incorrect-id', approved: true }));
+        setTimeout(() => {
+          assert.equal(sessions, 0);
+          client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
+          client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
+        }, 300);
       }
       if (event.type === 'task.started') { clearTimeout(timer); client.off('message', handler); resolve(); }
     });
