@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=120)
+param([int]$TimeoutSeconds=120,[ValidateRange(1024,65535)][int]$GatewayPort=18091,[ValidateSet('red','blue')][string]$Color='red')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
@@ -12,7 +12,7 @@ $base=Resources
 if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 256MB){throw 'Insufficient preflight headroom'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/spoken-image-$stamp"
 $env:PYTHONIOENCODING='utf-8'
-$p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-spoken-image.py')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+$p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-spoken-image.py'),'--gateway',"ws://127.0.0.1:$GatewayPort/voice",'--color',$Color) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {
   while([DateTime]::UtcNow -lt $deadline){

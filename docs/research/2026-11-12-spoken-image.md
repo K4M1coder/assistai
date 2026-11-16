@@ -13,3 +13,9 @@ Seven targeted JavaScript tests passed. An optional PNG inspection initially fai
 ## Interpretation
 
 One simple synthetic case verifies wiring through the real services, not physical microphone use, browser file selection, audible speech, visual reasoning generally, or simultaneous coding. Compare diverse consented images and real speech when resource headroom permits; keep the native speech mode's lack of image input visible.
+
+## Second synthetic color and current demo — 2026-11-17
+
+The probe now accepts a selected gateway port and either a red or blue generated 64-by-64 PNG; `python -m unittest prototype.test_spoken_image_probe` independently decompresses the PNG pixel data for both colors. On the Windows B60, `scripts/run-spoken-image-probe.ps1 -GatewayPort 18111 -Color blue` used the existing cascade gateway, Pocket TTS, Vosk and vision model. It generated a French question and a blue image without saving either or opening physical devices. The transcript was `[Image] quelle est la couleur dominante de cette image répond en un mot`, the visual answer was `Bleu`, and the gateway returned 59,520 bytes of audio in 5,812 ms after question synthesis. No tool call or agent task was executed. The audio was not listened to.
+
+Eight whole-system samples showed peak dedicated GPU use of 12,151,853,056 bytes, peak shared GPU use of 236,044,288 bytes, and minimum available RAM of 13,096,349,696 bytes. Sampling cannot rule out transient allocations or paging, and the shared reading was close to the conservative 256 MiB stop signal. This was the already running gateway rather than the latest source, and it does not verify the recent TTS timeout. The result extends the previous red synthetic case to a second simple image; it is not evidence of general visual understanding, physical camera or microphone use, audible quality, concurrent agent work or native speech-to-speech.

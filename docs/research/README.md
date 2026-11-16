@@ -99,3 +99,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [LFM3-Omni candidate 2026-11-17](2026-11-17-lfm3-omni-candidate.md) records primary-source claims, verified local file hashes, and a resource-gated idle trial that has not loaded the model.
 
 [Cascade speech stall 2026-11-17](2026-11-17-tts-stall.md) records a real streaming WAV header observation and a simulated stalled-response test.
+
+[Spoken image follow-up 2026-11-17](2026-11-12-spoken-image.md) adds a second synthetic color against the running cascade, with sampled hardware observations.
