@@ -86,6 +86,8 @@ Older Windows model-trial scripts now compare total observed shared GPU use agai
 
 The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
 
+A quantized LFM3-Omni projector has been prepared as a possible native speech-and-vision experiment, but its model has not yet been loaded or validated on this machine. The guarded preflight currently refuses the trial on shared GPU usage. See the [candidate record](docs/research/2026-11-17-lfm3-omni-candidate.md).
+
 The browser reports detected playback gaps over 30 ms in the conversation log. This can help distinguish delivery interruptions from pronunciation problems, but does not identify their cause or measure audio quality.
 
 Playback scheduling now keeps consecutive audio chunks adjacent while a queue remains, avoiding a previously possible artificial pause. This correction has a mock-clock regression test; its effect on live speech remains to be heard.

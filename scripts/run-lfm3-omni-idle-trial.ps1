@@ -1,4 +1,4 @@
-param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly,[switch]$DisableHostVisibleVidmem)
+param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly,[switch]$DisableHostVisibleVidmem,[switch]$Q8Projector)
 $ErrorActionPreference='Stop'
 if($Port -lt 1024 -or $Port -gt 65535 -or $Seconds -lt 1 -or $Seconds -gt 120){throw 'Invalid port or duration'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -6,6 +6,7 @@ $engine=Join-Path $env:USERPROFILE '.lmstudio/extensions/backends/llama.cpp-win-
 $folder=Join-Path $env:USERPROFILE '.lmstudio/models/LiquidAI/LFM3-Omni-2B-GGUF'
 $model=Join-Path $folder 'LFM3-Omni-2B-Q4_K_M.gguf'
 $projector=Join-Path $folder 'mmproj-LFM3-Omni-2B-F16.gguf'
+if($Q8Projector){$projector=Join-Path $root '.cache/lfm3-omni-research/mmproj-LFM3-Omni-2B-Q8_0.gguf'}
 foreach($file in @($engine,$model,$projector)){if(!(Test-Path -LiteralPath $file -PathType Leaf)){throw "Missing required file: $file"}}
 if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){throw 'Trial port is already occupied; no process was stopped'}
 $adapter='luid_0x00000000_0x00013269_phys_0'
@@ -42,5 +43,5 @@ try {
 } finally {
   $process.Refresh();if(!$process.HasExited){Stop-Process -Id $process.Id -Force;$process.WaitForExit()}
 }
-@{reason=$reason;ready=$ready;baseline=$baseline;disableHostVisibleVidmem=[bool]$DisableHostVisibleVidmem;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
+@{reason=$reason;ready=$ready;baseline=$baseline;disableHostVisibleVidmem=[bool]$DisableHostVisibleVidmem;q8Projector=[bool]$Q8Projector;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
 if($reason -ne 'duration elapsed' -or !$ready){exit 1}
