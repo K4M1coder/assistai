@@ -35,6 +35,21 @@ def cold_transcribe(audio):
     return module.recognize_crisp(pcm, EXECUTABLE, MODEL, 'kyutai-stt', seed=42, no_fallback=True)
 
 
+def rate_mismatch_control(audio):
+    """Experimental short-clip control, not a valid general server workaround."""
+    import numpy as np
+    from scipy.signal import resample_poly
+    with wave.open(io.BytesIO(audio), 'rb') as source:
+        if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
+            raise ValueError('Expected mono 16-bit 16 kHz WAV')
+        samples = np.frombuffer(source.readframes(source.getnframes()), dtype='<i2').astype(np.float64)
+    converted = np.clip(np.rint(resample_poly(samples, 3, 2)), -32768, 32767).astype('<i2')
+    result = io.BytesIO()
+    with wave.open(result, 'wb') as output:
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(converted.tobytes())
+    return result.getvalue()
+
+
 def main():
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
     audio = synthetic_wav()
@@ -62,14 +77,14 @@ def main():
             time.sleep(.2)
         startup_ms = round((time.monotonic() - started) * 1000)
         results = []
-        for _ in range(2):
+        for label, payload in [('original', audio), ('rate_mismatch_control', rate_mismatch_control(audio))]:
             beginning = time.monotonic()
-            response = requests.post(base + '/v1/audio/transcriptions', files={'file':('synthetic.wav', audio, 'audio/wav')},
+            response = requests.post(base + '/v1/audio/transcriptions', files={'file':('synthetic.wav', payload, 'audio/wav')},
                                      data={'language':'fr', 'response_format':'json', 'seed':'42', 'temperature':'0'}, timeout=60)
             response.raise_for_status()
             text = response.json().get('text', '').strip()
             if not text: raise RuntimeError('Empty transcription')
-            results.append({'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
+            results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
         print(json.dumps({'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
                           'physical_devices_opened':False, 'synthetic':True, 'audio_saved_by_probe':False}, ensure_ascii=False), flush=True)
