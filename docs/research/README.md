@@ -105,3 +105,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Reported premature task start 2026-11-17](2026-11-17-reported-premature-task.md) documents an unresolved operator report, the observed harness state and a simulated review-and-approval check.
 
 [Vosk vocabulary and Kyutai STT 2026-11-17](2026-11-17-vosk-vocabulary-kyutai.md) records an exact vocabulary check, a hash-verified CPU candidate and guarded synthetic comparisons including trailing silence.
+
+[Direct delegation and audio loopback 2026-11-17](2026-11-17-direct-delegation-audio-loopback.md) records the changed operator requirement, a real disposable edit, file-based voice checks and mockup restoration.

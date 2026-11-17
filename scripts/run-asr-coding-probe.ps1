@@ -1,7 +1,8 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$Kyutai, [switch]$ComparePadding)
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
+if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -15,6 +16,7 @@ if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/asr-coding-$stamp"
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
+if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario)}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
@@ -41,6 +43,13 @@ try {
     $processes=@(Get-CimInstance Win32_Process)
     $byId=@{};foreach($item in $processes){$byId[[int]$item.ProcessId]=$item}
     foreach($item in $processes | Where-Object {$_.ExecutablePath -eq $crisp}){
+      $parent=[int]$item.ParentProcessId;$seen=@{}
+      while($parent -gt 0 -and !$seen.ContainsKey($parent) -and $byId.ContainsKey($parent)){
+        if($parent -eq $p.Id){Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue;break}
+        $seen[$parent]=$true;$parent=[int]$byId[$parent].ParentProcessId
+      }
+    }
+    foreach($item in $processes | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*prototype*gateway.mjs*' }){
       $parent=[int]$item.ParentProcessId;$seen=@{}
       while($parent -gt 0 -and !$seen.ContainsKey($parent) -and $byId.ContainsKey($parent)){
         if($parent -eq $p.Id){Stop-Process -Id $item.ProcessId -Force -ErrorAction SilentlyContinue;break}
