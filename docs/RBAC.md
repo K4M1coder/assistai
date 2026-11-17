@@ -8,7 +8,7 @@ Service discovery strips URL userinfo, query strings and fragments from displaye
 
 When configured, the read-only resource endpoint exposes aggregate memory telemetry to clients that can reach the local gateway; it does not expose the sampler file path or apply a permission check. Resource reporting and advisory admission are not access-control or hard resource-isolation boundaries.
 
-The optional pressure-triggered cancellation requests an existing task stop without a new approval. It does not grant task execution, undo already performed actions, isolate the agent, or guarantee that cancellation succeeds. It is disabled by default and can interrupt an approved task if system-wide resource readings cross the configured thresholds.
+The optional pressure-triggered cancellation requests an existing task stop. It does not grant task execution, undo already performed actions, isolate the agent, or guarantee that cancellation succeeds. It is disabled by default and can interrupt a delegated task if system-wide resource readings cross the configured thresholds.
 
 Historical direct OpenCode probes submit tasks without gateway admission or an approval gate. They do not implement authentication or an OS sandbox.
 

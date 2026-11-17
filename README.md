@@ -100,7 +100,7 @@ The updated cascade offers an optional **Review speech before sending** mode: th
 
 A guarded synthetic ASR probe compares recognition of operation direction, negation and a filename. In one three-phrase run, both the Vosk baseline and a CPU FastConformer candidate missed the filename; this does not establish general accuracy.
 
-An existing quantized Kyutai French/English STT candidate has been inventoried without loading it. Its required codec, tokenizer and usable local runtime were not established, so it is not yet an alternative deployed in the demo. See [EXP-151](docs/research/2026-11-12-kyutai-stt-inventory.md).
+A quantized Kyutai French/English STT candidate was initially inventoried without a verified runtime. Subsequent Windows CPU file-mode experiments used the pinned CrispASR runtime and Q4 model, including a synthetic voice loopback; an optional sidecar buffers complete utterances and is not the default or a streaming solution. A persistent HTTP experiment exposed a likely sample-rate mismatch and remains under investigation. See the [initial inventory](docs/research/2026-11-12-kyutai-stt-inventory.md), [buffered tests](docs/research/2026-11-17-buffered-kyutai-and-mockup.md) and [persistent-server experiment](docs/research/2026-11-17-kyutai-persistent.md).
 
 A pinned Windows CPU research runtime, CrispASR, has been tested with an existing 117 MB French FastConformer checkpoint. One small synthetic comparison is recorded; live streaming, broad accuracy and sustained resource use remain unverified.
 
