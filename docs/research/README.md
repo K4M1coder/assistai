@@ -111,3 +111,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Buffered Kyutai and mockup memory 2026-11-17](2026-11-17-buffered-kyutai-and-mockup.md) records same-audio and end-to-end CPU transcription tests and the mockup's measured static-serving footprint.
 
 [Persistent Kyutai CPU experiment 2026-11-17](2026-11-17-kyutai-persistent.md) compares file and persistent-server transcription of identical synthetic audio, including observed accuracy failures and resource samples.
+
+[Working research manuscript](manuscript-draft.md) synthesizes the present architecture, methods, selected positive and negative results, and outstanding evidence. It is not a final paper.
