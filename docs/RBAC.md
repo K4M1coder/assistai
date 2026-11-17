@@ -18,6 +18,8 @@ The optional shared task-reservation database is a local coordination mechanism,
 
 The gateway no longer records approval decisions for new tasks because delegation is direct. Lifecycle events remain local and are not an authenticated or tamper-proof audit.
 
+The native bridge can now submit multiple tool calls from one response concurrently, subject to its four-call limit and the gateway's existing admission checks. This does not grant additional harness permissions, provide isolation, guarantee resource enforcement or validate parallel execution with a real native model.
+
 The experimental buffered Kyutai sidecar stores utterance audio temporarily as a WAV in the local cache. It removes the file on normal completion, but a crash or forced termination can leave it on disk. Like the other loopback services it has no user authentication.
 
 The browser's task-result replay uses the existing same-session completion lookup. A resumed session is selected by possession of its browser-held capability; replay is not identity verification or RBAC. Spoken results may be overheard, and the user explicitly initiates replay of a historical result.

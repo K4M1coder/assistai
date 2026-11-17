@@ -11,6 +11,14 @@ test('partial input reset replaces backend session',()=>{const {client,sessions}
 test('unexpected native backend closure disconnects the client for recovery',()=>{const {client,sessions}=setup();sessions[0].close();assert.deepEqual(client.closeInfo,{code:1011,reason:'Native speech disconnected'});assert.match(client.sent.at(-1).message,/connection closed/)});
 test('native backend fault is reported once before disconnect',()=>{const {client,sessions}=setup();sessions[0].emit('fault','Realtime transport error');sessions[0].close();assert.equal(client.sent.filter(e=>e.type==='error').length,1);assert.equal(client.closeInfo.code,1011)});
 test('delegates explicit tool call and sends bounded result',async()=>{const {client,sessions,tasks}=setup();const s=sessions[0];client.event({type:'audio.start'});s.emit('toolCall',{name:'delegate_task',callId:'1',arguments:'{"task":"read fixture"}'});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(tasks,[['read fixture','turn1']]);assert.deepEqual(s.results,[['1',{accepted:true}]])});
+test('starts separate delegated calls without waiting for the first',async()=>{
+ const client=new Client();let session;const pending=new Map(),started=[];
+ attachLfmBridge(client,{makeTurnId:()=> 'turn1',sessionFactory:()=>session=new Session(),launchTask:task=>{started.push(task);return new Promise(resolve=>pending.set(task,resolve));}});
+ client.event({type:'audio.start'});session.emit('toolCall',{name:'delegate_task',callId:'1',arguments:'{"task":"one"}'});session.emit('toolCall',{name:'delegate_task',callId:'2',arguments:'{"task":"two"}'});
+ assert.deepEqual(started,['one','two']);pending.get('two')({accepted:true});await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(session.results,[['2',{accepted:true}]]);pending.get('one')({accepted:true});await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(session.results,[['2',{accepted:true}],['1',{accepted:true}]]);
+});
 test('interrupt during tool submission resets voice without submitting a stale tool result',async()=>{
  const client=new Client(),sessions=[];let finishTask;const task=new Promise(resolve=>{finishTask=resolve});
  attachLfmBridge(client,{makeTurnId:()=> 'turn1',sessionFactory:()=>{const s=new Session();sessions.push(s);return s},launchTask:()=>task});

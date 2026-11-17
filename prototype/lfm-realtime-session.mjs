@@ -8,7 +8,7 @@ export class LfmRealtimeSession extends EventEmitter {
     if (typeof instructions !== 'string' || !instructions || !Array.isArray(tools)) throw new TypeError('Session configuration required');
     this.socket = socket; this.instructions = instructions; this.tools = tools;
     this.maxInputBytes = maxInputBytes; this.maxSocketBytes = maxSocketBytes;
-    this.state = 'connecting'; this.responseId = null; this.inputBytes = 0; this.pendingCall = null;
+    this.state = 'connecting'; this.responseId = null; this.inputBytes = 0; this.pendingCalls = null;
     socket.on('message', (data, binary) => {
       if (this.state === 'closed') return;
       if (binary) return this.fail('Unexpected binary message');
@@ -55,12 +55,18 @@ export class LfmRealtimeSession extends EventEmitter {
       this.responseId = null;
       if (cancelled) { this.state = 'ready'; this.emit('cancelled'); return; }
       if (event.response?.status !== 'completed') return this.fail('Realtime response failed');
-      if (calls.length > 1) return this.fail('Multiple tool calls are not supported');
-      if (calls.length === 1) {
-        const call = calls[0];
-        if (typeof call.name !== 'string' || typeof call.call_id !== 'string' || typeof call.arguments !== 'string' || call.arguments.length > 8192) throw Error('Invalid tool call');
-        this.pendingCall = call.call_id; this.state = 'awaiting_tool';
-        this.emit('toolCall', { name: call.name, callId: call.call_id, arguments: call.arguments });
+      if (calls.length > 4) return this.fail('Too many tool calls');
+      if (calls.length) {
+        const ids = new Set();
+        for (const call of calls) {
+          if (typeof call.name !== 'string' || !call.name || typeof call.call_id !== 'string' || !call.call_id || ids.has(call.call_id) || typeof call.arguments !== 'string' || call.arguments.length > 8192) throw Error('Invalid tool call');
+          ids.add(call.call_id);
+        }
+        this.pendingCalls = new Map(calls.map(call => [call.call_id, null])); this.state = 'awaiting_tool';
+        for (const call of calls) {
+          if (this.state !== 'awaiting_tool') break;
+          this.emit('toolCall', { name: call.name, callId: call.call_id, arguments: call.arguments });
+        }
       } else { this.state = 'ready'; this.emit('responseDone'); }
     } else if (event.type === 'error') { this.fail('Realtime backend error'); }
   }
@@ -82,9 +88,13 @@ export class LfmRealtimeSession extends EventEmitter {
     return this.send({ type: 'response.create', response: { output_modalities: ['text', 'audio'], tool_choice: 'none' } });
   }
   submitToolResult(callId, output) {
-    if (this.state !== 'awaiting_tool' || callId !== this.pendingCall || typeof output !== 'string' || output.length > 16000) return false;
-    if (!this.send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output } })) return false;
-    this.pendingCall = null; this.state = 'waiting';
+    if (this.state !== 'awaiting_tool' || !this.pendingCalls?.has(callId) || this.pendingCalls.get(callId) !== null || typeof output !== 'string' || output.length > 16000) return false;
+    this.pendingCalls.set(callId, output);
+    if ([...this.pendingCalls.values()].some(value => value === null)) return true;
+    for (const [id, result] of this.pendingCalls) {
+      if (!this.send({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: id, output: result } })) return false;
+    }
+    this.pendingCalls = null; this.state = 'waiting';
     return this.send({ type: 'response.create', response: { output_modalities: ['text', 'audio'] } });
   }
   cancel() {
@@ -95,5 +105,5 @@ export class LfmRealtimeSession extends EventEmitter {
   }
   fail(reason) { if (this.state !== 'closed') { this.emit('fault', reason); this.finish(); this.socket.close(); } return false; }
   close() { if (this.state !== 'closed') { this.finish(); this.socket.close(); } }
-  finish() { if (this.state !== 'closed') { this.state = 'closed'; this.pendingCall = null; this.emit('closed'); } }
+  finish() { if (this.state !== 'closed') { this.state = 'closed'; this.pendingCalls = null; this.emit('closed'); } }
 }
