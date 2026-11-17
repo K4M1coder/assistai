@@ -63,7 +63,7 @@ async def recognize(pcm):
             if event.get('type') == 'final': return ' '.join(result)
 
 
-def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=None, no_fallback=False, allow_empty=False):
+def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=None, no_fallback=False, allow_empty=False, threads=2):
     if backend not in ('fastconformer-ctc', 'kyutai-stt'):
         raise ValueError('Unsupported research backend')
     root = Path(__file__).resolve().parents[1]
@@ -77,7 +77,7 @@ def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=No
         started = time.monotonic()
         try:
             command = [str(executable), '--backend', backend, '-m', str(model), '-f', str(name),
-                       '-ng', '-t', '2', '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation']
+                       '-ng', '-t', str(threads), '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation']
             if seed is not None: command += ['--seed', str(seed)]
             if no_fallback: command += ['--no-fallback']
             result = subprocess.run(command,

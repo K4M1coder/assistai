@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -11,6 +11,7 @@ if($LocalCrispBuild -and !$PersistentTrial){throw 'LocalCrispBuild requires -Per
 if($FixedSyntheticFixture -and !$PersistentTrial){throw 'FixedSyntheticFixture requires -PersistentTrial'}
 if($NaturalFixture -and (!$PersistentTrial -or $FixedSyntheticFixture)){throw 'NaturalFixture requires PersistentTrial and excludes FixedSyntheticFixture'}
 if($NaturalGain -ne 1 -and !$NaturalFixture){throw 'NaturalGain requires NaturalFixture'}
+if($ASRThreads -ne 2 -and !$PersistentTrial){throw 'ASRThreads requires PersistentTrial'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -25,7 +26,7 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
-if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario)}
+if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario,'--threads',[string]$ASRThreads)}
 if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}
 if($NaturalFixture){$probeArgs+=@('--natural-fixture','--natural-gain',[string]$NaturalGain,'--natural-voice',$NaturalVoice)}
 if($FixtureOnly){$probeArgs+='--fixture-only'}

@@ -35,12 +35,12 @@ def synthetic_wav(text):
     return buffer.getvalue()
 
 
-def cold_transcribe(audio):
+def cold_transcribe(audio, threads):
     spec = importlib.util.spec_from_file_location('asr_coding', ROOT / 'scripts/probe-asr-coding.py')
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     with wave.open(io.BytesIO(audio), 'rb') as source:
         pcm = source.readframes(source.getnframes())
-    return module.recognize_crisp(pcm, EXECUTABLE, MODEL, 'kyutai-stt', seed=42, no_fallback=True, allow_empty=True)
+    return module.recognize_crisp(pcm, EXECUTABLE, MODEL, 'kyutai-stt', seed=42, no_fallback=True, allow_empty=True, threads=threads)
 
 
 def rate_mismatch_control(audio):
@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--natural-fixture', action='store_true')
     parser.add_argument('--natural-gain', type=int, choices=(1, 8, 64), default=1)
     parser.add_argument('--natural-voice', choices=tuple(NATURAL_FIXTURES), default='male')
+    parser.add_argument('--threads', type=int, choices=(2, 4), default=2)
     parser.add_argument('--scenario', choices=tuple(SCENARIOS), default='math')
     options = parser.parse_args()
     EXECUTABLE = options.executable.resolve()
@@ -103,11 +104,11 @@ def main():
         audio = synthetic_wav(SCENARIOS[options.scenario])
         if options.fixed_synthetic_fixture:
             with fixture.open('xb') as output: output.write(audio)
-    cold_text, cold_ms = cold_transcribe(audio)
+    cold_text, cold_ms = cold_transcribe(audio, options.threads)
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
     base = f'http://127.0.0.1:{port}'
-    args = [str(EXECUTABLE), '--server', '--backend', 'kyutai-stt', '-m', str(MODEL), '-ng', '-t', '2',
+    args = [str(EXECUTABLE), '--server', '--backend', 'kyutai-stt', '-m', str(MODEL), '-ng', '-t', str(options.threads),
             '-l', 'fr', '-nt', '-np', '--lid-backend', 'off', '--no-punctuation', '--no-fallback', '--seed', '42',
             '--no-warmup', '--host', '127.0.0.1', '--port', str(port)]
     started = time.monotonic()
@@ -135,7 +136,7 @@ def main():
             text = response.json().get('text', '').strip()
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
         print(json.dumps({'scenario':f'fleurs-fr-{identifier}' if options.natural_fixture else options.scenario,
-                          'natural_gain':options.natural_gain if options.natural_fixture else None,
+                          'natural_gain':options.natural_gain if options.natural_fixture else None, 'threads':options.threads,
                           'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
                           'audio_sha256':hashlib.sha256(audio).hexdigest(), 'fixture_reused':reused,
