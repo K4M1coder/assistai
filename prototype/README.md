@@ -59,7 +59,7 @@ The cascade reports empty or incomplete PCM16 speech as an error. The browser cl
 
 After a gateway disconnect, the browser retries with a capped delay. It pauses audio transmission while disconnected, resets an interrupted push-to-talk press and retains unsent text. An already enabled microphone stays enabled and resumes sending after recognition becomes ready. Without opt-in session resume, reconnect starts a new session; a policy rejection requires intervention. A lost cascade ASR connection closes the gateway connection so it can be re-established. This behavior has mock and simulated-DOM tests, not a physical microphone or browser reconnect test.
 
-The Windows demonstration uses the repository's `.venv-voice` environment and `.cache/huggingface` model cache. Keep `HF_HUB_OFFLINE=1` for the existing Pocket TTS model; using the default cache path can make offline startup fail. The updated gateway uses port 18089; the older gateway remains on 18088. See the research log for the verified service configuration and its limits.
+The Windows demonstration uses the repository's `.venv-voice` environment and `.cache/huggingface` model cache. Keep `HF_HUB_OFFLINE=1` for the existing Pocket TTS model; using the default cache path can make offline startup fail. The current editable-fixture gateway uses port 18131 while its services remain running. See the research log for the verified service configuration and its limits.
 
 Create a Python 3.11 or 3.12 environment, install the pinned direct dependencies in `requirements.txt`, then run `python scripts/setup-vosk-fr.py` from the repository root. This downloads the public Vosk French small model into `.cache/vosk`. After setup, the recognizer runs locally without network access. Set `ASSISTAI_VOSK_MODEL` to use a different Vosk model directory.
 
@@ -78,6 +78,18 @@ With the documented local model files and read-only fixture already installed, t
 ```
 
 Visit `http://127.0.0.1:18097/` and check its service and resource status. Stop the gateway with `scripts/stop-windows-demo.ps1 -Port 18097`, then `scripts/stop-windows-harness.ps1`, `scripts/stop-windows-controller.ps1 -Agent`, `scripts/stop-windows-controller.ps1`, and `scripts/stop-windows-speech.ps1`. These scripts refuse occupied ports or existing ownership records instead of replacing processes. Controller startup samples resource thresholds, but no continuous hardware limit is enforced after startup; retained history in this gateway is volatile. The harness fixture is application-level read-only, not an OS sandbox. Physical French conversation and strict memory compliance remain incompletely verified.
+
+For the separately scoped editable fixture, after starting the same speech and model services, create the fixture only if `.cache/agent-edit-demo` does not already exist; the setup deliberately refuses to overwrite it. Then start its harness and gateway:
+
+```powershell
+$env:ASSISTAI_PROBE_WORKSPACE = '.cache/agent-edit-demo'
+.\.venv-voice\Scripts\python.exe scripts\setup-agent-edit-probe.py
+Remove-Item Env:ASSISTAI_PROBE_WORKSPACE
+.\scripts\start-windows-harness.ps1 -EditFixture
+.\scripts\start-windows-demo.ps1 -EditFixture -Port 18131
+```
+
+If the fixture already exists, inspect and retain its contents instead of running its setup again. To stop this variant use `scripts/stop-windows-demo.ps1 -Port 18131` and `scripts/stop-windows-harness.ps1 -EditFixture` before stopping the shared model and speech services. Direct delegation may edit this fixture without a task approval panel. These commands assume all required local dependencies and weights already exist and may refuse startup when their sampled resource thresholds are exceeded; the complete startup sequence has not been re-executed for this documentation update.
 
 `python scripts/test-asr-sidecar.py path/to/mono.wav` resamples a 16-bit mono WAV and replays it at real-time speed. With no argument, it expects `.cache/french-test.wav`, produced by the Pocket TTS experiment. This is an integration probe, not a benchmark of real microphones, accents, noise, or word error rate.
 
