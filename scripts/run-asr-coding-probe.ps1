@@ -1,10 +1,12 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
 if($FixtureOnly -and $VoiceCases){throw 'Choose one case set'}
 if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
 if($KyutaiInput -and !$VoiceLoopback){throw 'KyutaiInput requires -VoiceLoopback'}
+if($PersistentTrial -and ($VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'PersistentTrial is a separate probe'}
+if($ProcessMetrics -and !$PersistentTrial){throw 'ProcessMetrics requires -PersistentTrial'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -19,6 +21,7 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
+if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'))}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($VoiceCases){$probeArgs+='--voice-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
@@ -33,10 +36,25 @@ $p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -A
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {
   while([DateTime]::UtcNow -lt $deadline){
-    $sample=Resources;($sample | ConvertTo-Json -Compress) | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
-    if($sample.availableRam -lt 6GB){$reason='RAM reserve';break}
-    if($sample.dedicated -gt 22GB){$reason='dedicated GPU threshold';break}
-    if($sample.shared -gt 256MB){$reason='shared GPU threshold';break}
+    $sample=Resources
+    if($sample.availableRam -lt 6GB -or $sample.dedicated -gt 22GB -or $sample.shared -gt 256MB){
+      ($sample | ConvertTo-Json -Compress) | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
+      $reason=if($sample.availableRam -lt 6GB){'RAM reserve'}elseif($sample.dedicated -gt 22GB){'dedicated GPU threshold'}else{'shared GPU threshold'}
+      break
+    }
+    if($ProcessMetrics){
+      $all=@(Get-CimInstance Win32_Process);$byId=@{};foreach($item in $all){$byId[[int]$item.ProcessId]=$item}
+      $working=[long]0;$private=[long]0;$count=0
+      foreach($item in $all | Where-Object {$_.ExecutablePath -eq $crisp}){
+        $parent=[int]$item.ParentProcessId;$seen=@{}
+        while($parent -gt 0 -and !$seen.ContainsKey($parent) -and $byId.ContainsKey($parent)){
+          if($parent -eq $p.Id){$tracked=Get-Process -Id $item.ProcessId -ErrorAction SilentlyContinue;if($tracked){$working+=$tracked.WorkingSet64;$private+=$tracked.PrivateMemorySize64;$count++};break}
+          $seen[$parent]=$true;$parent=[int]$byId[$parent].ParentProcessId
+        }
+      }
+      $sample.candidateCount=$count;$sample.candidateWorkingSet=$working;$sample.candidatePrivateBytes=$private
+    }
+    ($sample | ConvertTo-Json -Compress) | Add-Content -LiteralPath "$prefix.samples.jsonl" -Encoding utf8
     $p.Refresh();if($p.HasExited){$reason=if($p.ExitCode -eq 0){'probe completed'}else{"probe failed: $($p.ExitCode)"};break}
   }
 } finally {

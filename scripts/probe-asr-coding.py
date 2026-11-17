@@ -63,7 +63,7 @@ async def recognize(pcm):
             if event.get('type') == 'final': return ' '.join(result)
 
 
-def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc'):
+def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=None, no_fallback=False):
     if backend not in ('fastconformer-ctc', 'kyutai-stt'):
         raise ValueError('Unsupported research backend')
     root = Path(__file__).resolve().parents[1]
@@ -76,8 +76,11 @@ def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc'):
             output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(pcm)
         started = time.monotonic()
         try:
-            result = subprocess.run([str(executable), '--backend', backend, '-m', str(model), '-f', str(name),
-                                     '-ng', '-t', '2', '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation'],
+            command = [str(executable), '--backend', backend, '-m', str(model), '-f', str(name),
+                       '-ng', '-t', '2', '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation']
+            if seed is not None: command += ['--seed', str(seed)]
+            if no_fallback: command += ['--no-fallback']
+            result = subprocess.run(command,
                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
                                     errors='replace', timeout=45, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         except subprocess.TimeoutExpired as error:
