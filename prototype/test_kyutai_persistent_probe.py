@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -32,16 +33,17 @@ class PersistentProbeTests(unittest.TestCase):
             process = FakeProcess(); uploads = []
             def post(url, **kwargs):
                 uploads.append(kwargs['files']['file'][1])
-                return Response({'text':'deux plus trois'})
+                return Response({'text':'' if len(uploads) == 1 else 'deux plus trois'})
             with patch.object(probe, 'EXECUTABLE', file), patch.object(probe, 'MODEL', file), patch('sys.argv', ['probe']), \
                  patch.object(probe, 'synthetic_wav', return_value=b'synthetic'), \
                  patch.object(probe, 'rate_mismatch_control', return_value=b'converted'), \
                  patch.object(probe, 'cold_transcribe', return_value=('cold result', 100)), \
                  patch.object(probe.subprocess, 'Popen', return_value=process), \
                  patch.object(probe.requests, 'get', return_value=Response({'status':'ok'})), \
-                 patch.object(probe.requests, 'post', side_effect=post), contextlib.redirect_stdout(io.StringIO()):
+                 patch.object(probe.requests, 'post', side_effect=post), contextlib.redirect_stdout(io.StringIO()) as output:
                 probe.main()
             self.assertEqual(uploads, [b'synthetic', b'converted'])
+            self.assertEqual(json.loads(output.getvalue())['runs'][0]['text'], '')
             self.assertEqual(process.returncode, 0)
 
     def test_fixed_fixture_is_reused_without_resynthesizing(self):

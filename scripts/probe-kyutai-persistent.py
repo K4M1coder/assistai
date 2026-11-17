@@ -17,12 +17,14 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 EXECUTABLE = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
 MODEL = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
+SCENARIOS = {'math': 'Combien font deux plus trois ? Réponds en un mot.',
+             'capital': 'Quelle est la capitale de la France ? Réponds en un mot.'}
 
 
-def synthetic_wav():
+def synthetic_wav(text):
     spec = importlib.util.spec_from_file_location('spoken_recall', ROOT / 'scripts/probe-spoken-session-recall.py')
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-    pcm = module.synthesize('Combien font deux plus trois ? Réponds en un mot.') + bytes(32000)
+    pcm = module.synthesize(text) + bytes(32000)
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as output:
         output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(pcm)
@@ -57,15 +59,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--executable', type=Path, default=EXECUTABLE)
     parser.add_argument('--fixed-synthetic-fixture', action='store_true')
+    parser.add_argument('--scenario', choices=tuple(SCENARIOS), default='math')
     options = parser.parse_args()
     EXECUTABLE = options.executable.resolve()
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
-    fixture = ROOT / '.cache/kyutai-persistent-synthetic-math.wav'
+    fixture = ROOT / f'.cache/kyutai-persistent-synthetic-{options.scenario}.wav'
     reused = False
     if options.fixed_synthetic_fixture and fixture.is_file():
         audio = fixture.read_bytes(); reused = True
     else:
-        audio = synthetic_wav()
+        audio = synthetic_wav(SCENARIOS[options.scenario])
         if options.fixed_synthetic_fixture:
             with fixture.open('xb') as output: output.write(audio)
     cold_text, cold_ms = cold_transcribe(audio)
@@ -98,9 +101,8 @@ def main():
                                      data={'language':'fr', 'response_format':'json', 'seed':'42', 'temperature':'0'}, timeout=60)
             response.raise_for_status()
             text = response.json().get('text', '').strip()
-            if not text: raise RuntimeError('Empty transcription')
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
-        print(json.dumps({'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
+        print(json.dumps({'scenario':options.scenario, 'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
                           'audio_sha256':hashlib.sha256(audio).hexdigest(), 'fixture_reused':reused,
                           'physical_devices_opened':False, 'synthetic':not reused,
