@@ -1,5 +1,6 @@
 """Compare repeated synthetic utterances on one local persistent CPU model."""
 import importlib.util
+import argparse
 import io
 import json
 from pathlib import Path
@@ -51,6 +52,10 @@ def rate_mismatch_control(audio):
 
 
 def main():
+    global EXECUTABLE
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--executable', type=Path, default=EXECUTABLE)
+    EXECUTABLE = parser.parse_args().executable.resolve()
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
     audio = synthetic_wav()
     cold_text, cold_ms = cold_transcribe(audio)

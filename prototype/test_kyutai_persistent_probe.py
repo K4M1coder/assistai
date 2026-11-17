@@ -33,7 +33,7 @@ class PersistentProbeTests(unittest.TestCase):
             def post(url, **kwargs):
                 uploads.append(kwargs['files']['file'][1])
                 return Response({'text':'deux plus trois'})
-            with patch.object(probe, 'EXECUTABLE', file), patch.object(probe, 'MODEL', file), \
+            with patch.object(probe, 'EXECUTABLE', file), patch.object(probe, 'MODEL', file), patch('sys.argv', ['probe']), \
                  patch.object(probe, 'synthetic_wav', return_value=b'synthetic'), \
                  patch.object(probe, 'rate_mismatch_control', return_value=b'converted'), \
                  patch.object(probe, 'cold_transcribe', return_value=('cold result', 100)), \

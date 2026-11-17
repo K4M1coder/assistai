@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -7,6 +7,7 @@ if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyut
 if($KyutaiInput -and !$VoiceLoopback){throw 'KyutaiInput requires -VoiceLoopback'}
 if($PersistentTrial -and ($VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'PersistentTrial is a separate probe'}
 if($ProcessMetrics -and !$PersistentTrial){throw 'ProcessMetrics requires -PersistentTrial'}
+if($LocalCrispBuild -and !$PersistentTrial){throw 'LocalCrispBuild requires -PersistentTrial'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -26,6 +27,11 @@ if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($VoiceCases){$probeArgs+='--voice-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
+if($LocalCrispBuild){
+  $crisp=Join-Path $root '.cache/crispasr-source/build-local/bin/crispasr.exe'
+  if(!(Test-Path -LiteralPath $crisp -PathType Leaf)){throw 'Local CrispASR build is missing'}
+  $probeArgs+=@('--executable',"`"$crisp`"")
+}
 $model=Join-Path $env:USERPROFILE '.lmstudio/models/cstr/stt-fr-fastconformer-hybrid-ctc-large-GGUF/stt-fr-fastconformer-hybrid-ctc-large-q8_0.gguf'
 if($Kyutai){$model=Join-Path $root '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf';$probeArgs+=@('--crisp-backend','kyutai-stt')}
 if($CompareCrisp){
