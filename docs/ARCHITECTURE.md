@@ -128,6 +128,8 @@ An optional gateway pressure detector (`ASSISTAI_CANCEL_ON_PRESSURE=1`) requests
 
 Cascade speech generation has an inactivity timer covering response headers and each streamed chunk. A timeout aborts the TTS request and sends a turn-specific error instead of `speech.end`; the client can stop partial playback. It does not detect all truncated streams, because the current Pocket TTS WAV header uses a placeholder length. Mock integration verifies a stalled stream and recovery, not a real model stall or audible playback.
 
+The experimental Kyutai CPU sidecar implements the ASR protocol by buffering an utterance and starting a local file-mode subprocess. It has no streaming partials, uses a sampled resource guard and a bounded temporary WAV, and is not enabled in the main demo. It does not establish full-duplex interruption or prevent host-memory paging.
+
 Historical direct-to-OpenCode experiment scripts operate outside gateway admission and submit directly. The older direct edit probe uses static AST verification instead of executing generated fixture code.
 
 The gateway now submits tasks directly to the configured harness without an approval gate. Task lifecycle events remain local; they do not authenticate users or prevent other local callers from invoking the harness.

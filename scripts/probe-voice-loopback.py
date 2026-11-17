@@ -31,7 +31,7 @@ def expected_answer_present(text, expected):
     return bool(set(asr.tokens(text)) & expected)
 
 
-async def main(scenario='math'):
+async def main(scenario='math', input_asr='vosk'):
     spoken = load_module('spoken', 'probe-spoken-session-recall.py')
     asr = load_module('coding_asr', 'probe-asr-coding.py')
     question, expected = {
@@ -47,7 +47,7 @@ async def main(scenario='math'):
     env = dict(os.environ, ASSISTAI_GATEWAY_PORT=str(port), ASSISTAI_DB_PATH=':memory:',
                ASSISTAI_OPENCODE_URL='', ASSISTAI_LFM_REALTIME_URL='', ASSISTAI_BUDGET_SAMPLE_PATH='',
                ASSISTAI_RESOURCE_STATUS_PATH='', ASSISTAI_SHARED_RESERVATIONS_PATH='',
-               ASSISTAI_ASR_URL='ws://127.0.0.1:18082/asr', ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1',
+               ASSISTAI_ASR_URL='ws://127.0.0.1:18132/asr' if input_asr == 'kyutai' else 'ws://127.0.0.1:18082/asr', ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1',
                ASSISTAI_TTS_URL='http://127.0.0.1:18081')
     child = subprocess.Popen(['node', str(ROOT / 'prototype/gateway.mjs')], cwd=ROOT, env=env,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -67,23 +67,27 @@ async def main(scenario='math'):
         with wave.open(str(filename), 'rb') as source:
             pcm = source.readframes(source.getnframes())
         response = bytearray(); transcript = ''; answer = ''; sample_rate = None
+        first_audio_ms = None; final_asr_ms = None
         async with connect(f'ws://127.0.0.1:{port}/voice') as socket:
             while True:
                 event = json.loads(await asyncio.wait_for(socket.recv(), 20))
                 if event.get('type') == 'asr.ready': break
                 if event.get('type') == 'error': raise RuntimeError(event.get('message'))
+            turn_started = time.monotonic()
             await socket.send(json.dumps({'type':'audio.start'}))
             for offset in range(0, len(pcm), 3200):
                 await socket.send(pcm[offset:offset + 3200]); await asyncio.sleep(.1)
+            end_sent = time.monotonic()
             await socket.send(json.dumps({'type':'audio.end'}))
             while True:
                 event = await asyncio.wait_for(socket.recv(), 90)
                 if isinstance(event, bytes):
+                    if first_audio_ms is None: first_audio_ms = round((time.monotonic() - end_sent) * 1000)
                     response.extend(event)
                     if len(response) > 4 * 1024 * 1024: raise RuntimeError('Audio exceeded probe limit')
                     continue
                 event = json.loads(event); kind = event.get('type')
-                if kind == 'user.text': transcript = event.get('text', '')
+                if kind == 'user.text': transcript = event.get('text', ''); final_asr_ms = round((time.monotonic() - end_sent) * 1000)
                 elif kind == 'assistant.text': answer = event.get('text', '')
                 elif kind == 'speech.start': sample_rate = event.get('sample_rate')
                 elif kind == 'speech.end': break
@@ -94,14 +98,22 @@ async def main(scenario='math'):
         converted = np.clip(soxr.resample(samples, sample_rate, 16000), -32768, 32767).astype('<i2').tobytes()
         candidate = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
         executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
-        heard, elapsed = await asyncio.to_thread(asr.recognize_crisp, converted + bytes(32000), executable, candidate, 'kyutai-stt')
+        started = time.monotonic()
+        if input_asr == 'kyutai':
+            heard = await asr.recognize(converted)
+        else:
+            heard, _ = await asyncio.to_thread(asr.recognize_crisp, converted + bytes(32000), executable, candidate, 'kyutai-stt')
+        elapsed = round((time.monotonic() - started) * 1000)
         answered = expected_answer_present(answer, expected)
         heard_answer = expected_answer_present(heard, expected)
         print(json.dumps({'question':question, 'input_transcript':transcript, 'assistant_text':answer,
                           'output_asr':heard, 'normalized_wer':asr.word_error(answer, heard),
+                          'input_engine':input_asr, 'output_engine':'vosk' if input_asr == 'kyutai' else 'kyutai',
+                          'input_audio_ms':round(len(pcm) / 32), 'input_send_ms':round((end_sent - turn_started) * 1000),
+                          'end_to_transcript_ms':final_asr_ms, 'end_to_first_audio_ms':first_audio_ms,
                           'expected_answer_in_text':answered, 'expected_answer_in_output_asr':heard_answer,
                           'output_audio_bytes':len(response), 'output_sample_rate':sample_rate,
-                          'candidate_ms_including_load':elapsed, 'audio_synthetic':True,
+                          'output_asr_ms':elapsed, 'audio_synthetic':True,
                           'physical_devices_opened':False, 'audio_saved_after_run':False}, ensure_ascii=False), flush=True)
         if not answered or not heard_answer:
             raise RuntimeError('Expected answer was not present in both text and output transcription')
@@ -116,4 +128,6 @@ async def main(scenario='math'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--scenario', choices=('math', 'capital'), default='math')
-    asyncio.run(main(parser.parse_args().scenario))
+    parser.add_argument('--input-asr', choices=('vosk', 'kyutai'), default='vosk')
+    args = parser.parse_args()
+    asyncio.run(main(args.scenario, args.input_asr))

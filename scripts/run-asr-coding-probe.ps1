@@ -1,8 +1,10 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
-if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
+if($FixtureOnly -and $VoiceCases){throw 'Choose one case set'}
+if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
+if($KyutaiInput -and !$VoiceLoopback){throw 'KyutaiInput requires -VoiceLoopback'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -16,8 +18,9 @@ if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/asr-coding-$stamp"
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
-if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario)}
+if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
+if($VoiceCases){$probeArgs+='--voice-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
 $model=Join-Path $env:USERPROFILE '.lmstudio/models/cstr/stt-fr-fastconformer-hybrid-ctc-large-GGUF/stt-fr-fastconformer-hybrid-ctc-large-q8_0.gguf'

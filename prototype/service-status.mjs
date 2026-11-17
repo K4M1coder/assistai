@@ -20,7 +20,7 @@ export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, 
   };
   const httpAsr = new URL(nativeSpeech && nativeTranscriptUrl ? nativeTranscriptUrl : asrUrl); httpAsr.protocol = httpAsr.protocol === 'wss:' ? 'https:' : 'http:'; httpAsr.pathname = '/health'; httpAsr.search = '';
   const service = async (role, url) => {
-    try { const data = await get(url); return { role, server: displayUrl(url), available: ['ready', 'healthy', 'ok'].includes(data.status), reported: data.status ?? 'unknown', engine: data.engine ?? null, model: data.model ?? null, language: data.language ?? null }; }
+    try { const data = await get(url); return { role, server: displayUrl(url), available: ['ready', 'healthy', 'ok'].includes(data.status), reported: data.status ?? 'unknown', engine: data.engine ?? null, model: data.model ?? null, language: data.language ?? null, ...(typeof data.mode === 'string' ? { mode: data.mode } : {}) }; }
     catch { return { role, server: displayUrl(url), available: false }; }
   };
   const voice = models(nativeSpeech ? 'Speech-to-speech model' : 'Voice controller', voiceUrl);

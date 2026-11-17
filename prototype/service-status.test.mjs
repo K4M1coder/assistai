@@ -39,6 +39,15 @@ test('native mode reports only the configured parallel transcription engine', as
   assert.ok(!requested.some(url => url.includes(':18081') || url.includes(':18082')));
 });
 
+test('reports buffered recognition mode when the provider supplies it', async () => {
+  const fetcher = async url => ({ok:true,json:async()=>url.includes('/health')
+    ? {status:'ready',engine:'CrispASR CPU',model:'kyutai',language:'fr',mode:'buffered-utterance'} : {data:[]}});
+  const services = await getServiceStatus({voiceUrl:'http://127.0.0.1:18084/v1',asrUrl:'ws://127.0.0.1:18132/asr',ttsUrl:'http://127.0.0.1:18081'},fetcher);
+  const asr = services.find(service=>service.role==='Speech recognition');
+  assert.equal(asr.engine,'CrispASR CPU');
+  assert.equal(asr.mode,'buffered-utterance');
+});
+
 test('redacts URL credentials, query parameters and fragments in reported endpoints', async () => {
   const fetcher = async url => {
     if (url.includes('/config')) return {ok:true,json:async()=>({model:'local/gemma',provider:{local:{options:{baseURL:'http://user:secret@127.0.0.1:18080/v1?token=secret#secret'}}}})};

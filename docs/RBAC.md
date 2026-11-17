@@ -18,6 +18,8 @@ The optional shared task-reservation database is a local coordination mechanism,
 
 The gateway no longer records approval decisions for new tasks because delegation is direct. Lifecycle events remain local and are not an authenticated or tamper-proof audit.
 
+The experimental buffered Kyutai sidecar stores utterance audio temporarily as a WAV in the local cache. It removes the file on normal completion, but a crash or forced termination can leave it on disk. Like the other loopback services it has no user authentication.
+
 The browser's task-result replay uses the existing same-session completion lookup. A resumed session is selected by possession of its browser-held capability; replay is not identity verification or RBAC. Spoken results may be overheard, and the user explicitly initiates replay of a historical result.
 
 The experimental Windows native client opens the default microphone and speaker only when explicitly run; its synthetic tests and format checks do not open physical devices. A separate physical AEC probe opened them and retained aggregate levels only, without saving captured audio. A physical gateway-client test used a separate local SQLite database for transcripts; automatic cleanup was blocked by the execution environment, so that test database remains in `.cache/physical-native-probe-20261111/events.sqlite`. The client only accepts loopback gateway URLs and does not add authentication, change gateway permissions or provide an OS sandbox. Experimental AEC loads a pinned local research dependency.

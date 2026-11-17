@@ -1,9 +1,13 @@
-param([int]$Port=18089,[switch]$EditFixture,[switch]$WebFixture,[switch]$CancelOnPressure)
+param([int]$Port=18089,[switch]$EditFixture,[switch]$WebFixture,[switch]$CancelOnPressure,[switch]$KyutaiASR)
 $ErrorActionPreference='Stop'
 if($EditFixture -and $WebFixture){throw 'Choose one fixture'}
 $root=Split-Path -Parent $PSScriptRoot
 if($Port -lt 1024 -or $Port -gt 65535){throw 'Choose a port from 1024 to 65535'}
 if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){throw 'Demo port is already in use; no process was stopped'}
+if($KyutaiASR){
+  try {$asrHealth=Invoke-RestMethod 'http://127.0.0.1:18132/health' -TimeoutSec 2} catch {throw 'Experimental Kyutai ASR service is unavailable'}
+  if($asrHealth.status -ne 'ready' -or $asrHealth.mode -ne 'buffered-utterance' -or $asrHealth.resource_headroom_observed -ne $true){throw 'Experimental Kyutai ASR service is not ready'}
+}
 $adapter='luid_0x00000000_0x00013269_phys_0'
 $counters=@((Get-Counter -Counter "\GPU Adapter Memory($adapter)\Dedicated Usage","\GPU Adapter Memory($adapter)\Shared Usage").CounterSamples)
 $dedicated=@($counters | Where-Object Path -like '*\dedicated usage');$shared=@($counters | Where-Object Path -like '*\shared usage')
@@ -24,7 +28,7 @@ try {
   $env:ASSISTAI_LFM_REALTIME_URL=''; $env:ASSISTAI_LFM_TRANSCRIPT_ASR_URL=''; $env:ASSISTAI_OPENCODE_URL=if($EditFixture){'http://127.0.0.1:18110'}elseif($WebFixture){'http://127.0.0.1:18120'}else{'http://127.0.0.1:18085'}
   $env:ASSISTAI_WORKSPACE_LABEL=if($EditFixture){'Disposable coding fixture: .cache/agent-edit-demo. File editing is enabled. This is not an OS sandbox.'}elseif($WebFixture){'Web research fixture: search queries are sent to hosted Exa and pages to their websites. File editing is disabled.'}else{'Read-only research fixture: .cache/opencode-probe. Web search and editing are disabled.'}
   $env:ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1'; $env:ASSISTAI_VISION_URL='http://127.0.0.1:18080/v1'
-  $env:ASSISTAI_TTS_URL='http://127.0.0.1:18081'; $env:ASSISTAI_ASR_URL='ws://127.0.0.1:18082/asr'
+  $env:ASSISTAI_TTS_URL='http://127.0.0.1:18081'; $env:ASSISTAI_ASR_URL=if($KyutaiASR){'ws://127.0.0.1:18132/asr'}else{'ws://127.0.0.1:18082/asr'}
   $env:ASSISTAI_BUDGET_SAMPLE_PATH=$sample; $env:ASSISTAI_RESOURCE_STATUS_PATH=$sample
   $env:ASSISTAI_CANCEL_ON_PRESSURE=if($CancelOnPressure){'1'}else{'0'}
   $env:ASSISTAI_SHARED_RESERVATIONS_PATH=Join-Path $runtime 'task-reservations.sqlite'

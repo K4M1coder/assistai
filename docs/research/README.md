@@ -107,3 +107,5 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 [Vosk vocabulary and Kyutai STT 2026-11-17](2026-11-17-vosk-vocabulary-kyutai.md) records an exact vocabulary check, a hash-verified CPU candidate and guarded synthetic comparisons including trailing silence.
 
 [Direct delegation and audio loopback 2026-11-17](2026-11-17-direct-delegation-audio-loopback.md) records the changed operator requirement, a real disposable edit, file-based voice checks and mockup restoration.
+
+[Buffered Kyutai and mockup memory 2026-11-17](2026-11-17-buffered-kyutai-and-mockup.md) records same-audio and end-to-end CPU transcription tests and the mockup's measured static-serving footprint.

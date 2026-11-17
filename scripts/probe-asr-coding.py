@@ -26,6 +26,10 @@ FIXTURE_CASES = [
     ('fixture-name', 'Quel est le mot écrit dans le fichier fixture point texte ?', ('fixture', 'texte')),
     ('fixture-spelled', 'Lis le fichier f i x t u r e point t x t.', ('f', 'i', 'x', 't', 'u', 'r', 'e')),
 ]
+VOICE_CASES = [
+    ('math', 'Combien font deux plus trois ? Réponds en un mot.', ('deux', 'trois')),
+    ('capital', 'Quelle est la capitale de la France ? Réponds en un mot.', ('capitale', 'france')),
+]
 
 
 def tokens(text):
@@ -119,7 +123,10 @@ if __name__ == '__main__':
     parser.add_argument('--crisp-model', type=Path)
     parser.add_argument('--crisp-backend', choices=('fastconformer-ctc', 'kyutai-stt'), default='fastconformer-ctc')
     parser.add_argument('--compare-padding', action='store_true', help='Compare candidate outputs with and without one second of trailing silence')
-    parser.add_argument('--fixture-only', action='store_true', help='Use synthetic filename-focused phrases')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--fixture-only', action='store_true', help='Use synthetic filename-focused phrases')
+    group.add_argument('--voice-only', action='store_true', help='Use synthetic conversational control phrases')
     args = parser.parse_args()
     if bool(args.crisp_executable) != bool(args.crisp_model): parser.error('Provide both CrispASR executable and model')
-    asyncio.run(main(args.crisp_executable, args.crisp_model, FIXTURE_CASES if args.fixture_only else CASES, args.crisp_backend, args.compare_padding))
+    cases = FIXTURE_CASES if args.fixture_only else VOICE_CASES if args.voice_only else CASES
+    asyncio.run(main(args.crisp_executable, args.crisp_model, cases, args.crisp_backend, args.compare_padding))
