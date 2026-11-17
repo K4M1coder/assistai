@@ -8,6 +8,10 @@ $model=Join-Path $folder 'LFM3-Omni-2B-Q4_K_M.gguf'
 $projector=Join-Path $folder 'mmproj-LFM3-Omni-2B-F16.gguf'
 if($Q8Projector){$projector=Join-Path $root '.cache/lfm3-omni-research/mmproj-LFM3-Omni-2B-Q8_0.gguf'}
 foreach($file in @($engine,$model,$projector)){if(!(Test-Path -LiteralPath $file -PathType Leaf)){throw "Missing required file: $file"}}
+if($Q8Projector){
+  $expected='8a25f9d1931244429de404fccacfb7fb933970a36aa5688d2f5069f29c6b27b1'
+  if((Get-FileHash -LiteralPath $projector -Algorithm SHA256).Hash -ne $expected){throw 'Q8 projector hash mismatch; no process was started'}
+}
 if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){throw 'Trial port is already occupied; no process was stopped'}
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Get-Resources {
