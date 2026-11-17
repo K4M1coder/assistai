@@ -107,6 +107,10 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.reset'}));
   });
   assert.equal(sessionInstructions.length,2);
+  for (const instructions of sessionInstructions) {
+    assert.match(instructions, /Delegate substantive tasks directly/);
+    assert.doesNotMatch(instructions, /requires explicit user approval/);
+  }
   assert.match(sessionInstructions[1],/spoken fixture/);
   assert.match(sessionInstructions[1],/approximate parallel transcript/);
   assert.match(sessionInstructions[1],/BLUEBIRD/);
