@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8)][int]$NaturalGain=1, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -27,7 +27,7 @@ $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
 if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario)}
 if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}
-if($NaturalFixture){$probeArgs+=@('--natural-fixture','--natural-gain',[string]$NaturalGain)}
+if($NaturalFixture){$probeArgs+=@('--natural-fixture','--natural-gain',[string]$NaturalGain,'--natural-voice',$NaturalVoice)}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($VoiceCases){$probeArgs+='--voice-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}

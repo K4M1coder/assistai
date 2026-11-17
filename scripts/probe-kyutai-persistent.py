@@ -19,6 +19,10 @@ EXECUTABLE = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64
 MODEL = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
 SCENARIOS = {'math': 'Combien font deux plus trois ? Réponds en un mot.',
              'capital': 'Quelle est la capitale de la France ? Réponds en un mot.'}
+NATURAL_FIXTURES = {
+    'male': ('17559822372056259463', 'ca0c712cd2098656ae5c35b5e515f8682356f44983814a2e1cf2d16beb1775cc'),
+    'female': ('118005971910520590', '12e953bde5e4c50ef4280bbd94be79a810788c0494069389035bf928731eb5f7'),
+}
 
 
 def synthetic_wav(text):
@@ -60,7 +64,8 @@ def main():
     parser.add_argument('--executable', type=Path, default=EXECUTABLE)
     parser.add_argument('--fixed-synthetic-fixture', action='store_true')
     parser.add_argument('--natural-fixture', action='store_true')
-    parser.add_argument('--natural-gain', type=int, choices=(1, 8), default=1)
+    parser.add_argument('--natural-gain', type=int, choices=(1, 8, 64), default=1)
+    parser.add_argument('--natural-voice', choices=tuple(NATURAL_FIXTURES), default='male')
     parser.add_argument('--scenario', choices=tuple(SCENARIOS), default='math')
     options = parser.parse_args()
     EXECUTABLE = options.executable.resolve()
@@ -72,9 +77,10 @@ def main():
     fixture = ROOT / f'.cache/kyutai-persistent-synthetic-{options.scenario}.wav'
     reused = False
     if options.natural_fixture:
-        natural = ROOT / '.cache/fleurs-fr-17559822372056259463.wav'
+        identifier, expected_hash = NATURAL_FIXTURES[options.natural_voice]
+        natural = ROOT / f'.cache/fleurs-fr-{identifier}.wav'
         raw = natural.read_bytes()
-        if hashlib.sha256(raw).hexdigest() != 'ca0c712cd2098656ae5c35b5e515f8682356f44983814a2e1cf2d16beb1775cc':
+        if hashlib.sha256(raw).hexdigest() != expected_hash:
             raise ValueError('Natural fixture hash mismatch')
         with wave.open(io.BytesIO(raw), 'rb') as source:
             if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
@@ -128,7 +134,7 @@ def main():
             response.raise_for_status()
             text = response.json().get('text', '').strip()
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
-        print(json.dumps({'scenario':'fleurs-fr-17559822372056259463' if options.natural_fixture else options.scenario,
+        print(json.dumps({'scenario':f'fleurs-fr-{identifier}' if options.natural_fixture else options.scenario,
                           'natural_gain':options.natural_gain if options.natural_fixture else None,
                           'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
