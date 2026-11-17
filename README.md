@@ -58,6 +58,8 @@ The current editable-fixture demonstration is available at `http://127.0.0.1:181
 
 A second synthetic spoken-image check on the running cascade returned the expected blue color and produced audio. It did not use a physical microphone or speaker; see the [spoken-image notes](docs/research/2026-11-12-spoken-image.md).
 
+The installed French Vosk vocabulary lacks exact entries for `fixture` and `calculator`, so transcription review remains important for file tasks. A local CPU comparison with quantized Kyutai STT recovered parts of those names but not the exact paths; its streaming and real-room performance remain unverified. See the [ASR notes](docs/research/2026-11-17-vosk-vocabulary-kyutai.md).
+
 Historical scripts that submit directly to OpenCode now require attended approval; they bypass the gateway's admission policy and are not sandboxed. See the [direct-probe notes](docs/research/2026-11-17-direct-probes.md) before using them.
 
 New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.

@@ -45,5 +45,15 @@ class AsrCodingProbeTests(unittest.TestCase):
                     probe.recognize_crisp(b'\x00\x00' * 320, Path(sys.executable), model)
             self.assertFalse(captured['path'].exists())
 
+    def test_kyutai_backend_is_explicit_and_cpu_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder) / 'model.gguf'; model.write_bytes(b'model')
+            def fake_run(args, **kwargs):
+                self.assertEqual(args[args.index('--backend') + 1], 'kyutai-stt')
+                self.assertIn('-ng', args)
+                return SimpleNamespace(returncode=0, stdout='Bonjour', stderr='')
+            with patch.object(probe.subprocess, 'run', side_effect=fake_run):
+                self.assertEqual(probe.recognize_crisp(b'\x00\x00' * 320, Path(sys.executable), model, 'kyutai-stt')[0], 'Bonjour')
+
 
 if __name__ == '__main__': unittest.main()

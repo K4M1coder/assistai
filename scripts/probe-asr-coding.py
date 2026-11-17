@@ -59,7 +59,9 @@ async def recognize(pcm):
             if event.get('type') == 'final': return ' '.join(result)
 
 
-def recognize_crisp(pcm, executable, model):
+def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc'):
+    if backend not in ('fastconformer-ctc', 'kyutai-stt'):
+        raise ValueError('Unsupported research backend')
     root = Path(__file__).resolve().parents[1]
     executable, model = executable.resolve(strict=True), model.resolve(strict=True)
     # This is synthetic audio only. A temporary WAV is needed by the file-oriented CLI.
@@ -70,7 +72,7 @@ def recognize_crisp(pcm, executable, model):
             output.setnchannels(1); output.setsampwidth(2); output.setframerate(16000); output.writeframes(pcm)
         started = time.monotonic()
         try:
-            result = subprocess.run([str(executable), '--backend', 'fastconformer-ctc', '-m', str(model), '-f', str(name),
+            result = subprocess.run([str(executable), '--backend', backend, '-m', str(model), '-f', str(name),
                                      '-ng', '-t', '2', '-nt', '-np', '-l', 'fr', '--lid-backend', 'off', '--no-punctuation'],
                                     stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
                                     errors='replace', timeout=45, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -85,7 +87,7 @@ def recognize_crisp(pcm, executable, model):
         name.unlink(missing_ok=True)
 
 
-async def main(crisp_executable=None, crisp_model=None, cases=CASES):
+async def main(crisp_executable=None, crisp_model=None, cases=CASES, crisp_backend='fastconformer-ctc', compare_padding=False):
     for label, reference, markers in cases:
         pcm = await asyncio.to_thread(spoken.synthesize, reference)
         started = time.monotonic(); hypothesis = await recognize(pcm)
@@ -99,21 +101,25 @@ async def main(crisp_executable=None, crisp_model=None, cases=CASES):
                           'physical_devices_opened':False, 'permanent_audio_saved':False}
         print(json.dumps(result, ensure_ascii=False), flush=True)
         if crisp_executable and crisp_model:
-            candidate, elapsed = await asyncio.to_thread(recognize_crisp, pcm, crisp_executable, crisp_model)
-            candidate_tokens = tokens(candidate)
-            candidate_result = {'case':label, 'engine':'CrispASR fastconformer-ctc CPU', 'hypothesis':candidate,
-                'wer':round(word_error(reference, candidate), 3), 'elapsed_ms_including_model_load':elapsed,
-                'markers_present':{marker:marker in candidate_tokens for marker in markers},
-                'marker_order_matches':all(marker in candidate_tokens for marker in markers) and
-                    [candidate_tokens.index(marker) for marker in markers] == sorted(candidate_tokens.index(marker) for marker in markers)}
-            print(json.dumps(candidate_result, ensure_ascii=False), flush=True)
+            for padding_ms in ([0, 1000] if compare_padding else [0]):
+                padded_pcm = pcm + bytes(32 * padding_ms)  # 16 kHz mono PCM16
+                candidate, elapsed = await asyncio.to_thread(recognize_crisp, padded_pcm, crisp_executable, crisp_model, crisp_backend)
+                candidate_tokens = tokens(candidate)
+                candidate_result = {'case':label, 'engine':f'CrispASR {crisp_backend} CPU', 'hypothesis':candidate,
+                    'trailing_silence_ms':padding_ms, 'wer':round(word_error(reference, candidate), 3), 'elapsed_ms_including_model_load':elapsed,
+                    'markers_present':{marker:marker in candidate_tokens for marker in markers},
+                    'marker_order_matches':all(marker in candidate_tokens for marker in markers) and
+                        [candidate_tokens.index(marker) for marker in markers] == sorted(candidate_tokens.index(marker) for marker in markers)}
+                print(json.dumps(candidate_result, ensure_ascii=False), flush=True)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--crisp-executable', type=Path)
     parser.add_argument('--crisp-model', type=Path)
+    parser.add_argument('--crisp-backend', choices=('fastconformer-ctc', 'kyutai-stt'), default='fastconformer-ctc')
+    parser.add_argument('--compare-padding', action='store_true', help='Compare candidate outputs with and without one second of trailing silence')
     parser.add_argument('--fixture-only', action='store_true', help='Use synthetic filename-focused phrases')
     args = parser.parse_args()
     if bool(args.crisp_executable) != bool(args.crisp_model): parser.error('Provide both CrispASR executable and model')
-    asyncio.run(main(args.crisp_executable, args.crisp_model, FIXTURE_CASES if args.fixture_only else CASES))
+    asyncio.run(main(args.crisp_executable, args.crisp_model, FIXTURE_CASES if args.fixture_only else CASES, args.crisp_backend, args.compare_padding))

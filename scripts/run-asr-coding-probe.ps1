@@ -1,5 +1,7 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly)
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$Kyutai, [switch]$ComparePadding)
 $ErrorActionPreference='Stop'
+if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
+if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -14,8 +16,10 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($FixtureOnly){$probeArgs+='--fixture-only'}
+if($ComparePadding){$probeArgs+='--compare-padding'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
 $model=Join-Path $env:USERPROFILE '.lmstudio/models/cstr/stt-fr-fastconformer-hybrid-ctc-large-GGUF/stt-fr-fastconformer-hybrid-ctc-large-q8_0.gguf'
+if($Kyutai){$model=Join-Path $root '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf';$probeArgs+=@('--crisp-backend','kyutai-stt')}
 if($CompareCrisp){
   if(!(Test-Path -LiteralPath $crisp) -or !(Test-Path -LiteralPath $model)){throw 'CrispASR executable or model missing'}
   $probeArgs+=@('--crisp-executable',"`"$crisp`"",'--crisp-model',"`"$model`"")
