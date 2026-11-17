@@ -15,6 +15,16 @@ test('buffers up to three seconds during cancellation and rejects excess input',
  for(let i=0;i<31;i++)second.client.audio(Buffer.alloc(3200));
  assert.match(second.client.sent.at(-1).message,/three-second buffer/);t.state='ready';t.emit('cancelled');assert.equal(t.frames.length,0);
 });
+test('overflow stops the parallel transcript for the discarded turn',()=>{
+ const client=new Client();let session;let stops=0;let appends=0;
+ attachLfmBridge(client,{makeTurnId:()=> 'turn1',sessionFactory:()=>session=new Session(),transcriptUrl:'ws://127.0.0.1/asr',
+  transcriptFactory:()=>({start(){},append(){appends++},end(){},stop(){stops++}})});
+ session.state='responding';client.event({type:'interrupt'});client.event({type:'audio.start'});
+ for(let i=0;i<31;i++)client.audio(Buffer.alloc(3200));
+ assert.equal(appends,31);assert.equal(stops,2); // interrupt and discarded turn
+ assert.equal(client.sent.at(-2).type,'transcript.unavailable');
+ assert.match(client.sent.at(-1).message,/three-second buffer/);
+});
 test('partial input reset replaces backend session',()=>{const {client,sessions}=setup();client.event({type:'audio.start'});client.audio(Buffer.alloc(2));client.event({type:'audio.reset'});assert.equal(sessions.length,2);assert.equal(sessions[0].closed,true)});
 test('unexpected native backend closure disconnects the client for recovery',()=>{const {client,sessions}=setup();sessions[0].close();assert.deepEqual(client.closeInfo,{code:1011,reason:'Native speech disconnected'});assert.match(client.sent.at(-1).message,/connection closed/)});
 test('native backend fault is reported once before disconnect',()=>{const {client,sessions}=setup();sessions[0].emit('fault','Realtime transport error');sessions[0].close();assert.equal(client.sent.filter(e=>e.type==='error').length,1);assert.equal(client.closeInfo.code,1011)});
