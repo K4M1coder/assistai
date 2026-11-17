@@ -1,6 +1,7 @@
 """Compare repeated synthetic utterances on one local persistent CPU model."""
 import importlib.util
 import argparse
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -55,9 +56,18 @@ def main():
     global EXECUTABLE
     parser = argparse.ArgumentParser()
     parser.add_argument('--executable', type=Path, default=EXECUTABLE)
-    EXECUTABLE = parser.parse_args().executable.resolve()
+    parser.add_argument('--fixed-synthetic-fixture', action='store_true')
+    options = parser.parse_args()
+    EXECUTABLE = options.executable.resolve()
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
-    audio = synthetic_wav()
+    fixture = ROOT / '.cache/kyutai-persistent-synthetic-math.wav'
+    reused = False
+    if options.fixed_synthetic_fixture and fixture.is_file():
+        audio = fixture.read_bytes(); reused = True
+    else:
+        audio = synthetic_wav()
+        if options.fixed_synthetic_fixture:
+            with fixture.open('xb') as output: output.write(audio)
     cold_text, cold_ms = cold_transcribe(audio)
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
@@ -92,7 +102,9 @@ def main():
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
         print(json.dumps({'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
-                          'physical_devices_opened':False, 'synthetic':True, 'audio_saved_by_probe':False}, ensure_ascii=False), flush=True)
+                          'audio_sha256':hashlib.sha256(audio).hexdigest(), 'fixture_reused':reused,
+                          'physical_devices_opened':False, 'synthetic':not reused,
+                          'audio_saved_by_probe':options.fixed_synthetic_fixture}, ensure_ascii=False), flush=True)
         succeeded = True
     finally:
         if process.poll() is None:

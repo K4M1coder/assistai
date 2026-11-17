@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -8,6 +8,7 @@ if($KyutaiInput -and !$VoiceLoopback){throw 'KyutaiInput requires -VoiceLoopback
 if($PersistentTrial -and ($VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'PersistentTrial is a separate probe'}
 if($ProcessMetrics -and !$PersistentTrial){throw 'ProcessMetrics requires -PersistentTrial'}
 if($LocalCrispBuild -and !$PersistentTrial){throw 'LocalCrispBuild requires -PersistentTrial'}
+if($FixedSyntheticFixture -and !$PersistentTrial){throw 'FixedSyntheticFixture requires -PersistentTrial'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -23,6 +24,7 @@ $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
 if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'))}
+if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($VoiceCases){$probeArgs+='--voice-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
