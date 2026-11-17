@@ -1,4 +1,5 @@
 import json
+import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -24,6 +25,27 @@ class Socket:
 
 
 class KyutaiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancelled_client_does_not_release_worker_during_transcription(self):
+        entered = asyncio.Event(); release = asyncio.Event(); calls = []
+        async def background(function, pcm):
+            calls.append(pcm)
+            if pcm == b'first':
+                entered.set(); await release.wait()
+            return 'ok'
+        with patch.object(server, 'worker', asyncio.Lock()), patch.object(server.asyncio, 'to_thread', side_effect=background):
+            first = asyncio.create_task(server.serialized_transcribe(b'first'))
+            await entered.wait(); first.cancel()
+            with self.assertRaises(asyncio.CancelledError): await first
+            abandoned = asyncio.create_task(server.serialized_transcribe(b'abandoned'))
+            await asyncio.sleep(0.01); abandoned.cancel()
+            with self.assertRaises(asyncio.CancelledError): await abandoned
+            second = asyncio.create_task(server.serialized_transcribe(b'second'))
+            await asyncio.sleep(0.01)
+            self.assertEqual(calls, [b'first'])
+            release.set()
+            self.assertEqual(await asyncio.wait_for(second, 1), 'ok')
+            self.assertEqual(calls, [b'first', b'second'])
+
     def test_budget_rejects_pressure_and_stale_samples(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'sample.json'

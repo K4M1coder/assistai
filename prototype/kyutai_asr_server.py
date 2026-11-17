@@ -19,6 +19,26 @@ app = FastAPI()
 worker = asyncio.Lock()
 
 
+async def serialized_transcribe(pcm):
+    started = False
+    async def run():
+        nonlocal started
+        async with worker:
+            started = True
+            return await asyncio.to_thread(transcribe, pcm)
+    # A cancelled client must not cancel the task holding the lock: Python
+    # cannot stop the underlying thread, which may still hold a model in RAM.
+    job = asyncio.create_task(run())
+    try:
+        return await asyncio.shield(job)
+    except asyncio.CancelledError:
+        if not started:
+            job.cancel()
+        # Consume failures if the disconnected caller no longer awaits the job.
+        job.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+        raise
+
+
 def check_budget(min_available=6 * 1024**3):
     path = os.environ.get('ASSISTAI_KYUTAI_BUDGET_PATH')
     if not path: raise RuntimeError('ASR resource sample is not configured')
@@ -107,8 +127,7 @@ async def asr(socket: WebSocket):
                     await socket.send_json({'type': 'final', 'text': ''})
                     continue
                 try:
-                    async with worker:
-                        text = await asyncio.to_thread(transcribe, pcm)
+                    text = await serialized_transcribe(pcm)
                     await socket.send_json({'type': 'final', 'text': text})
                 except Exception:
                     await socket.send_json({'type': 'error', 'text': 'Buffered ASR failed'})
