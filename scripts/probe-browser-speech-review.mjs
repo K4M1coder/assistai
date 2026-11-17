@@ -61,7 +61,8 @@ try {
   }
   const result = { reviewReached: state.status.includes('Review the transcript'), transcript: state.text, submitted: state.log.includes('You:'), inputOptions: state.inputCount };
   if (process.env.ASSISTAI_PROBE_REVIEW_TASK === '1' && result.reviewReached && result.transcript && !result.submitted) {
-    const corrected = 'Quel est le mot écrit dans le fichier fixture.txt ?';
+    const fixture = process.env.ASSISTAI_PROBE_FIXTURE === 'calculator' ? 'calculator.py' : 'fixture.txt';
+    const corrected = fixture === 'calculator.py' ? 'Lis le fichier calculator.py et explique ce qu’il fait.' : 'Quel est le mot écrit dans le fichier fixture.txt ?';
     await evaluate(`document.querySelector('#stop').click(); document.querySelector('#text').value = ${JSON.stringify(corrected)}; document.querySelector('#form').requestSubmit(); true`);
     let proposal;
     for (let i = 0; i < 400; i++) {
@@ -79,9 +80,11 @@ try {
     result.proposalVisible = proposal.visible;
     result.original = proposal.original;
     result.proposedTask = proposal.task;
+    result.approvalNotice = proposal.log.includes('Approval requested: the agent task has not started.');
     result.declined = after.declined;
+    result.declineNotice = after.log.includes('Task declined; no task was submitted.');
     result.agentStarted = after.log.includes('Agent started:');
-    if (!proposal.visible || proposal.original !== corrected || !proposal.task.includes('fixture.txt') || !result.declined || result.agentStarted) process.exitCode = 1;
+    if (!proposal.visible || proposal.original !== corrected || !proposal.task.includes(fixture) || !result.approvalNotice || !result.declined || !result.declineNotice || result.agentStarted) process.exitCode = 1;
   }
   if (process.env.ASSISTAI_PROBE_RESELECT === '1') {
     await evaluate("window.__captureRequest = null; const originalCapture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia = options => { window.__captureRequest = options.audio.deviceId?.exact ?? ''; return originalCapture(options); }; document.querySelector('#stop').click(); true");

@@ -54,6 +54,8 @@ The operator has reported one successfully approved read of the disposable `calc
 
 An operator subsequently reported a possible task start before approval. The provided excerpt says the task was waiting for approval and does not show a start; the original observation remains unexplained. The updated gateway adds local approval-to-start traceability, covered by mock tests. See the [investigation](docs/research/2026-11-17-reported-premature-task.md).
 
+The current editable-fixture demonstration is available at `http://127.0.0.1:18131/` while the owned services remain running. The browser log distinguishes approval requests from actual start events. The prior demonstration gateways were stopped after checking for active clients; their volatile histories were discarded.
+
 A second synthetic spoken-image check on the running cascade returned the expected blue color and produced audio. It did not use a physical microphone or speaker; see the [spoken-image notes](docs/research/2026-11-12-spoken-image.md).
 
 Historical scripts that submit directly to OpenCode now require attended approval; they bypass the gateway's admission policy and are not sandboxed. See the [direct-probe notes](docs/research/2026-11-17-direct-probes.md) before using them.

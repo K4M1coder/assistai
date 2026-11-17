@@ -269,10 +269,14 @@ function handleSocketMessage({ data }) {
     $('approval-original').textContent = event.original_request ?? 'Unavailable in native speech mode.';
     $('approval-task').textContent = event.task;
     $('task-approval').hidden = false;
+    log('Approval requested: the agent task has not started.');
     status('Review the task and click Approve task or Decline task. Spoken confirmation does not approve it.');
   }
   else if (event.type === 'task.approval_submitted' || event.type === 'task.approval_declined' || event.type === 'task.approval_expired' || event.type === 'task.approval_rejected' || event.type === 'task.approval_result') {
     if (event.approval_id === pendingApproval) clearApproval();
+    if (event.type === 'task.approval_submitted') log('Approval received; waiting for the agent task to start.');
+    else if (event.type === 'task.approval_declined') log('Task declined; no task was submitted.');
+    else if (event.type === 'task.approval_expired') log('Approval expired; no task was submitted.');
     status(event.message ?? (event.type === 'task.approval_submitted' ? 'Approval received; submitting the task.' : 'Task was not approved or approval expired.'));
   }
   else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
