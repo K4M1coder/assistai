@@ -63,7 +63,7 @@ async def recognize(pcm):
             if event.get('type') == 'final': return ' '.join(result)
 
 
-def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=None, no_fallback=False):
+def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=None, no_fallback=False, allow_empty=False):
     if backend not in ('fastconformer-ctc', 'kyutai-stt'):
         raise ValueError('Unsupported research backend')
     root = Path(__file__).resolve().parents[1]
@@ -87,7 +87,7 @@ def recognize_crisp(pcm, executable, model, backend='fastconformer-ctc', seed=No
             diagnostic = error.stderr or b''
             if isinstance(diagnostic, bytes): diagnostic = diagnostic.decode('utf-8', errors='replace')
             raise RuntimeError(f'CrispASR timed out after 45 seconds; stderr: {diagnostic[-1000:]}') from error
-        if result.returncode or not result.stdout.strip():
+        if result.returncode or (not allow_empty and not result.stdout.strip()):
             raise RuntimeError(f'CrispASR failed ({result.returncode}): {result.stderr[-1000:]}')
         return result.stdout.strip(), round((time.monotonic()-started)*1000)
     finally:

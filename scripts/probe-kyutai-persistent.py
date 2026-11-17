@@ -36,7 +36,7 @@ def cold_transcribe(audio):
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     with wave.open(io.BytesIO(audio), 'rb') as source:
         pcm = source.readframes(source.getnframes())
-    return module.recognize_crisp(pcm, EXECUTABLE, MODEL, 'kyutai-stt', seed=42, no_fallback=True)
+    return module.recognize_crisp(pcm, EXECUTABLE, MODEL, 'kyutai-stt', seed=42, no_fallback=True, allow_empty=True)
 
 
 def rate_mismatch_control(audio):
@@ -59,13 +59,29 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--executable', type=Path, default=EXECUTABLE)
     parser.add_argument('--fixed-synthetic-fixture', action='store_true')
+    parser.add_argument('--natural-fixture', action='store_true')
     parser.add_argument('--scenario', choices=tuple(SCENARIOS), default='math')
     options = parser.parse_args()
     EXECUTABLE = options.executable.resolve()
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
+    if options.natural_fixture and options.fixed_synthetic_fixture:
+        raise ValueError('Choose a natural or synthetic fixture')
     fixture = ROOT / f'.cache/kyutai-persistent-synthetic-{options.scenario}.wav'
     reused = False
-    if options.fixed_synthetic_fixture and fixture.is_file():
+    if options.natural_fixture:
+        natural = ROOT / '.cache/fleurs-fr-17559822372056259463.wav'
+        raw = natural.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != 'ca0c712cd2098656ae5c35b5e515f8682356f44983814a2e1cf2d16beb1775cc':
+            raise ValueError('Natural fixture hash mismatch')
+        with wave.open(io.BytesIO(raw), 'rb') as source:
+            if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
+                raise ValueError('Expected mono PCM16 16 kHz natural fixture')
+            pcm = source.readframes(source.getnframes()) + bytes(32000)
+        output = io.BytesIO()
+        with wave.open(output, 'wb') as wav:
+            wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000); wav.writeframes(pcm)
+        audio = output.getvalue()
+    elif options.fixed_synthetic_fixture and fixture.is_file():
         audio = fixture.read_bytes(); reused = True
     else:
         audio = synthetic_wav(SCENARIOS[options.scenario])
@@ -102,10 +118,11 @@ def main():
             response.raise_for_status()
             text = response.json().get('text', '').strip()
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
-        print(json.dumps({'scenario':options.scenario, 'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
+        print(json.dumps({'scenario':'fleurs-fr-17559822372056259463' if options.natural_fixture else options.scenario,
+                          'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
                           'audio_sha256':hashlib.sha256(audio).hexdigest(), 'fixture_reused':reused,
-                          'physical_devices_opened':False, 'synthetic':not reused,
+                          'physical_devices_opened':False, 'synthetic':not reused and not options.natural_fixture,
                           'audio_saved_by_probe':options.fixed_synthetic_fixture}, ensure_ascii=False), flush=True)
         succeeded = True
     finally:
