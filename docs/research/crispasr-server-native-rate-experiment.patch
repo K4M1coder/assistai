@@ -1,0 +1,22 @@
+diff --git a/examples/cli/crispasr_server.cpp b/examples/cli/crispasr_server.cpp
+index a55ac985..367f3fe5 100644
+--- a/examples/cli/crispasr_server.cpp
++++ b/examples/cli/crispasr_server.cpp
+@@ -51,0 +52 @@
++#include "core/audio_resample.h"
+@@ -830 +831,14 @@ static transcription_result do_transcribe(const form_part& audio_file, CrispasrB
+-            auto segs = backend->transcribe(pcmf32.data() + sl.start, sl.end - sl.start, sl.t0_cs, rp);
++            const float* backend_audio = pcmf32.data() + sl.start;
++            int backend_samples = sl.end - sl.start;
++            std::vector<float> native_audio;
++            if (backend->input_sample_rate() != SR) {
++                native_audio = core_audio::resample_polyphase(backend_audio, backend_samples, SR,
++                                                             backend->input_sample_rate());
++                if (native_audio.empty()) {
++                    result.error = "failed to resample audio for backend";
++                    return result;
++                }
++                backend_audio = native_audio.data();
++                backend_samples = (int)native_audio.size();
++            }
++            auto segs = backend->transcribe(backend_audio, backend_samples, sl.t0_cs, rp);
