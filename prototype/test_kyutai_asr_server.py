@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -25,6 +26,29 @@ class Socket:
 
 
 class KyutaiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_thread_remains_serialized_after_cancellation(self):
+        started = threading.Event(); release = threading.Event(); calls = []
+        def transcribe(pcm):
+            calls.append(pcm)
+            if pcm == b'first':
+                started.set()
+                if not release.wait(2): raise TimeoutError('test release timed out')
+            return 'ok'
+        with patch.object(server, 'worker', asyncio.Lock()), patch.object(server, 'transcribe', side_effect=transcribe):
+            first = asyncio.create_task(server.serialized_transcribe(b'first'))
+            try:
+                self.assertTrue(await asyncio.to_thread(started.wait, 1))
+                first.cancel()
+                with self.assertRaises(asyncio.CancelledError): await first
+                second = asyncio.create_task(server.serialized_transcribe(b'second'))
+                await asyncio.sleep(0.05)
+                self.assertEqual(calls, [b'first'])
+                release.set()
+                self.assertEqual(await asyncio.wait_for(second, 1), 'ok')
+                self.assertEqual(calls, [b'first', b'second'])
+            finally:
+                release.set()
+
     async def test_cancelled_client_does_not_release_worker_during_transcription(self):
         entered = asyncio.Event(); release = asyncio.Event(); calls = []
         async def background(function, pcm):
