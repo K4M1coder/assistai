@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "start:mockup": "tsx scripts/start-mockup.mjs",
     "build": "vite build",
     "start": "node server.ts",
     "preview": "vite preview",
