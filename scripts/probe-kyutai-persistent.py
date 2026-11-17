@@ -60,12 +60,15 @@ def main():
     parser.add_argument('--executable', type=Path, default=EXECUTABLE)
     parser.add_argument('--fixed-synthetic-fixture', action='store_true')
     parser.add_argument('--natural-fixture', action='store_true')
+    parser.add_argument('--natural-gain', type=int, choices=(1, 8), default=1)
     parser.add_argument('--scenario', choices=tuple(SCENARIOS), default='math')
     options = parser.parse_args()
     EXECUTABLE = options.executable.resolve()
     if not EXECUTABLE.is_file() or not MODEL.is_file(): raise RuntimeError('Pinned local files are missing')
     if options.natural_fixture and options.fixed_synthetic_fixture:
         raise ValueError('Choose a natural or synthetic fixture')
+    if options.natural_gain != 1 and not options.natural_fixture:
+        raise ValueError('Natural gain requires natural fixture')
     fixture = ROOT / f'.cache/kyutai-persistent-synthetic-{options.scenario}.wav'
     reused = False
     if options.natural_fixture:
@@ -76,7 +79,14 @@ def main():
         with wave.open(io.BytesIO(raw), 'rb') as source:
             if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
                 raise ValueError('Expected mono PCM16 16 kHz natural fixture')
-            pcm = source.readframes(source.getnframes()) + bytes(32000)
+            pcm = source.readframes(source.getnframes())
+        if options.natural_gain != 1:
+            import numpy as np
+            samples = np.frombuffer(pcm, dtype='<i2').astype(np.int32) * options.natural_gain
+            if np.any(samples < -32768) or np.any(samples > 32767):
+                raise ValueError('Natural fixture gain would clip')
+            pcm = samples.astype('<i2').tobytes()
+        pcm += bytes(32000)
         output = io.BytesIO()
         with wave.open(output, 'wb') as wav:
             wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000); wav.writeframes(pcm)
@@ -119,6 +129,7 @@ def main():
             text = response.json().get('text', '').strip()
             results.append({'condition':label, 'text':text, 'request_ms':round((time.monotonic() - beginning) * 1000)})
         print(json.dumps({'scenario':'fleurs-fr-17559822372056259463' if options.natural_fixture else options.scenario,
+                          'natural_gain':options.natural_gain if options.natural_fixture else None,
                           'startup_ms':startup_ms, 'audio_bytes':len(audio), 'cold_text':cold_text,
                           'cold_ms_including_load':cold_ms, 'runs':results,
                           'audio_sha256':hashlib.sha256(audio).hexdigest(), 'fixture_reused':reused,
