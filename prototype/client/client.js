@@ -245,6 +245,7 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'asr.reconnecting') { asrReady = false; $('talk').disabled = true; status('Reconnecting the voice session.'); }
   else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; if (speechReviewAvailable) send(JSON.stringify({type:'speech.review.configure',enabled:$('speech-review').checked})); $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
   else if (event.type === 'speech.review') { pendingReviewId = event.review_id; $('text').value = event.text; responsePending = false; status(event.has_image ? 'Review the transcript, then press Send. The spoken image is attached.' : 'Review the transcript, then press Send.'); }
+  else if (event.type === 'asr.error') log(`Speech recognition: ${event.text || 'An error occurred.'}`);
   else if (event.type === 'asr.empty') { if (spokenImageSent) log('No speech was recognized. Select the image again to retry.'); spokenImageSent = false; responsePending = false; announceWhenIdle(); }
   else if (event.type === 'transcript.empty') $('partial').textContent = '';
   else if (event.type === 'transcript.unavailable') { $('partial').textContent = ''; log('Parallel transcription unavailable for this turn.'); }

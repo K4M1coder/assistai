@@ -155,6 +155,17 @@ class KyutaiServerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([item['type'] for item in socket.sent], ['ready', 'error', 'final'])
             self.assertEqual(socket.sent[-1]['text'], '')
 
+    async def test_busy_message_is_distinct_from_transcription_failure(self):
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder) / 'model'; model.touch()
+            socket = Socket([{'bytes':b'\x02\x00'}, {'text':json.dumps({'type':'end'})},
+                             {'type':'websocket.disconnect'}])
+            with patch.object(server, 'MODEL', model), patch.object(server, 'EXECUTABLE', model), \
+                 patch.object(server, 'serialized_transcribe', side_effect=server.ASRBusy('busy')):
+                await server.asr(socket)
+            self.assertEqual(socket.sent[-2]['text'], 'Buffered ASR is busy; please retry.')
+            self.assertEqual(socket.sent[-1], {'type':'final', 'text':''})
+
 
 if __name__ == '__main__':
     unittest.main()

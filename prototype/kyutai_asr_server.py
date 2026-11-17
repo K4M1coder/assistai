@@ -23,10 +23,14 @@ MAX_PENDING_JOBS = 2  # One running transcription and at most one waiting.
 active_connections = 0
 
 
+class ASRBusy(RuntimeError):
+    pass
+
+
 async def serialized_transcribe(pcm):
     global pending_jobs
     if pending_jobs >= MAX_PENDING_JOBS:
-        raise RuntimeError('Buffered ASR is busy')
+        raise ASRBusy('Buffered ASR is busy')
     pending_jobs += 1
     started = False
     async def run():
@@ -153,6 +157,9 @@ async def serve_asr(socket: WebSocket):
                 try:
                     text = await serialized_transcribe(pcm)
                     await socket.send_json({'type': 'final', 'text': text})
+                except ASRBusy:
+                    await socket.send_json({'type': 'error', 'text': 'Buffered ASR is busy; please retry.'})
+                    await socket.send_json({'type': 'final', 'text': ''})
                 except Exception:
                     await socket.send_json({'type': 'error', 'text': 'Buffered ASR failed'})
                     await socket.send_json({'type': 'final', 'text': ''})
