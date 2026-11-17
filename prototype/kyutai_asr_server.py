@@ -17,9 +17,15 @@ MAX_FRAME_BYTES = 32000
 MAX_UTTERANCE_BYTES = 960000  # 30 seconds of 16 kHz mono PCM16.
 app = FastAPI()
 worker = asyncio.Lock()
+pending_jobs = 0
+MAX_PENDING_JOBS = 2  # One running transcription and at most one waiting.
 
 
 async def serialized_transcribe(pcm):
+    global pending_jobs
+    if pending_jobs >= MAX_PENDING_JOBS:
+        raise RuntimeError('Buffered ASR is busy')
+    pending_jobs += 1
     started = False
     async def run():
         nonlocal started
@@ -29,13 +35,17 @@ async def serialized_transcribe(pcm):
     # A cancelled client must not cancel the task holding the lock: Python
     # cannot stop the underlying thread, which may still hold a model in RAM.
     job = asyncio.create_task(run())
+    def finished(done):
+        global pending_jobs
+        pending_jobs -= 1
+        if not done.cancelled():
+            done.exception()  # Observe errors even if the caller has disconnected.
+    job.add_done_callback(finished)
     try:
         return await asyncio.shield(job)
     except asyncio.CancelledError:
         if not started:
             job.cancel()
-        # Consume failures if the disconnected caller no longer awaits the job.
-        job.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
         raise
 
 

@@ -26,6 +26,23 @@ class Socket:
 
 
 class KyutaiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_bounded_queue_rejects_excess_work(self):
+        entered = asyncio.Event(); release = asyncio.Event()
+        async def background(function, pcm):
+            entered.set(); await release.wait(); return 'ok'
+        with patch.object(server, 'worker', asyncio.Lock()), patch.object(server, 'pending_jobs', 0), \
+             patch.object(server.asyncio, 'to_thread', side_effect=background):
+            first = asyncio.create_task(server.serialized_transcribe(b'first'))
+            await entered.wait()
+            second = asyncio.create_task(server.serialized_transcribe(b'second'))
+            await asyncio.sleep(0)
+            with self.assertRaisesRegex(RuntimeError, 'busy'):
+                await server.serialized_transcribe(b'third')
+            release.set()
+            self.assertEqual(await asyncio.gather(first, second), ['ok', 'ok'])
+            await asyncio.sleep(0)
+            self.assertEqual(server.pending_jobs, 0)
+
     async def test_real_thread_remains_serialized_after_cancellation(self):
         started = threading.Event(); release = threading.Event(); calls = []
         def transcribe(pcm):
