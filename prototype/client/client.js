@@ -110,18 +110,6 @@ function finishAudio() {
 let pushToTalkActive = false;
 let responsePending = false, notificationPending = false, currentNotification = null, currentNotificationTurn = null;
 let taskCancelAvailable = false;
-let pendingApproval = null;
-function clearApproval() {
-  pendingApproval = null;
-  $('task-approval').hidden = true;
-}
-function decideApproval(approved) {
-  if (!pendingApproval || ws.readyState !== WebSocket.OPEN) return;
-  send(JSON.stringify({ type: 'task.approval', approval_id: pendingApproval, approved }));
-  clearApproval();
-}
-$('approve-task').onclick = () => decideApproval(true);
-$('decline-task').onclick = () => decideApproval(false);
 const activeTaskIds = new Set(), cancellationRequested = new Set();
 function latestCancellableTask() { return [...activeTaskIds].reverse().find(id => !cancellationRequested.has(id)); }
 function refreshTaskButton() { $('stop-task').disabled = !taskCancelAvailable || !latestCancellableTask(); }
@@ -240,10 +228,9 @@ function handleSocketMessage({ data }) {
   const event = JSON.parse(data);
   if (event.type === 'session.capabilities') {
     $('workspace-label').textContent = event.workspace_label || 'Agent workspace and permissions were not reported; inspect the harness configuration.';
-    $('approval-workspace').textContent = $('workspace-label').textContent;
     $('approval-safety').textContent = event.task_approval === true
-      ? 'Agent tasks require explicit approval before submission.'
-      : 'Warning: this gateway does not confirm agent tasks before submission. Do not delegate consequential work.';
+      ? 'This older gateway requires task approval; restart the gateway to use direct delegation.'
+      : 'Agent tasks are submitted directly to the configured workspace.';
     textInputAvailable = event.text_input === true;
     speechReviewAvailable = event.speech_review === true;
     $('speech-review').disabled = !speechReviewAvailable;
@@ -264,21 +251,6 @@ function handleSocketMessage({ data }) {
   else if (event.type === 'asr.partial') $('partial').textContent = event.text ?? '';
   else if (event.type === 'user.text') { spokenImageSent = false; $('partial').textContent = ''; log(`You: ${event.text}`); }
   else if (event.type === 'assistant.text') log(`Assistant: ${event.text}`);
-  else if (event.type === 'task.approval_requested') {
-    pendingApproval = event.approval_id;
-    $('approval-original').textContent = event.original_request ?? 'Unavailable in native speech mode.';
-    $('approval-task').textContent = event.task;
-    $('task-approval').hidden = false;
-    log('Approval requested: the agent task has not started.');
-    status('Review the task and click Approve task or Decline task. Spoken confirmation does not approve it.');
-  }
-  else if (event.type === 'task.approval_submitted' || event.type === 'task.approval_declined' || event.type === 'task.approval_expired' || event.type === 'task.approval_rejected' || event.type === 'task.approval_result') {
-    if (event.approval_id === pendingApproval) clearApproval();
-    if (event.type === 'task.approval_submitted') log('Approval received; waiting for the agent task to start.');
-    else if (event.type === 'task.approval_declined') log('Task declined; no task was submitted.');
-    else if (event.type === 'task.approval_expired') log('Approval expired; no task was submitted.');
-    status(event.message ?? (event.type === 'task.approval_submitted' ? 'Approval received; submitting the task.' : 'Task was not approved or approval expired.'));
-  }
   else if (event.type === 'session.task_history' && Array.isArray(event.events)) {
     log('Recent task history (past events; started does not confirm current status):');
     for (const item of event.events) {
@@ -327,7 +299,7 @@ function connectGateway() {
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); clearApproval(); $('approval-safety').textContent = 'Disconnected; task approval protection is unavailable.'; refreshTaskButton(); stopPlayback();
+    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); $('approval-safety').textContent = 'Disconnected; agent tasks are unavailable.'; refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; currentNotificationTurn = null; pendingNotifications.length = 0;

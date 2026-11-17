@@ -10,13 +10,13 @@ When configured, the read-only resource endpoint exposes aggregate memory teleme
 
 The optional pressure-triggered cancellation requests an existing task stop without a new approval. It does not grant task execution, undo already performed actions, isolate the agent, or guarantee that cancellation succeeds. It is disabled by default and can interrupt an approved task if system-wide resource readings cross the configured thresholds.
 
-Four historical direct OpenCode probes now require an interactive terminal and explicit approval before creating an agent session. These scripts bypass the gateway approval panel and admission accounting; the operator must independently verify the actual harness workspace and permissions. Their terminal prompt is not authentication, a sandbox, or an access-control boundary for other local callers.
+Historical direct OpenCode probes submit tasks without gateway admission or an approval gate. They do not implement authentication or an OS sandbox.
 
 The optional one-task headroom projection is also unauthenticated telemetry, not an allocation or permission to execute a task.
 
 The optional shared task-reservation database is a local coordination mechanism, not an authorization boundary. Any process able to alter it can invalidate its estimates; it stores resource estimates, process IDs, timestamps, OpenCode session IDs and random reservation identifiers, not task content.
 
-Approval lifecycle records link a request and accepted, declined or expired decision to a task-start event using an opaque ID. They use the same local SQLite storage and retention as gateway events, can be volatile, and do not establish user identity, prove physical button interaction or prevent other local callers from using OpenCode directly.
+The gateway no longer records approval decisions for new tasks because delegation is direct. Lifecycle events remain local and are not an authenticated or tamper-proof audit.
 
 The browser's task-result replay uses the existing same-session completion lookup. A resumed session is selected by possession of its browser-held capability; replay is not identity verification or RBAC. Spoken results may be overheard, and the user explicitly initiates replay of a historical result.
 
@@ -66,9 +66,9 @@ Real-model synthetic reset tests repeated an already completed task. After a nat
 
 OpenCode applies its own configured permissions. The currently tested fixture configuration allows read, glob and grep and denies other actions; it is intended for disposable read-only research. A separate isolated fixture was used for one edit test with an explicit edit permission. These policies are application-level controls, not an OS sandbox or proof of complete filesystem or network isolation. Do not represent the mockup roles as protecting the real agent. See [architecture](ARCHITECTURE.md) for the two separate stacks.
 
-An opt-in `-EditFixture` harness and gateway use the disposable `.cache/agent-edit-demo` workspace with OpenCode edit permission, `external_directory` denied and other unspecified actions denied. The gateway displays an operator-provided workspace label and requires task approval. The label is informational, not independent verification of permissions or a security boundary; other local clients may access the unauthenticated services, and application rules do not sandbox the process. Do not use this fixture to modify unrelated or valuable files.
+The `-EditFixture` harness uses the disposable `.cache/agent-edit-demo` workspace with application-level edit permission. Delegation is direct, the label is informational, and neither the unauthenticated gateway nor OpenCode rules provide an OS sandbox.
 
-The separately configured `-WebFixture` permits OpenCode `websearch` and `webfetch` and denies other unspecified actions. Search uses the configured hosted Exa provider, so the model's query is transmitted outside the machine; fetched sites receive requests as well. The workspace label is repeated in the approval panel, but it cannot constrain what the model includes in a query. Task approval and OpenCode permissions are not an OS network sandbox or a defense against untrusted page instructions. Do not include sensitive information in a research task unless its external transmission is intended.
+The separately configured `-WebFixture` permits hosted Exa search and page fetching. Delegation is direct, so queries and page requests can leave the machine without an approval panel; this is not an OS network sandbox.
 
 The prepared voice-to-agent coding probe requires an explicitly selected `.cache` workspace and a separately configured gateway and harness. Its static arithmetic checker avoids executing the generated fixture but does not confine the harness. One synthetic text-driven real-agent edit passed; a synthetic spoken-input attempt stopped below the RAM reserve before completion. The current demo's read-only fixture remains unchanged.
 

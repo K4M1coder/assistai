@@ -10,14 +10,7 @@ import WebSocket, { WebSocketServer } from 'ws';
 
 async function listen(server) { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server.address().port; }
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
-function approveRequests(client) {
-  client.on('message', (data, binary) => {
-    if (binary) return;
-    const event = JSON.parse(data);
-    if (event.type === 'task.approval_requested') client.send(JSON.stringify({ type: 'task.approval', approval_id: event.approval_id, approved: true }));
-  });
-}
-function clearMessageListeners(client) { client.removeAllListeners('message'); approveRequests(client); }
+function clearMessageListeners(client) { client.removeAllListeners('message'); }
 
 test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
   const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult=''; let nextToolOnResume=false; let agentBusy=false; let agentResult='BLUEBIRD'; let messagePolls=0;
@@ -75,7 +68,6 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   assert.ok(!serviceStatus.services.some(service=>service.role==='Speech synthesis'));
   const protocols=['assistai-v1',`resume.${'a'.repeat(64)}`];
   const client=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);let completed=false,initialEnd=false,notified=false,notificationAudio=0,capabilities,transcript;
-  approveRequests(client);
   t.after(()=>client.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Gateway integration timed out')),12000);
@@ -92,7 +84,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
   });
-  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,spoken_image_input:false,speech_review:false,task_cancel:true,task_approval:true,input_transcript:true,workspace_label:''});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.equal(calls.length,1);assert.match(calls[0],/^Read fixture\.txt and report the secret word/);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/BLUEBIRD/);assert.equal(requestNumber,3);
+  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,spoken_image_input:false,speech_review:false,task_cancel:true,task_approval:false,input_transcript:true,workspace_label:''});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.equal(calls.length,1);assert.match(calls[0],/^Read fixture\.txt and report the secret word/);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/BLUEBIRD/);assert.equal(requestNumber,3);
   await unlink(budgetPath);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
@@ -107,7 +99,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));
   });
   assert.equal(calls.length,1);
-  assert.equal(JSON.parse(rejectedToolResult).awaiting_approval,true);
+  assert.equal(typeof JSON.parse(rejectedToolResult).accepted,'boolean');
   clearMessageListeners(client);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Session reset timed out')),5000);
@@ -126,7 +118,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));
   });
   assert.equal(calls.length,1);
-  assert.equal(JSON.parse(rejectedToolResult).awaiting_approval,true);
+  assert.equal(typeof JSON.parse(rejectedToolResult).accepted,'boolean');
   await writeFile(budgetPath,JSON.stringify({observedAt:new Date().toISOString(),dedicatedBytes:0,sharedBytes:0,availableRamBytes:10*1024**3}));
   clearMessageListeners(client);
   await new Promise((resolve,reject)=>{
@@ -139,7 +131,6 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   assert.match(calls[1], /BLUEBIRD/);
   client.close();await once(client,'close');
   const resumed=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);
-  approveRequests(resumed);
   t.after(()=>resumed.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Resumed native session timed out')),5000);
@@ -156,7 +147,7 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
     resumed.send(JSON.stringify({type:'audio.start'}));resumed.send(Buffer.alloc(3200));resumed.send(JSON.stringify({type:'audio.end'}));
   });
   assert.equal(calls.length,2);
-  assert.equal(JSON.parse(rejectedToolResult).awaiting_approval,true);
+  assert.equal(typeof JSON.parse(rejectedToolResult).accepted,'boolean');
   agentBusy=true;
   nextToolOnResume='rerun';
   await new Promise((resolve,reject)=>{
@@ -169,7 +160,6 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   const upstreamClosed=once(upstream,'close');
   resumed.close();await once(resumed,'close');await upstreamClosed;
   const reconnect=new WebSocket(`ws://127.0.0.1:${gatewayPort}/voice`,protocols);
-  approveRequests(reconnect);
   t.after(()=>reconnect.terminate());
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('In-flight reconnect timed out')),5000);
@@ -179,11 +169,11 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
   nextToolOnResume=true;
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('In-flight duplicate check timed out')),5000);
-    reconnect.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='task.approval_result'){clearTimeout(timer);resolve();}else if(e.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}});
+    reconnect.on('message',(data,binary)=>{if(binary)return;const e=JSON.parse(data);if(e.type==='speech.end'){clearTimeout(timer);resolve();}else if(e.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}});
     reconnect.send(JSON.stringify({type:'audio.start'}));reconnect.send(Buffer.alloc(3200));reconnect.send(JSON.stringify({type:'audio.end'}));
   });
   assert.equal(calls.length,3);
-  assert.equal(JSON.parse(rejectedToolResult).awaiting_approval,true);
+  assert.equal(typeof JSON.parse(rejectedToolResult).accepted,'boolean');
   const completedAfterReconnect=new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Reconnected client did not receive completion')),5000);
     reconnect.on('message',(data,binary)=>{if(binary)return;const event=JSON.parse(data);if(event.type==='task.completed'){clearTimeout(timer);resolve(event);}else if(event.type==='task.error'){clearTimeout(timer);reject(Error(event.message));}});

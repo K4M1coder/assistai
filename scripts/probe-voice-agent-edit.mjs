@@ -4,7 +4,6 @@ import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import WebSocket from 'ws';
-import { askProbeApproval } from './interactive-probe-approval.mjs';
 
 const configuredWorkspace = process.env.ASSISTAI_PROBE_WORKSPACE;
 const gatewayUrl = process.env.ASSISTAI_TEST_VOICE_URL;
@@ -48,17 +47,6 @@ function finish() {
 socket.on('message', async (data, binary) => {
   if (binary) { audioBytes += data.length; if (notificationStarted) notificationAudioBytes += data.length; return; }
   const event = JSON.parse(data.toString());
-  if (event.type === 'task.approval_requested') {
-    const approved = await askProbeApproval(event);
-    if (socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: 'task.approval', approval_id: event.approval_id, approved }));
-    if (!approved) {
-      clearTimeout(timer);
-      console.error('Task was declined or interactive approval was unavailable');
-      process.exitCode = 1; socket.close();
-    }
-    return;
-  }
   if (['asr.ready', 'task.started', 'task.completed', 'task.error', 'task.rejected', 'assistant.text', 'notification.started', 'notification.rejected', 'speech.end', 'error'].includes(event.type)) {
     console.error(JSON.stringify({ event: event.type, elapsed_ms: Math.round(performance.now() - startedAt), turn_id: event.turn_id ?? null }));
   }

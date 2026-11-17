@@ -214,10 +214,8 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                 finally:
                     if worker is not None: await worker.close()
 
-            pending_approval = None
-
             async def receive_audio():
-                nonlocal generation, playback_started, audio_epoch, pending_approval
+                nonlocal generation, playback_started, audio_epoch
                 async for message in socket:
                     if isinstance(message, bytes):
                         if generation is not None:
@@ -231,15 +229,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                     event = json.loads(message)
                     kind = event.get('type')
                     notifications.server_event(event)
-                    if kind == 'task.approval_requested':
-                        pending_approval = event.get('approval_id')
-                        print(json.dumps(event, ensure_ascii=False), flush=True)
-                        print('Review the original request and proposed task. Press Y to approve or N to decline.', flush=True)
-                    elif kind in ('task.approval_submitted', 'task.approval_declined', 'task.approval_expired', 'task.approval_rejected', 'task.approval_result'):
-                        if event.get('approval_id') in (None, pending_approval):
-                            pending_approval = None
-                        print(json.dumps(event, ensure_ascii=False), flush=True)
-                    elif kind == 'speech.start':
+                    if kind == 'speech.start':
                         if event.get('sample_rate') != 24000: raise RuntimeError('Unexpected gateway output rate')
                         audio_epoch += 1
                         generation = playback.begin()
@@ -254,14 +244,11 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
                 raise RuntimeError('Gateway disconnected')
 
             async def keyboard():
-                nonlocal generation, audio_epoch, pending_approval
+                nonlocal generation, audio_epoch
                 import msvcrt
                 while True:
                     if msvcrt.kbhit():
                         key = msvcrt.getwch()
-                        if key.lower() in ('y', 'n') and pending_approval:
-                            await socket.send(json.dumps({'type': 'task.approval', 'approval_id': pending_approval, 'approved': key.lower() == 'y'}))
-                            pending_approval = None
                         action = await _keyboard_action(key, playback, detector, socket, speech_detector)
                         if action == 'interrupt': generation = None; audio_epoch += 1; notifications.audio_event('interrupt')
                         if action == 'quit': return

@@ -5,12 +5,13 @@ const url = new URL(process.env.ASSISTAI_TEST_VOICE_URL ?? 'ws://127.0.0.1:18111
 if (url.protocol !== 'ws:' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname) || url.username || url.password) throw Error('Expected loopback gateway');
 const text = 'Dans calculator.py, corrige add pour faire une addition au lieu d’une soustraction, sans changer d’autre fichier.';
 const socket = new WebSocket(url);
-let proposed, original, declined = false, ended = false, audioBytes = 0;
+let proposed, original, declined = false, ended = false, audioBytes = 0, approvalAvailable = false;
 const timer = setTimeout(() => { console.error('Timed out'); process.exitCode = 1; socket.close(); }, 60000);
 socket.on('message', (raw, binary) => {
   if (binary) { audioBytes += raw.length; return; }
   const event = JSON.parse(raw);
-  if (event.type === 'asr.ready') socket.send(JSON.stringify({type:'text',text}));
+  if (event.type === 'session.capabilities') approvalAvailable = event.task_approval === true;
+  else if (event.type === 'asr.ready') { if (!approvalAvailable) { console.error('Legacy proposal probe requires an approval-enabled gateway'); process.exitCode = 1; socket.close(); return; } socket.send(JSON.stringify({type:'text',text})); }
   else if (event.type === 'task.approval_requested') {
     proposed = event.task; original = event.original_request;
     socket.send(JSON.stringify({type:'task.approval',approval_id:event.approval_id,approved:false}));

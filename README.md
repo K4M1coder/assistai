@@ -20,7 +20,7 @@ A guarded synthetic spoken coding trial changed the disposable fixture and gener
 
 The corrected measurement was verified in a second real-model synthetic trial, which again delegated incorrect identifiers despite editing the fixture. See [EXP-185](docs/research/2026-11-14-spoken-coding-repeat.md).
 
-The current-source gateway requires explicit approval before agent submission. Compare the original request and proposed task before approving; approval does not sandbox the agent. The approval flow has mock coverage and a real-controller decline test, but human-approved real-agent completion remains unverified. See [EXP-186](docs/research/2026-11-14-task-approval.md).
+The gateway submits delegated tasks directly to the configured OpenCode harness. The editable demonstration uses a disposable workspace; its rules are not an OS sandbox and the gateway is not authenticated.
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.
 
@@ -52,15 +52,17 @@ LFM3-Omni-2B is an additional native audio-and-vision research candidate. Its lo
 
 The operator has reported one successfully approved read of the disposable `calculator.py` fixture and confirmed hearing an understandable result. This used typed input and does not establish a completed voice-input or edit demonstration. See the [fixture notes](docs/research/2026-11-17-edit-fixture.md).
 
-An operator subsequently reported a possible task start before approval. The provided excerpt says the task was waiting for approval and does not show a start; the original observation remains unexplained. The updated gateway adds local approval-to-start traceability, covered by mock tests. See the [investigation](docs/research/2026-11-17-reported-premature-task.md).
+The earlier approval-based experiment and operator report remain documented in the [investigation](docs/research/2026-11-17-reported-premature-task.md). The approval gate was subsequently removed at the operator's request.
 
-The current editable-fixture demonstration is available at `http://127.0.0.1:18131/` while the owned services remain running. The browser log distinguishes approval requests from actual start events. The prior demonstration gateways were stopped after checking for active clients; their volatile histories were discarded.
+The current editable-fixture demonstration is available at `http://127.0.0.1:18131/` while the owned services remain running. Delegated tasks start directly. The prior demonstration gateways were stopped after checking for active clients; their volatile histories were discarded.
+
+The separate mockup runs with `npm run dev` at `http://localhost:3000/`. On Windows, stop any owned OpenCode harness before `npm ci` so its executable is not locked. The mockup and the local voice gateway are separate systems. See [direct delegation and audio tests](docs/research/2026-11-17-direct-delegation-audio-loopback.md).
 
 A second synthetic spoken-image check on the running cascade returned the expected blue color and produced audio. It did not use a physical microphone or speaker; see the [spoken-image notes](docs/research/2026-11-12-spoken-image.md).
 
 The installed French Vosk vocabulary lacks exact entries for `fixture` and `calculator`, so transcription review remains important for file tasks. A local CPU comparison with quantized Kyutai STT recovered parts of those names but not the exact paths; its streaming and real-room performance remain unverified. See the [ASR notes](docs/research/2026-11-17-vosk-vocabulary-kyutai.md).
 
-Historical scripts that submit directly to OpenCode now require attended approval; they bypass the gateway's admission policy and are not sandboxed. See the [direct-probe notes](docs/research/2026-11-17-direct-probes.md) before using them.
+Historical scripts can submit directly to OpenCode, bypassing gateway resource admission; use them only with the intended disposable fixture. Their earlier approval behavior is documented in the [direct-probe notes](docs/research/2026-11-17-direct-probes.md).
 
 New Windows demo starts configure a small shared reservation database so participating gateways account for each other's estimated tasks. Older or independently configured gateways do not participate, so this is not a global limit. Reservations from a crash or an uncertain task deliberately remain until an operator verifies the task has stopped and reconciles the ledger. Existing gateways need restarting to use it.
 

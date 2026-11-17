@@ -21,7 +21,6 @@ import { createPressureDetector } from './resource-pressure.mjs';
 import { speechText, visibleAnswer } from './speech-text.mjs';
 import { latestCompletedAssistant } from './agent-task-status.mjs';
 import { openSharedTaskReservations } from './shared-task-reservations.mjs';
-import { createTaskApproval } from './task-approval.mjs';
 import { agentProgress } from './agent-progress.mjs';
 
 function validImage(image) {
@@ -157,7 +156,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: Boolean(opencodeUrl), input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: false, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -177,7 +176,7 @@ wss.on('connection', (client, req) => {
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`);
     return response.status === 204 ? null : response.json();
   };
-  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false, originalRequest = null, approvalId = null } = {}) => {
+  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false, originalRequest = null } = {}) => {
     if (!opencodeUrl) throw new Error('OpenCode is not configured');
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
     // Deduplicate by proposed task regardless of how the user phrased the request.
@@ -226,7 +225,7 @@ wss.on('connection', (client, req) => {
       cleanTaskState();
       throw error;
     }
-    const event = { task_id: agentSession.id, task, approval_id: approvalId };
+    const event = { task_id: agentSession.id, task };
     completedTasks.delete(taskKey);
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
@@ -304,20 +303,9 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
-  const approvals = createTaskApproval({ send, execute: launchTask,
-    audit: (kind, turnId, approvalId) => record(session, turnId, kind, { approval_id: approvalId }) });
-  const proposeTask = async (task, turnId, options = {}) => {
-    if (!opencodeUrl) throw Error('OpenCode is not configured');
-    return approvals.propose(task, turnId, options);
-  };
-  client.once('close', () => approvals.clear());
   client.on('message', (data, binary) => {
     if (binary) return;
     let event; try { event = JSON.parse(data.toString()); } catch { return; }
-    if (event.type === 'task.approval') {
-      void approvals.decide(event.approval_id, event.approved).catch(() => send({ type: 'task.approval_rejected', message: 'Could not record the approval decision; no new task was submitted.' }));
-      return;
-    }
     if (event.type !== 'task.cancel') return;
     const owned = typeof event.task_id === 'string' && [...runningTasks.values()].some(task => task.id === event.task_id);
     if (!owned || !opencodeUrl) { send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Task is not running in this session.' }); return; }
@@ -327,7 +315,7 @@ wss.on('connection', (client, req) => {
       .catch(() => send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Could not request cancellation; task status is uncertain.' }));
   });
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask: proposeTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
       getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),
       getCompletedTask: taskId => {
@@ -408,19 +396,17 @@ wss.on('connection', (client, req) => {
       if (active !== turn) return;
       if (message?.tool_calls?.length) {
         messages.push(message);
-        let approvalRequested = false;
         for (const call of message.tool_calls) {
           let result;
           try {
             if (call.function?.name !== 'delegate_task') throw new Error('Unknown tool');
             const args = JSON.parse(call.function.arguments);
-            result = await proposeTask(args.task, turn.id, { originalRequest: text });
-            approvalRequested ||= result.awaiting_approval === true;
+            result = await launchTask(args.task, turn.id, { originalRequest: text });
           } catch (error) { result = { accepted: false, error: String(error) }; }
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
         }
         if (active !== turn) return;
-        message = approvalRequested ? { content: 'La t\u00e2che n\u2019a pas encore commenc\u00e9. V\u00e9rifiez la demande affich\u00e9e, puis cliquez sur Approve task pour l\u2019autoriser, ou sur Decline task pour la refuser. La confirmation vocale ne suffit pas.' } : await complete(false);
+        message = await complete(false);
       }
       const answer = visibleAnswer(message?.content);
       if (!answer) throw new Error('LLM returned no spoken text');

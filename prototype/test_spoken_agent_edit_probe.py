@@ -37,35 +37,6 @@ class FakeSocket:
 
 
 class SpokenAgentProbeTests(unittest.IsolatedAsyncioTestCase):
-    async def test_declines_proposed_task_without_automatic_execution(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / '.cache') as folder:
-            (Path(folder) / 'calculator.py').write_text('def add(a, b):\n    return a - b\n', encoding='utf-8')
-            socket = FakeSocket()
-            socket.events = iter([{'type':'asr.ready'}, {'type':'task.approval_requested','approval_id':'approval-1'}])
-            env = {'ASSISTAI_PROBE_WORKSPACE':folder, 'ASSISTAI_TEST_VOICE_URL':'ws://127.0.0.1:18091/voice'}
-            with patch.dict(os.environ, env), patch.object(probe, 'connect', return_value=socket), \
-                 patch.object(probe.spoken_recall, 'synthesize', return_value=b'00'):
-                with self.assertRaisesRegex(RuntimeError, 'interactive approval was unavailable'):
-                    await probe.main()
-            self.assertIn({'type':'task.approval','approval_id':'approval-1','approved':False},
-                          [json.loads(item) for item in socket.sent if isinstance(item, str)])
-
-    async def test_forwards_operator_approval_for_synthetic_fixture(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / '.cache') as folder:
-            (Path(folder) / 'calculator.py').write_text('def add(a, b):\n    return a - b\n', encoding='utf-8')
-            socket = FakeSocket()
-            socket.events = iter([{'type':'asr.ready'}, {'type':'task.approval_requested','approval_id':'approval-1','task':'Fix calculator.py'},
-                {'type':'user.text','text':'request','turn_id':'task-turn'}, {'type':'task.started','task':'Fix calculator.py','turn_id':'task-turn'},
-                {'type':'assistant.text','text':'Bonjour','turn_id':'followup-turn'}, b'12', {'type':'task.completed'}])
-            env = {'ASSISTAI_PROBE_WORKSPACE':folder, 'ASSISTAI_TEST_VOICE_URL':'ws://127.0.0.1:18091/voice'}
-            with patch.dict(os.environ, env), patch.object(probe, 'connect', return_value=socket), \
-                 patch.object(probe.spoken_recall, 'synthesize', return_value=b'00'), patch.object(probe, 'ask_probe_approval', return_value=True), \
-                 patch.object(probe.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
-                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                await probe.main()
-            self.assertIn({'type':'task.approval','approval_id':'approval-1','approved':True},
-                          [json.loads(item) for item in socket.sent if isinstance(item, str)])
-
     async def test_records_synthetic_transcript_and_distinct_followup(self):
         with tempfile.TemporaryDirectory(dir=ROOT / '.cache') as folder:
             fixture = Path(folder) / 'calculator.py'

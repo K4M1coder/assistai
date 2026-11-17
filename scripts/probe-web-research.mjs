@@ -8,7 +8,7 @@ const request = 'Recherche le site officiel de la ville de Nantes et donne son a
 const socket = new WebSocket(address);
 const started = performance.now();
 let sent = false, proposal = null, approved = false, startedTask = false, complete = null, label = '';
-let audioBytes = 0, notificationBytes = 0, notification = false, pendingResponse = false, notificationRequested = false;
+let audioBytes = 0, notificationBytes = 0, notification = false, pendingResponse = false, notificationRequested = false, approvalAvailable = false;
 const timer = setTimeout(() => { console.error('Timed out; task status may be uncertain.'); process.exitCode = 1; socket.terminate(); }, 180000);
 function fail(message) { console.error(message); process.exitCode = 1; clearTimeout(timer); socket.close(); }
 function notifyWhenReady() {
@@ -20,9 +20,10 @@ socket.on('message', async (raw, binary) => {
   if (binary) { audioBytes += raw.length; if (notification) notificationBytes += raw.length; return; }
   let event;
   try { event = JSON.parse(raw); } catch { fail('Invalid gateway event'); return; }
-  if (event.type === 'session.capabilities') label = event.workspace_label ?? '';
+  if (event.type === 'session.capabilities') { label = event.workspace_label ?? ''; approvalAvailable = event.task_approval === true; }
   else if (event.type === 'asr.ready' && !sent) {
     if (!label.includes('hosted Exa')) { fail('Expected an explicitly labeled hosted web-search fixture'); return; }
+    if (!approvalAvailable) { fail('Legacy research probe requires an approval-enabled gateway'); return; }
     sent = true; pendingResponse = true; socket.send(JSON.stringify({type:'text',text:request}));
   } else if (event.type === 'task.approval_requested') {
     proposal = event.task;

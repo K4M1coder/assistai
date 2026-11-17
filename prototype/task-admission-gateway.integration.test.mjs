@@ -64,7 +64,6 @@ test('gateway retains uncertain tasks, requests pressure cancellation and recove
       ws.on('message',(data,binary)=>{
         if(binary)return;const event=JSON.parse(data);
         if(event.type==='asr.ready'){ws.send(JSON.stringify({type:'audio.start'}));ws.send(Buffer.alloc(3200));ws.send(JSON.stringify({type:'audio.end'}));}
-        else if(event.type==='task.approval_requested'){ws.send(JSON.stringify({type:'task.approval',approval_id:event.approval_id,approved:true}));}
         else if(event.type===expected){clearTimeout(timer);resolve(event);}
         else if(event.type==='error'){clearTimeout(timer);reject(Error(JSON.stringify(event)));}
       });

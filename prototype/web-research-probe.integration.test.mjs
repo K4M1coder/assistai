@@ -9,7 +9,7 @@ test('web research probe declines when no operator terminal is available', {time
   await once(server,'listening');
   let approved;
   server.on('connection', socket => {
-    socket.send(JSON.stringify({type:'session.capabilities',workspace_label:'Search uses hosted Exa'}));
+    socket.send(JSON.stringify({type:'session.capabilities',workspace_label:'Search uses hosted Exa',task_approval:true}));
     socket.send(JSON.stringify({type:'asr.ready'}));
     socket.on('message', raw => {
       const event = JSON.parse(raw);

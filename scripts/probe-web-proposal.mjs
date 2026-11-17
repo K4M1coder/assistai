@@ -5,13 +5,13 @@ const url = new URL(process.env.ASSISTAI_TEST_VOICE_URL ?? 'ws://127.0.0.1:18121
 if (url.protocol !== 'ws:' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname) || url.username || url.password) throw Error('Expected loopback gateway');
 const text = 'Délègue à ton agent une recherche sur le site officiel de la ville de Nantes et demande les sources.';
 const socket = new WebSocket(url);
-let label = '', proposal, declined = false, ended = false, bytes = 0;
+let label = '', proposal, declined = false, ended = false, bytes = 0, approvalAvailable = false;
 const timer = setTimeout(() => { console.error('Timed out'); process.exitCode = 1; socket.close(); }, 60000);
 socket.on('message', (raw, binary) => {
   if (binary) { bytes += raw.length; return; }
   const event = JSON.parse(raw);
-  if (event.type === 'session.capabilities') label = event.workspace_label ?? '';
-  else if (event.type === 'asr.ready') socket.send(JSON.stringify({type:'text',text}));
+  if (event.type === 'session.capabilities') { label = event.workspace_label ?? ''; approvalAvailable = event.task_approval === true; }
+  else if (event.type === 'asr.ready') { if (!approvalAvailable) { console.error('Legacy proposal probe requires an approval-enabled gateway'); process.exitCode = 1; socket.close(); return; } socket.send(JSON.stringify({type:'text',text})); }
   else if (event.type === 'task.approval_requested') {
     proposal = event.task;
     socket.send(JSON.stringify({type:'task.approval',approval_id:event.approval_id,approved:false}));

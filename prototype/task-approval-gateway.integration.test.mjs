@@ -16,7 +16,7 @@ async function listen(server) {
   return server.address().port;
 }
 
-test('reviewed speech submits no agent session before explicit one-use approval', { timeout: 15000 }, async t => {
+test('reviewed speech delegates directly without an approval gate', { timeout: 15000 }, async t => {
   let sessions = 0, prompt, modelCalls = 0;
   const agent = http.createServer(async (req, res) => {
     res.setHeader('content-type', 'application/json');
@@ -67,14 +67,14 @@ test('reviewed speech submits no agent session before explicit one-use approval'
     child.stdout.on('data', chunk => { if (chunk.toString().includes('Experimental voice gateway')) { clearTimeout(timer); resolve(); } });
   });
   const client = new WebSocket(`ws://127.0.0.1:${port}/voice`); clients.push(client);
-  let approvalId, approvalCount = 0;
+  let sawApproval = false;
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Error('Approval flow timed out')), 8000);
+    const timer = setTimeout(() => reject(Error('Direct delegation timed out')), 8000);
     client.on('error', reject);
     client.on('message', function handler(data, binary) {
       if (binary) return;
       const event = JSON.parse(data);
-      if (event.type === 'session.capabilities') assert.equal(event.workspace_label, 'Disposable edit fixture');
+      if (event.type === 'session.capabilities') { assert.equal(event.workspace_label, 'Disposable edit fixture'); assert.equal(event.task_approval, false); }
       if (event.type === 'asr.ready') {
         client.send(JSON.stringify({ type: 'speech.review.configure', enabled: true }));
         client.send(JSON.stringify({ type: 'audio.end' }));
@@ -84,46 +84,15 @@ test('reviewed speech submits no agent session before explicit one-use approval'
         assert.equal(modelCalls, 0); assert.equal(sessions, 0);
         client.send(JSON.stringify({ type: 'speech.review.submit', review_id: event.review_id, text: 'Read fixture.txt only' }));
       }
-      if (event.type === 'task.approval_requested') {
-        approvalId = event.approval_id;
-        assert.equal(event.original_request, 'Read fixture.txt only');
-        assert.equal(event.task, 'Read fixture.txt');
-        assert.equal(sessions, 0);
-        approvalCount++;
-        client.send(JSON.stringify({ type: 'task.approval', approval_id: 'incorrect-id', approved: true }));
-        setTimeout(() => {
-          assert.equal(sessions, 0);
-          client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
-          client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
-        }, 300);
-      }
-      if (event.type === 'task.started') { assert.equal(event.approval_id, approvalId); clearTimeout(timer); client.off('message', handler); resolve(); }
+      if (event.type === 'task.approval_requested') sawApproval = true;
+      if (event.type === 'task.started') { clearTimeout(timer); client.off('message', handler); resolve(); }
     });
   });
-  assert.equal(approvalCount, 1);
+  assert.equal(sawApproval, false);
   assert.equal(sessions, 1);
   assert.match(prompt, /Read fixture\.txt only/);
   const db = new DatabaseSync(database, { readOnly: true });
-  const audit = db.prepare("SELECT kind,payload FROM events WHERE kind IN ('task.approval_requested','task.approval_submitted','task.started') ORDER BY rowid").all();
+  const starts = db.prepare("SELECT kind FROM events WHERE kind='task.started'").all();
   db.close();
-  assert.deepEqual(audit.map(row => row.kind), ['task.approval_requested', 'task.approval_submitted', 'task.started']);
-  assert.ok(audit.every(row => JSON.parse(row.payload).approval_id === approvalId));
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Error('Duplicate task check timed out')), 8000);
-    client.on('message', function handler(data, binary) {
-      if (binary) return;
-      const event = JSON.parse(data);
-      if (event.type === 'task.approval_requested') {
-        assert.equal(event.original_request, 'Please read fixture.txt');
-        client.send(JSON.stringify({ type: 'task.approval', approval_id: event.approval_id, approved: true }));
-      }
-      if (event.type === 'task.approval_result') {
-        clearTimeout(timer); client.off('message', handler);
-        assert.match(event.message, /already running/); resolve();
-      }
-      if (event.type === 'task.started') { clearTimeout(timer); reject(Error('Duplicate task was submitted')); }
-    });
-    client.send(JSON.stringify({ type: 'text', text: 'Please read fixture.txt' }));
-  });
-  assert.equal(sessions, 1);
+  assert.equal(starts.length, 1);
 });

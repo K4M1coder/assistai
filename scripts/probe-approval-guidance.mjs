@@ -4,12 +4,13 @@ import WebSocket from 'ws';
 const target = new URL(process.env.ASSISTAI_TEST_VOICE_URL ?? 'ws://127.0.0.1:18098/voice');
 if (target.protocol !== 'ws:' || !['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || target.username || target.password) throw Error('Expected local gateway');
 const socket = new WebSocket(target);
-let proposal = false, declined = false, answer = '', bytes = 0, done = false;
+let proposal = false, declined = false, answer = '', bytes = 0, done = false, approvalAvailable = false;
 const timer = setTimeout(() => { console.error('Approval probe timed out'); process.exitCode = 1; socket.close(); }, 60000);
 socket.on('message', (raw, binary) => {
   if (binary) { bytes += raw.length; return; }
   const event = JSON.parse(raw);
-  if (event.type === 'asr.ready') socket.send(JSON.stringify({ type:'text', text:'Délègue à ton agent la lecture de fixture.txt et demande le mot secret.' }));
+  if (event.type === 'session.capabilities') approvalAvailable = event.task_approval === true;
+  else if (event.type === 'asr.ready') { if (!approvalAvailable) { console.error('Legacy proposal probe requires an approval-enabled gateway'); process.exitCode = 1; socket.close(); return; } socket.send(JSON.stringify({ type:'text', text:'Délègue à ton agent la lecture de fixture.txt et demande le mot secret.' })); }
   else if (event.type === 'task.approval_requested') {
     proposal = typeof event.task === 'string' && typeof event.approval_id === 'string';
     socket.send(JSON.stringify({ type:'task.approval', approval_id:event.approval_id, approved:false }));

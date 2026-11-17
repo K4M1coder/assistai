@@ -22,7 +22,7 @@ try {
   $null=$sampler.Handle
   $env:ASSISTAI_GATEWAY_PORT=[string]$Port; $env:ASSISTAI_DB_PATH=':memory:'; $env:ASSISTAI_ENABLE_SESSION_RESUME='1'
   $env:ASSISTAI_LFM_REALTIME_URL=''; $env:ASSISTAI_LFM_TRANSCRIPT_ASR_URL=''; $env:ASSISTAI_OPENCODE_URL=if($EditFixture){'http://127.0.0.1:18110'}elseif($WebFixture){'http://127.0.0.1:18120'}else{'http://127.0.0.1:18085'}
-  $env:ASSISTAI_WORKSPACE_LABEL=if($EditFixture){'Disposable coding fixture: .cache/agent-edit-demo. File editing is enabled after approval. This is not an OS sandbox.'}elseif($WebFixture){'Web research fixture: search queries are sent to hosted Exa and pages to their websites after approval. File editing is disabled.'}else{'Read-only research fixture: .cache/opencode-probe. Web search and editing are disabled.'}
+  $env:ASSISTAI_WORKSPACE_LABEL=if($EditFixture){'Disposable coding fixture: .cache/agent-edit-demo. File editing is enabled. This is not an OS sandbox.'}elseif($WebFixture){'Web research fixture: search queries are sent to hosted Exa and pages to their websites. File editing is disabled.'}else{'Read-only research fixture: .cache/opencode-probe. Web search and editing are disabled.'}
   $env:ASSISTAI_LLM_URL='http://127.0.0.1:18084/v1'; $env:ASSISTAI_VISION_URL='http://127.0.0.1:18080/v1'
   $env:ASSISTAI_TTS_URL='http://127.0.0.1:18081'; $env:ASSISTAI_ASR_URL='ws://127.0.0.1:18082/asr'
   $env:ASSISTAI_BUDGET_SAMPLE_PATH=$sample; $env:ASSISTAI_RESOURCE_STATUS_PATH=$sample

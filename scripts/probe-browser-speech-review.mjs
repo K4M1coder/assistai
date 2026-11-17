@@ -51,6 +51,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   if (!ready) throw Error('Client not ready');
+  if (process.env.ASSISTAI_PROBE_REVIEW_TASK === '1' && !(await evaluate("document.querySelector('#approval-safety').textContent.includes('requires task approval')"))) throw Error('Legacy task proposal probe requires an approval-enabled gateway');
   await evaluate("document.querySelector('#speech-review').click(); document.querySelector('#start').click(); true");
   let state;
   for (let i = 0; i < 200; i++) {
