@@ -177,7 +177,7 @@ wss.on('connection', (client, req) => {
     if (!response.ok) throw new Error(`OpenCode HTTP ${response.status}`);
     return response.status === 204 ? null : response.json();
   };
-  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false, originalRequest = null } = {}) => {
+  const launchTask = async (task, turnId, { reuseCompleted = false, rerun = false, originalRequest = null, approvalId = null } = {}) => {
     if (!opencodeUrl) throw new Error('OpenCode is not configured');
     if (typeof task !== 'string' || !task.trim() || task.length > 4000) throw new Error('Invalid agent task');
     // Deduplicate by proposed task regardless of how the user phrased the request.
@@ -226,7 +226,7 @@ wss.on('connection', (client, req) => {
       cleanTaskState();
       throw error;
     }
-    const event = { task_id: agentSession.id, task };
+    const event = { task_id: agentSession.id, task, approval_id: approvalId };
     completedTasks.delete(taskKey);
     record(session, turnId, 'task.started', event);
     send({ type: 'task.started', turn_id: turnId, ...event });
@@ -304,7 +304,8 @@ wss.on('connection', (client, req) => {
     })();
     return { accepted: true, task_id: agentSession.id };
   };
-  const approvals = createTaskApproval({ send, execute: launchTask });
+  const approvals = createTaskApproval({ send, execute: launchTask,
+    audit: (kind, turnId, approvalId) => record(session, turnId, kind, { approval_id: approvalId }) });
   const proposeTask = async (task, turnId, options = {}) => {
     if (!opencodeUrl) throw Error('OpenCode is not configured');
     return approvals.propose(task, turnId, options);
@@ -314,7 +315,7 @@ wss.on('connection', (client, req) => {
     if (binary) return;
     let event; try { event = JSON.parse(data.toString()); } catch { return; }
     if (event.type === 'task.approval') {
-      void approvals.decide(event.approval_id, event.approved);
+      void approvals.decide(event.approval_id, event.approved).catch(() => send({ type: 'task.approval_rejected', message: 'Could not record the approval decision; no new task was submitted.' }));
       return;
     }
     if (event.type !== 'task.cancel') return;

@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
+import { unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
 
 async function listen(server) {
@@ -38,8 +43,9 @@ test('reviewed speech submits no agent session before explicit one-use approval'
   });
   const [agentPort, modelPort, asrPort] = await Promise.all([listen(agent), listen(model), listen(asr)]);
   const reservation = http.createServer(); const port = await listen(reservation); await new Promise(resolve => reservation.close(resolve));
+  const database = path.join(tmpdir(), `assistai-approval-${randomUUID()}.sqlite`);
   const child = spawn(process.execPath, ['prototype/gateway.mjs'], {
-    env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: ':memory:',
+    env: { ...process.env, ASSISTAI_GATEWAY_PORT: String(port), ASSISTAI_DB_PATH: database,
       ASSISTAI_LFM_REALTIME_URL: '', ASSISTAI_BUDGET_SAMPLE_PATH: '', ASSISTAI_OPENCODE_URL: `http://127.0.0.1:${agentPort}`,
       ASSISTAI_LLM_URL: `http://127.0.0.1:${modelPort}/v1`, ASSISTAI_TTS_URL: `http://127.0.0.1:${modelPort}`, ASSISTAI_ASR_URL: `ws://127.0.0.1:${asrPort}/asr`, ASSISTAI_WORKSPACE_LABEL:'Disposable edit fixture' },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
@@ -51,6 +57,7 @@ test('reviewed speech submits no agent session before explicit one-use approval'
     for (const client of clients) client.terminate();
     for (const socket of asrSockets.clients) socket.terminate();
     child.kill(); await once(child, 'exit');
+    for (const suffix of ['', '-wal', '-shm']) await unlink(database + suffix).catch(error => { if (error.code !== 'ENOENT') throw error; });
     await Promise.all([new Promise(resolve => asrSockets.close(resolve)), new Promise(resolve => asr.close(resolve)),
       new Promise(resolve => agent.close(resolve)), new Promise(resolve => model.close(resolve))]);
   });
@@ -90,12 +97,17 @@ test('reviewed speech submits no agent session before explicit one-use approval'
           client.send(JSON.stringify({ type: 'task.approval', approval_id: approvalId, approved: true }));
         }, 300);
       }
-      if (event.type === 'task.started') { clearTimeout(timer); client.off('message', handler); resolve(); }
+      if (event.type === 'task.started') { assert.equal(event.approval_id, approvalId); clearTimeout(timer); client.off('message', handler); resolve(); }
     });
   });
   assert.equal(approvalCount, 1);
   assert.equal(sessions, 1);
   assert.match(prompt, /Read fixture\.txt only/);
+  const db = new DatabaseSync(database, { readOnly: true });
+  const audit = db.prepare("SELECT kind,payload FROM events WHERE kind IN ('task.approval_requested','task.approval_submitted','task.started') ORDER BY rowid").all();
+  db.close();
+  assert.deepEqual(audit.map(row => row.kind), ['task.approval_requested', 'task.approval_submitted', 'task.started']);
+  assert.ok(audit.every(row => JSON.parse(row.payload).approval_id === approvalId));
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(Error('Duplicate task check timed out')), 8000);
     client.on('message', function handler(data, binary) {
