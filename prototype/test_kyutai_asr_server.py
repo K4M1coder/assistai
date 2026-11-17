@@ -26,6 +26,24 @@ class Socket:
 
 
 class KyutaiServerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_connection_limit_recovers_after_disconnect(self):
+        entered = asyncio.Event(); release = asyncio.Event(); count = 0
+        async def hold(socket):
+            nonlocal count
+            count += 1
+            if count == server.MAX_CONNECTIONS: entered.set()
+            await release.wait()
+        with patch.object(server, 'active_connections', 0), patch.object(server, 'serve_asr', side_effect=hold):
+            active = [asyncio.create_task(server.asr(Socket([]))) for _ in range(server.MAX_CONNECTIONS)]
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+                excess = Socket([]); await server.asr(excess)
+                self.assertEqual(excess.closed['code'], 1013)
+                self.assertEqual(count, server.MAX_CONNECTIONS)
+            finally:
+                release.set(); await asyncio.gather(*active)
+            self.assertEqual(server.active_connections, 0)
+
     async def test_bounded_queue_rejects_excess_work(self):
         entered = asyncio.Event(); release = asyncio.Event()
         async def background(function, pcm):

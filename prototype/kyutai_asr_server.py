@@ -15,10 +15,12 @@ EXECUTABLE = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64
 MODEL = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
 MAX_FRAME_BYTES = 32000
 MAX_UTTERANCE_BYTES = 960000  # 30 seconds of 16 kHz mono PCM16.
+MAX_CONNECTIONS = 4
 app = FastAPI()
 worker = asyncio.Lock()
 pending_jobs = 0
 MAX_PENDING_JOBS = 2  # One running transcription and at most one waiting.
+active_connections = 0
 
 
 async def serialized_transcribe(pcm):
@@ -107,7 +109,19 @@ async def health():
 
 @app.websocket('/asr')
 async def asr(socket: WebSocket):
+    global active_connections
     await socket.accept()
+    if active_connections >= MAX_CONNECTIONS:
+        await socket.close(code=1013, reason='ASR connection limit reached')
+        return
+    active_connections += 1
+    try:
+        await serve_asr(socket)
+    finally:
+        active_connections -= 1
+
+
+async def serve_asr(socket: WebSocket):
     if not EXECUTABLE.is_file() or not MODEL.is_file():
         await socket.close(code=1013, reason='ASR files unavailable')
         return
