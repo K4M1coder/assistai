@@ -88,7 +88,7 @@ The browser can enumerate available audio inputs and request a selected input by
 
 Automatic speech turns end after a configurable quiet interval, default 1.4 seconds; push-to-talk ends on release. Longer intervals tolerate pauses at the cost of response latency and do not separate nearby speakers.
 
-In experimental native speech mode, interrupting while a tool submission is pending replaces the realtime voice session, discards its late tool response and signals reconnection to the browser. Input arriving during session setup is buffered up to 32,000 PCM bytes and then flushed; overflow fails explicitly. The background task may already have been accepted and continues independently; interrupting voice does not cancel or undo it. This race is covered by mock tests, not yet by a live native model or physical audio test.
+In experimental native speech mode, interrupting while a tool submission is pending replaces the realtime voice session, discards its late tool response and signals reconnection to the browser. Input arriving during session setup or cancellation is buffered up to 96,000 PCM bytes (three seconds at 16 kHz mono PCM16) and then flushed; overflow discards that input and fails explicitly. The background task may already have been accepted and continues independently; interrupting voice does not cancel or undo it. This race is covered by mock tests, not yet by a live native model or physical audio test.
 
 The optional Windows resource sample can include total system pagefile usage. This is not attributed to a process, is not a hard memory limit, and does not prove where model data resides. Resource status warns above the conservative total shared-GPU threshold independently of whether task admission is configured.
 

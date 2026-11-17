@@ -3,6 +3,7 @@ import { LfmRealtimeSession } from './lfm-realtime-session.mjs';
 import { createNativeTranscript } from './native-transcript.mjs';
 
 // Opt-in research bridge. It does not provide OS isolation or a memory limit.
+const MAX_INTERRUPTION_BUFFER_BYTES = 96000; // Three seconds of mono 16 kHz PCM16.
 export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFactory, workspaceContext = '', getCompletedTask = () => null, transcriptUrl, recordEvent = () => {}, getContext = () => [], resumed = false } = {}) {
   const send = event => {
     if (['user.text','assistant.text'].includes(event.type) && typeof event.text === 'string' && event.text.trim()) recordEvent(event);
@@ -70,7 +71,7 @@ export function attachLfmBridge(client, { url, launchTask, makeTurnId, sessionFa
       const frame=Buffer.from(data);
       transcript?.append(frame);
       if(bufferingInput()){
-        if(queuedBytes+frame.length>32000){fail('Interrupted input buffer full');return;}
+        if(queuedBytes+frame.length>MAX_INTERRUPTION_BUFFER_BYTES){fail('Interrupted speech exceeded the three-second buffer; please retry.');return;}
         queued.push(frame);queuedBytes+=frame.length;return;
       }
       if(!current.appendAudio(frame))fail('Realtime session is busy or unavailable');

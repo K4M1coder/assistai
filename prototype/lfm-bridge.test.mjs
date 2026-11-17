@@ -7,6 +7,14 @@ class Session extends EventEmitter {state='ready';frames=[];results=[];closed=fa
 function setup(){const client=new Client();const sessions=[];const tasks=[];attachLfmBridge(client,{makeTurnId:()=> 'turn1',sessionFactory:()=>{const s=new Session();sessions.push(s);return s},launchTask:async(t,id)=>{tasks.push([t,id]);return {accepted:true,task_id:'internal-id'}},getCompletedTask:id=>id==='completed'?'BLUEBIRD':null});return {client,sessions,tasks}}
 test('ignores idle audio and sends captured speech',()=>{const {client,sessions}=setup();const s=sessions[0];client.audio(Buffer.alloc(2));assert.equal(s.frames.length,0);client.event({type:'audio.start'});client.audio(Buffer.alloc(2));client.event({type:'audio.end'});assert.equal(s.frames.length,1);assert.equal(s.state,'waiting')});
 test('interrupt queues new speech until cancellation completes',()=>{const {client,sessions}=setup();const s=sessions[0];s.state='responding';client.event({type:'interrupt'});client.event({type:'audio.start'});client.audio(Buffer.alloc(2));client.event({type:'audio.end'});assert.equal(s.frames.length,0);s.state='ready';s.emit('cancelled');assert.equal(s.frames.length,1);assert.equal(s.state,'waiting');assert.equal(client.sent[0].type,'speech.cancelled')});
+test('buffers up to three seconds during cancellation and rejects excess input',()=>{
+ const first=setup(),s=first.sessions[0];s.state='responding';first.client.event({type:'interrupt'});first.client.event({type:'audio.start'});
+ for(let i=0;i<30;i++)first.client.audio(Buffer.alloc(3200));first.client.event({type:'audio.end'});s.state='ready';s.emit('cancelled');
+ assert.equal(s.frames.reduce((sum,frame)=>sum+frame.length,0),96000);assert.equal(s.state,'waiting');
+ const second=setup(),t=second.sessions[0];t.state='responding';second.client.event({type:'interrupt'});second.client.event({type:'audio.start'});
+ for(let i=0;i<31;i++)second.client.audio(Buffer.alloc(3200));
+ assert.match(second.client.sent.at(-1).message,/three-second buffer/);t.state='ready';t.emit('cancelled');assert.equal(t.frames.length,0);
+});
 test('partial input reset replaces backend session',()=>{const {client,sessions}=setup();client.event({type:'audio.start'});client.audio(Buffer.alloc(2));client.event({type:'audio.reset'});assert.equal(sessions.length,2);assert.equal(sessions[0].closed,true)});
 test('unexpected native backend closure disconnects the client for recovery',()=>{const {client,sessions}=setup();sessions[0].close();assert.deepEqual(client.closeInfo,{code:1011,reason:'Native speech disconnected'});assert.match(client.sent.at(-1).message,/connection closed/)});
 test('native backend fault is reported once before disconnect',()=>{const {client,sessions}=setup();sessions[0].emit('fault','Realtime transport error');sessions[0].close();assert.equal(client.sent.filter(e=>e.type==='error').length,1);assert.equal(client.closeInfo.code,1011)});
