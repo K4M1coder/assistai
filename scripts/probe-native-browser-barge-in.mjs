@@ -10,6 +10,11 @@ import { followupAnswer, followupTranscript, plausibleFollowupTranscript, correc
 
 const different=process.argv.includes('--different-followup');
 const windowsFollowup=process.argv.includes('--windows-followup');
+const agentFixture=process.argv.includes('--agent-fixture');
+if(agentFixture&&(different||windowsFollowup))throw Error('Agent fixture uses a fixed capital follow-up');
+const gapArg=process.argv.find(arg=>arg.startsWith('--agent-gap-ms='));
+const gapMs=gapArg?Number(gapArg.slice('--agent-gap-ms='.length)):0;
+if(gapArg&&(!agentFixture||!Number.isInteger(gapMs)||gapMs<0||gapMs>10000))throw Error('Agent gap must be 0 to 10000 ms');
 const captureArg=process.argv.find(arg=>arg.startsWith('--capture-run-id='));
 const captureId=captureArg?.slice('--capture-run-id='.length);
 if(captureArg&&!/^[A-Za-z0-9_-]{1,40}$/.test(captureId))throw Error('Invalid capture run ID');
@@ -21,15 +26,18 @@ if(windowsFollowup&&!different)throw Error('Windows follow-up requires --differe
 async function readPhrase(filename){const input=await readFile(filename);const offset=input.indexOf('data');
  if(offset<0||input.readUInt16LE(22)!==1||input.readUInt32LE(24)!==16000||input.readUInt16LE(34)!==16)throw Error('Expected mono 16 kHz PCM16');
  return input.subarray(offset+8,offset+8+input.readUInt32LE(offset+4));}
-const phrase=await readPhrase('.cache/kyutai-persistent-synthetic-capital.wav');
-const followup=different?await readPhrase(windowsFollowup?'.cache/lfm3-math-windows.wav':'.cache/kyutai-persistent-synthetic-math.wav'):phrase;
-const pcm=Buffer.concat([Buffer.alloc(3*32000),phrase,followup,Buffer.alloc(4*32000)]);
+const capital=await readPhrase('.cache/kyutai-persistent-synthetic-capital.wav');
+const phrase=agentFixture?await readPhrase('.cache/lfm3-fixture-french.wav'):capital;
+const followup=agentFixture?capital:different?await readPhrase(windowsFollowup?'.cache/lfm3-math-windows.wav':'.cache/kyutai-persistent-synthetic-math.wav'):phrase;
+const pcm=Buffer.concat([Buffer.alloc(3*32000),phrase,Buffer.alloc(gapMs*32),followup,Buffer.alloc(4*32000)]);
 const header=Buffer.alloc(44);header.write('RIFF');header.writeUInt32LE(36+pcm.length,4);header.write('WAVEfmt ',8);header.writeUInt32LE(16,16);header.writeUInt16LE(1,20);header.writeUInt16LE(1,22);header.writeUInt32LE(16000,24);header.writeUInt32LE(32000,28);header.writeUInt16LE(2,32);header.writeUInt16LE(16,34);header.write('data',36);header.writeUInt32LE(pcm.length,40);
 const profile=await mkdtemp(path.join(tmpdir(),'assistai-barge-in-'));const audio=path.join(profile,'synthetic.wav');await writeFile(audio,Buffer.concat([header,pcm]),{flag:'wx'});
 const reservation=net.createServer();reservation.listen(0,'127.0.0.1');await once(reservation,'listening');const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
 const env={...process.env,ASSISTAI_GATEWAY_PORT:String(port),ASSISTAI_DB_PATH:':memory:',ASSISTAI_LFM_REALTIME_URL:'ws://127.0.0.1:18210/v1/realtime',
- ASSISTAI_LFM_TRANSCRIPT_ASR_URL:'ws://127.0.0.1:18082/asr',ASSISTAI_LFM_NOTIFICATION_TTS:'',ASSISTAI_OPENCODE_URL:'',
- ASSISTAI_BUDGET_SAMPLE_PATH:'',ASSISTAI_RESOURCE_STATUS_PATH:'',ASSISTAI_SHARED_RESERVATIONS_PATH:''};
+ ASSISTAI_LFM_TRANSCRIPT_ASR_URL:'ws://127.0.0.1:18082/asr',ASSISTAI_LFM_NOTIFICATION_TTS:'',ASSISTAI_OPENCODE_URL:agentFixture?'http://127.0.0.1:18085':'',
+ ASSISTAI_LFM_WORKSPACE_CONTEXT:agentFixture?'The read-only fixture contains fixture.txt.':'',
+ ASSISTAI_BUDGET_SAMPLE_PATH:agentFixture?'.cache/assistant/demo-18131-resource.json':'',ASSISTAI_RESOURCE_STATUS_PATH:agentFixture?'.cache/assistant/demo-18131-resource.json':'',ASSISTAI_SHARED_RESERVATIONS_PATH:'',
+ ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(512*1024**2),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(3*1024**3)};
 const gateway=spawn(process.execPath,['prototype/gateway.mjs'],{env,stdio:['ignore','pipe','pipe'],windowsHide:true});let stderr='',browser,socket;
 gateway.stderr.on('data',chunk=>stderr+=chunk);
 try{
@@ -52,7 +60,7 @@ try{
  for(let i=0;i<500;i++){
    state=await evaluate("({status:document.querySelector('#status').textContent,log:document.querySelector('#log').textContent,before:window.__before,after:window.__after})");
    if(state.status.includes('Microphone unavailable'))throw Error(state.status);
-   if((state.log.match(/You:/g)||[]).length>=2&&plausibleFollowupTranscript(followupTranscript(state.log),different)&&correctFollowup(followupAnswer(state.log),different)&&state.after>0)break;
+   if((state.log.match(/You:/g)||[]).length>=2&&plausibleFollowupTranscript(followupTranscript(state.log),different)&&correctFollowup(followupAnswer(state.log),different)&&state.after>0&&(!agentFixture||/Agent completed:.*BLUEBIRD/i.test(state.log)))break;
    await new Promise(resolve=>setTimeout(resolve,100));
  }
  if(captureId){
@@ -66,7 +74,9 @@ try{
  }
  await evaluate("document.querySelector('#stop').click();true");
  const interruption=state.log.includes('Playback interrupted: microphone detected speech.');const transcripts=(state.log.match(/You:/g)||[]).length;
+ const startedAt=state.log.indexOf('Agent started:'),interruptedAt=state.log.indexOf('Playback interrupted: microphone detected speech.'),completedAt=state.log.indexOf('Agent completed:');
+ const interruptedDuringTask=startedAt>=0&&interruptedAt>startedAt&&(completedAt<0||interruptedAt<completedAt);
  const answer=followupAnswer(state.log),correct=correctFollowup(answer,different),transcript=followupTranscript(state.log),transcriptPlausible=plausibleFollowupTranscript(transcript,different);
- console.log(JSON.stringify({...state,interruption,transcripts,differentFollowup:different,windowsFollowup,followupTranscript:transcript,transcriptPlausible,followupAnswer:answer,followupCorrect:correct,microphoneSource:'Chromium fake WAV device',browserAudioMuted:true,profile},null,2));
- if(!interruption||transcripts<2||!state.before||!state.after||!correct||!transcriptPlausible)process.exitCode=1;
+ console.log(JSON.stringify({...state,interruption,transcripts,differentFollowup:different,windowsFollowup,agentFixture,gapMs,interruptedDuringTask,followupTranscript:transcript,transcriptPlausible,followupAnswer:answer,followupCorrect:correct,microphoneSource:'Chromium fake WAV device',browserAudioMuted:true,profile},null,2));
+ if(!interruption||transcripts<2||!state.before||!state.after||!correct||!transcriptPlausible||(agentFixture&&(!interruptedDuringTask||!/Agent completed:.*BLUEBIRD/i.test(state.log))))process.exitCode=1;
 }finally{socket?.close();browser?.kill();gateway.kill();await Promise.race([once(gateway,'exit').catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);}
