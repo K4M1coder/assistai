@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=60)
+param([int]$TimeoutSeconds=60,[switch]$InspectPlacement)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -18,7 +18,8 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $previousEncoding=[Environment]::GetEnvironmentVariable('PYTHONIOENCODING','Process')
 try {
   $env:PYTHONIOENCODING='utf-8'
-  $p=Start-Process -FilePath (Join-Path $root '.cache/piper-directml-clean/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-piper-directml.py')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+  $probeArgs=@((Join-Path $root 'scripts/probe-piper-directml.py'));if($InspectPlacement){$probeArgs+='--inspect-placement'}
+  $p=Start-Process -FilePath (Join-Path $root '.cache/piper-directml-clean/Scripts/python.exe') -ArgumentList $probeArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 } finally {[Environment]::SetEnvironmentVariable('PYTHONIOENCODING',$previousEncoding,'Process')}
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {

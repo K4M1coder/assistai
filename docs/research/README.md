@@ -1,6 +1,6 @@
 # Research notebook — local voice assistant
 
-Recent experiment: [Piper French voice with DirectML](2026-11-19-piper-directml-candidate.md) investigates a GPU notification synthesizer; its guarded inference has not yet run.
+Recent experiment: [Piper French voice with DirectML](2026-11-19-piper-directml-candidate.md) found that strict no-CPU-fallback initialization fails; no speech was generated.
 
 This directory records the product's research. Never overwrite an experiment: give it an identifier, a falsifiable hypothesis, the exact configuration, raw measurements, and a conclusion. Negative results are valuable too.
 
