@@ -13,11 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--concurrent', action='store_true')
 parser.add_argument('--browser-run-id')
-parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows'))
+parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math'))
 options = parser.parse_args()
-if options.browser_run_id is not None and (options.sample != 'browser-agent-notification' or
+if options.browser_run_id is not None and (options.sample not in ('browser-agent-notification', 'browser-barge-math') or
         not re.fullmatch(r'[A-Za-z0-9_-]{1,40}', options.browser_run_id)):
-    raise ValueError('Browser run ID requires browser-agent-notification and a simple identifier')
+    raise ValueError('Browser run ID requires a supported browser sample and a simple identifier')
+if options.sample == 'browser-barge-math' and not options.browser_run_id:
+    raise ValueError('Browser barge-in capture requires a run ID')
 spec = importlib.util.spec_from_file_location('asr_coding', ROOT / 'scripts/probe-asr-coding.py')
 asr = importlib.util.module_from_spec(spec); spec.loader.exec_module(asr)
 filename = 'lfm3-omni-concurrent-output.wav' if options.concurrent else 'lfm3-omni-capital-output.wav'
@@ -33,8 +35,9 @@ if options.sample:
                 'browser-agent-notification':'native-browser-notification.wav',
                 'browser-capture-roundtrip':'native-browser-capture-roundtrip.wav',
                 'pocket-agent-notification':'pocket-agent-notification.wav',
-                'math-windows':'lfm3-omni-math-windows-interleaved-q8-output.wav'}[options.sample]
-    if options.browser_run_id:
+                'math-windows':'lfm3-omni-math-windows-interleaved-q8-output.wav',
+                'browser-barge-math':f'native-barge-{options.browser_run_id}.wav'}[options.sample]
+    if options.browser_run_id and options.sample == 'browser-agent-notification':
         filename = f'native-browser-notification-{options.browser_run_id}.wav'
 with wave.open(str(ROOT / '.cache' / filename), 'rb') as source:
     if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 24000):
@@ -47,6 +50,11 @@ text, elapsed = asr.recognize_crisp(pcm + bytes(32000), executable, model, 'kyut
 reference = 'Le mot secret est BLUEBIRD.' if options.sample in ('agent-notification','browser-agent-notification','browser-capture-roundtrip') else 'La capitale de la France est Paris.'
 if options.sample == 'math-windows':
     reference = 'cinq'
+if options.sample == 'browser-barge-math':
+    metadata = json.loads((ROOT / '.cache' / f'native-barge-{options.browser_run_id}.json').read_text(encoding='utf-8'))
+    reference = metadata.get('followupAnswer')
+    if not isinstance(reference, str) or not reference.strip() or len(reference) > 1000:
+        raise ValueError('Missing or invalid browser follow-up text')
 if options.sample in ('browser-agent-notification','pocket-agent-notification'):
     metadata_file = (f'native-browser-notification-{options.browser_run_id}.json' if options.browser_run_id else 'native-browser-notification.json') if options.sample == 'browser-agent-notification' else 'pocket-agent-notification.json'
     metadata = json.loads((ROOT / '.cache' / metadata_file).read_text(encoding='utf-8'))
