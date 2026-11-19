@@ -11,7 +11,7 @@ import soxr
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--concurrent', action='store_true')
-parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip'))
+parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification'))
 options = parser.parse_args()
 spec = importlib.util.spec_from_file_location('asr_coding', ROOT / 'scripts/probe-asr-coding.py')
 asr = importlib.util.module_from_spec(spec); spec.loader.exec_module(asr)
@@ -26,7 +26,8 @@ if options.sample:
                 'interleaved-q8-reasoning-off-repeat2':'lfm3-omni-interleaved-q8-repeat2-output.wav',
                 'agent-notification':'native-agent-notification.wav',
                 'browser-agent-notification':'native-browser-notification.wav',
-                'browser-capture-roundtrip':'native-browser-capture-roundtrip.wav'}[options.sample]
+                'browser-capture-roundtrip':'native-browser-capture-roundtrip.wav',
+                'pocket-agent-notification':'pocket-agent-notification.wav'}[options.sample]
 with wave.open(str(ROOT / '.cache' / filename), 'rb') as source:
     if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 24000):
         raise ValueError('Unexpected native output format')
@@ -36,8 +37,9 @@ executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64
 model = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
 text, elapsed = asr.recognize_crisp(pcm + bytes(32000), executable, model, 'kyutai-stt', allow_empty=True)
 reference = 'Le mot secret est BLUEBIRD.' if options.sample in ('agent-notification','browser-agent-notification','browser-capture-roundtrip') else 'La capitale de la France est Paris.'
-if options.sample == 'browser-agent-notification':
-    metadata = json.loads((ROOT / '.cache/native-browser-notification.json').read_text(encoding='utf-8'))
+if options.sample in ('browser-agent-notification','pocket-agent-notification'):
+    metadata_file = 'native-browser-notification.json' if options.sample == 'browser-agent-notification' else 'pocket-agent-notification.json'
+    metadata = json.loads((ROOT / '.cache' / metadata_file).read_text(encoding='utf-8'))
     reference = metadata.get('notification_text')
     if not isinstance(reference, str) or not reference.strip() or len(reference) > 1000:
         raise ValueError('Missing or invalid browser notification text')

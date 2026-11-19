@@ -3,12 +3,20 @@ import http from 'node:http';
 import net from 'node:net';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
+import { access, writeFile } from 'node:fs/promises';
 import WebSocket, { WebSocketServer } from 'ws';
 
 async function listen(server){server.listen(0,'127.0.0.1');await once(server,'listening');return server.address().port;}
 const realAgent=process.argv.includes('--real-agent');
 const unavailableTts=process.argv.includes('--tts-unavailable');
+const saveAudio=process.argv.includes('--save-audio');
 if(realAgent&&unavailableTts)throw Error('Use the simulated agent for the unavailable-TTS probe');
+if(saveAudio&&unavailableTts)throw Error('Cannot save audio from an unavailable TTS service');
+const audioPath='.cache/pocket-agent-notification.wav', metadataPath='.cache/pocket-agent-notification.json';
+if(saveAudio)for(const output of [audioPath,metadataPath]){
+  try{await access(output);throw Error('Preserve or move the existing Pocket notification before this probe');}
+  catch(error){if(error.code!=='ENOENT')throw error;}
+}
 const agent=http.createServer((req,res)=>{
   res.setHeader('content-type','application/json');
   if(req.method==='POST'&&req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
@@ -48,25 +56,33 @@ try {
   const status=await (await fetch(`http://127.0.0.1:${port}/services`)).json();
   const tts=status.services.find(item=>item.role==='Task notification synthesis');
   client=new WebSocket(`ws://127.0.0.1:${port}/voice`);
-  let taskId=null,initialEnd=false,notification=false,notificationTurn=null,notificationBytes=0,text='',capability=null,notificationError=null;
+  let taskId=null,initialEnd=false,notification=false,notificationTurn=null,notificationBytes=0,rate=null,text='',capability=null,notificationError=null;
+  const audio=[];
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Notification probe timed out; task may still be running')),90000);
     const maybeNotify=()=>{if(taskId&&initialEnd){initialEnd=false;client.send(JSON.stringify({type:'notification.speak',task_id:taskId}));}};
     client.on('error',reject);
     client.on('message',(raw,binary)=>{
-      if(binary){if(notification)notificationBytes+=raw.length;return;}
+      if(binary){if(notification){notificationBytes+=raw.length;if(notificationBytes>4*1024*1024){clearTimeout(timer);reject(Error('Notification audio exceeds limit'));return;}if(saveAudio)audio.push(Buffer.from(raw));}return;}
       const event=JSON.parse(raw);
       if(event.type==='session.capabilities')capability=event.notification_synthesis;
       else if(event.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
       else if(event.type==='task.completed'){taskId=event.task_id;maybeNotify();}
       else if(event.type==='notification.started'){notification=true;notificationTurn=event.turn_id;}
+      else if(event.type==='speech.start'&&notification)rate=event.sample_rate;
       else if(event.type==='assistant.text'&&notification)text=event.text;
       else if(event.type==='speech.end'){if(notification){clearTimeout(timer);resolve();}else{initialEnd=true;maybeNotify();}}
       else if(event.type==='error'&&notification&&unavailableTts&&event.turn_id===notificationTurn){notificationError=event.message;clearTimeout(timer);resolve();}
       else if(['error','task.error','task.rejected','notification.rejected'].includes(event.type)){clearTimeout(timer);reject(Error(JSON.stringify(event)));}
     });
   });
-  console.log(JSON.stringify({notificationBytes,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,notificationError,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:unavailableTts?'unavailable loopback endpoint':'real local service',physicalDevicesOpened:false}));
+  if(saveAudio){
+    if(rate!==24000||!notificationBytes||notificationBytes%2)throw Error('Invalid notification audio');
+    const wav=Buffer.alloc(44);wav.write('RIFF');wav.writeUInt32LE(36+notificationBytes,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(rate,24);wav.writeUInt32LE(rate*2,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(notificationBytes,40);
+    await writeFile(audioPath,Buffer.concat([wav,...audio]),{flag:'wx'});
+    await writeFile(metadataPath,JSON.stringify({notification_text:text})+'\n',{flag:'wx'});
+  }
+  console.log(JSON.stringify({notificationBytes,rate,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,notificationError,audioFile:saveAudio?audioPath:null,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:unavailableTts?'unavailable loopback endpoint':'real local service',physicalDevicesOpened:false}));
   if(!text.includes('BLUEBIRD')||capability!=='local-tts'||requests!==2||
      (unavailableTts ? tts?.available!==false||notificationBytes!==0||notificationError!=='Task notification speech failed.' : !notificationBytes||!tts?.available))process.exitCode=1;
 } finally {
