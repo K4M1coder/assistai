@@ -1,7 +1,7 @@
 // Real browser and native model; synthetic, muted audio; no physical microphone input.
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -13,6 +13,10 @@ const windowsFollowup=process.argv.includes('--windows-followup');
 const captureArg=process.argv.find(arg=>arg.startsWith('--capture-run-id='));
 const captureId=captureArg?.slice('--capture-run-id='.length);
 if(captureArg&&!/^[A-Za-z0-9_-]{1,40}$/.test(captureId))throw Error('Invalid capture run ID');
+if(captureId){for(const extension of ['wav','json']){
+ try{await access(`.cache/native-barge-${captureId}.${extension}`);throw Error('Capture already exists');}
+ catch(error){if(error.code!=='ENOENT')throw error;}
+}}
 if(windowsFollowup&&!different)throw Error('Windows follow-up requires --different-followup');
 async function readPhrase(filename){const input=await readFile(filename);const offset=input.indexOf('data');
  if(offset<0||input.readUInt16LE(22)!==1||input.readUInt32LE(24)!==16000||input.readUInt16LE(34)!==16)throw Error('Expected mono 16 kHz PCM16');
@@ -39,10 +43,10 @@ try{
  let id=0;const pending=new Map();socket.on('message',raw=>{const result=JSON.parse(raw);if(!pending.has(result.id))return;const {resolve,reject}=pending.get(result.id);pending.delete(result.id);if(result.error)reject(Error(result.error.message));else resolve(result.result);});
  const evaluate=expression=>new Promise((resolve,reject)=>{const request=++id;pending.set(request,{resolve,reject});socket.send(JSON.stringify({id:request,method:'Runtime.evaluate',params:{expression,returnByValue:true}}));}).then(result=>{if(result.exceptionDetails)throw Error(result.exceptionDetails.text);return result.result.value;});
  let ready=false;for(let i=0;i<100;i++){ready=await evaluate("document.querySelector('#mode')?.textContent.includes('native speech') && document.querySelector('#status')?.textContent.includes('Ready.')");if(ready)break;await new Promise(resolve=>setTimeout(resolve,100));}if(!ready)throw Error('Native client not ready');
- await evaluate(`window.__before=0;window.__after=0;window.__afterChunks=[];const original=AudioContext.prototype.createBuffer;
+ await evaluate(`window.__before=0;window.__after=0;window.__afterChunks=[];window.__afterCount=0;window.__afterOverflow=false;const original=AudioContext.prototype.createBuffer;
    AudioContext.prototype.createBuffer=function(channels,length,rate){if(channels===1&&rate===24000){if(document.querySelector('#log').textContent.includes('Playback interrupted: microphone detected speech.'))window.__after+=length*2;else window.__before+=length*2;}return original.call(this,channels,length,rate);};
    const originalStart=AudioBufferSourceNode.prototype.start;
-   AudioBufferSourceNode.prototype.start=function(...args){if(${Boolean(captureId)}&&this.buffer?.numberOfChannels===1&&this.buffer.sampleRate===24000&&document.querySelector('#log').textContent.includes('Playback interrupted: microphone detected speech.'))window.__afterChunks.push(Array.from(this.buffer.getChannelData(0)));return originalStart.apply(this,args);};
+   AudioBufferSourceNode.prototype.start=function(...args){if(${Boolean(captureId)}&&this.buffer?.numberOfChannels===1&&this.buffer.sampleRate===24000&&document.querySelector('#log').textContent.includes('Playback interrupted: microphone detected speech.')){const data=this.buffer.getChannelData(0);window.__afterCount+=data.length;if(window.__afterCount>2000000)window.__afterOverflow=true;else window.__afterChunks.push(Array.from(data));}return originalStart.apply(this,args);};
    document.querySelector('#speaker-safe').checked=false;document.querySelector('#start').click();true`);
  let state={};
  for(let i=0;i<500;i++){
@@ -53,7 +57,7 @@ try{
  }
  if(captureId){
    await new Promise(resolve=>setTimeout(resolve,5000));
-   const chunks=await evaluate('window.__afterChunks');
+   const chunks=await evaluate("(() => { if(window.__afterOverflow) throw Error('Captured audio exceeds limit'); return window.__afterChunks; })()");
    const samples=chunks.flat();if(!samples.length)throw Error('No post-interruption audio captured');
    const output=Buffer.alloc(44+samples.length*2);output.write('RIFF');output.writeUInt32LE(36+samples.length*2,4);output.write('WAVEfmt ',8);output.writeUInt32LE(16,16);output.writeUInt16LE(1,20);output.writeUInt16LE(1,22);output.writeUInt32LE(24000,24);output.writeUInt32LE(48000,28);output.writeUInt16LE(2,32);output.writeUInt16LE(16,34);output.write('data',36);output.writeUInt32LE(samples.length*2,40);
    for(let i=0;i<samples.length;i++)output.writeInt16LE(Math.max(-32768,Math.min(32767,Math.round(samples[i]*32767))),44+i*2);
