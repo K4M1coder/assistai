@@ -2,12 +2,18 @@
 // Requires the guarded Omni trial, Vosk, agent model and fixture harness to be running.
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import WebSocket from 'ws';
 
+const notificationPath = '.cache/native-browser-notification.wav';
+const notificationMetadataPath = '.cache/native-browser-notification.json';
+for (const output of [notificationPath, notificationMetadataPath]) {
+  try { await access(output); throw Error('Preserve or move the existing browser notification before this probe'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
 const fixture = await readFile('.cache/lfm3-fixture-french.wav');
 const dataOffset = fixture.indexOf('data');
 if (dataOffset < 0 || fixture.readUInt16LE(22) !== 1 || fixture.readUInt32LE(24) !== 16000 || fixture.readUInt16LE(34) !== 16) throw Error('Expected mono 16 kHz PCM16 fixture');
@@ -47,7 +53,19 @@ try {
   let ready = false;
   for (let i = 0; i < 100; i++) { ready = await evaluate("document.querySelector('#mode')?.textContent.includes('native speech') && document.querySelector('#status')?.textContent.includes('Ready.')"); if (ready) break; await new Promise(resolve => setTimeout(resolve, 100)); }
   if (!ready) throw Error('Native browser client not ready');
-  await evaluate("window.__audioBytes=0; const originalBuffer=AudioContext.prototype.createBuffer; AudioContext.prototype.createBuffer=function(channels, length, rate){ if(channels===1 && rate===24000) window.__audioBytes+=length*2; return originalBuffer.call(this, channels, length, rate); }; document.querySelector('#start').click(); true");
+  await evaluate(`window.__audioBytes=0; window.__notificationSamples=[]; window.__notificationOverflow=false;
+    const originalBuffer=AudioContext.prototype.createBuffer;
+    AudioContext.prototype.createBuffer=function(channels, length, rate){ if(channels===1 && rate===24000) window.__audioBytes+=length*2; return originalBuffer.call(this, channels, length, rate); };
+    const originalStart=AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start=function(...args){
+      if(this.buffer?.sampleRate===24000 && this.buffer.numberOfChannels===1 && document.querySelector('#log').textContent.includes('Speaking agent result.')){
+        const samples=this.buffer.getChannelData(0);
+        if(window.__notificationSamples.length+samples.length>2000000) window.__notificationOverflow=true;
+        else for(const sample of samples) window.__notificationSamples.push(Math.max(-32768,Math.min(32767,Math.round(sample*32768))));
+      }
+      return originalStart.apply(this,args);
+    };
+    document.querySelector('#start').click(); true`);
   let state = {}; let stopped = false, completionObserved = false, audioAtCompletion = 0, notificationObserved = false;
   for (let i = 0; i < 650; i++) {
     state = await evaluate("({status:document.querySelector('#status').textContent, log:document.querySelector('#log').textContent, activity:document.querySelector('#agent-activity').textContent, audioBytes:window.__audioBytes, microphoneStopped:document.querySelector('#stop').disabled})");
@@ -58,7 +76,22 @@ try {
     if (completionObserved && state.audioBytes > audioAtCompletion && state.log.slice(completedAt).includes('Speaking agent result.') && state.log.slice(completedAt).includes('Assistant:')) { notificationObserved = true; break; }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  console.log(JSON.stringify({ ...state, microphoneStoppedAfterTranscript: stopped, audioAtCompletion, notificationObserved, microphoneSource: 'Chromium fake WAV device', browserAudioMuted: true, profile }, null, 2));
+  let notificationFile = null, notificationText = null;
+  if (notificationObserved) {
+    notificationText = state.log.split('Speaking agent result.').at(-1).match(/(?:^|\n)Assistant: ([^\n]+)/)?.[1]?.trim();
+    if (!notificationText || notificationText.length > 1000) throw Error('Notification text missing or excessive');
+    const captured = await evaluate(`(() => { if(window.__notificationOverflow) throw Error('Notification audio exceeds limit');
+      const pcm=new Uint8Array(window.__notificationSamples.length*2), view=new DataView(pcm.buffer);
+      window.__notificationSamples.forEach((value,index)=>view.setInt16(index*2,value,true));
+      let binary=''; for(let i=0;i<pcm.length;i+=16384) binary+=String.fromCharCode(...pcm.subarray(i,i+16384));
+      return btoa(binary); })()`);
+    const pcm = Buffer.from(captured, 'base64');
+    if (!pcm.length) throw Error('Notification was observed but no scheduled audio was captured');
+    const wav = Buffer.alloc(44); wav.write('RIFF'); wav.writeUInt32LE(36+pcm.length,4); wav.write('WAVEfmt ',8); wav.writeUInt32LE(16,16); wav.writeUInt16LE(1,20); wav.writeUInt16LE(1,22); wav.writeUInt32LE(24000,24); wav.writeUInt32LE(48000,28); wav.writeUInt16LE(2,32); wav.writeUInt16LE(16,34); wav.write('data',36); wav.writeUInt32LE(pcm.length,40);
+    await writeFile(notificationPath, Buffer.concat([wav,pcm]), { flag:'wx' });
+    await writeFile(notificationMetadataPath, JSON.stringify({ notification_text: notificationText })+'\n', { flag:'wx' }); notificationFile=notificationPath;
+  }
+  console.log(JSON.stringify({ ...state, microphoneStoppedAfterTranscript: stopped, audioAtCompletion, notificationObserved, notificationFile, notificationText, microphoneSource: 'Chromium fake WAV device', browserAudioMuted: true, profile }, null, 2));
   if (!state.log.includes('Agent started:') || !/Agent completed:.*BLUEBIRD/i.test(state.log) || !notificationObserved || !stopped) process.exitCode = 1;
 } finally {
   socket?.close(); if (browser) browser.kill(); gateway.kill();
