@@ -20,6 +20,8 @@ The gateway no longer records approval decisions for new tasks because delegatio
 
 The native bridge can now submit multiple tool calls from one response concurrently, subject to its four-call limit and the gateway's existing admission checks. This does not grant additional harness permissions, provide isolation, guarantee resource enforcement or validate parallel execution with a real native model.
 
+Two synthetic LFM3-Omni trials delegated a fixture read directly to a separately configured local read-only harness. This verifies a narrow execution path, not a sandbox or a general authorization boundary. The harness's actual permissions and workspace configuration determine what delegated tasks can access; the resource checks do not enforce a hard memory limit. See the [candidate notebook](research/2026-11-17-lfm3-omni-candidate.md).
+
 The experimental buffered Kyutai sidecar stores utterance audio temporarily as a WAV in the local cache. It removes the file on normal completion, but a crash or forced termination can leave it on disk. Like the other loopback services it has no user authentication.
 
 The browser's task-result replay uses the existing same-session completion lookup. A resumed session is selected by possession of its browser-held capability; replay is not identity verification or RBAC. Spoken results may be overheard, and the user explicitly initiates replay of a historical result.

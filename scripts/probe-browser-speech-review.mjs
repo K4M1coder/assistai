@@ -18,7 +18,7 @@ if (process.env.ASSISTAI_PROBE_REVIEW_TASK === '1') {
 }
 const profile = await mkdtemp(path.join(tmpdir(), 'assistai-audio-'));
 const processHandle = spawn(chrome, ['--headless', '--disable-gpu', '--disable-background-networking', '--no-first-run',
-  '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${audio}`,
+  '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${audio}%noloop`,
   `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { windowsHide: true, stdio: 'ignore' });
 let socket;
 try {
@@ -109,6 +109,8 @@ try {
   socket?.close();
   processHandle.kill();
   await new Promise(resolve => processHandle.once('exit', resolve));
+  const relativeProfile = path.relative(path.resolve(tmpdir()), path.resolve(profile));
+  if (!relativeProfile || relativeProfile.startsWith('..') || path.isAbsolute(relativeProfile)) throw Error('Temporary profile escaped the intended directory');
   try { await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }); }
   catch { console.error(`Could not remove temporary browser profile: ${profile}`); }
 }

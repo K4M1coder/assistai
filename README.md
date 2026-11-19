@@ -48,7 +48,7 @@ An optional sampled resource check can reject new background tasks when measured
 
 An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option can request cancellation of a running agent task after consecutive low-resource samples. It is reactive, cannot guarantee cancellation or prevent memory overshoot, and has only been exercised with simulated resources and harness responses.
 
-LFM3-Omni-2B is an additional native audio-and-vision research candidate. Its local Q4 weights and F16 projector match the publisher's hashes, but a guarded loading trial was refused at preflight and no capability has been demonstrated locally. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).
+LFM3-Omni-2B is an additional native audio-and-vision research candidate. A guarded Windows trial loaded its Q4 weights with Q8 or F16 projector and returned correct text for a synthetic French question, but generated audio was often short or did not match that text in independent ASR checks. Full-duplex, intelligible speech and concurrent agent tasks remain unverified. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).
 
 The operator has reported one successfully approved read of the disposable `calculator.py` fixture and confirmed hearing an understandable result. This used typed input and does not establish a completed voice-input or edit demonstration. See the [fixture notes](docs/research/2026-11-17-edit-fixture.md).
 
@@ -86,7 +86,7 @@ Older Windows model-trial scripts now compare total observed shared GPU use agai
 
 The cascade can attach a selected image to the next spoken question when the gateway advertises that capability. One synthetic French question about a generated red image passed through the real local services; browser file selection, physical microphone and real-world vision remain unverified. Spoken output removes common markup and replaces code and links with short cues; the complete task result stays in the conversation.
 
-A quantized LFM3-Omni projector has been prepared as a possible native speech-and-vision experiment, but its model has not yet been loaded or validated on this machine. The guarded preflight currently refuses the trial on shared GPU usage. See the [candidate record](docs/research/2026-11-17-lfm3-omni-candidate.md).
+A quantized LFM3-Omni projector was loaded in a guarded native speech experiment. Some generated audio was truncated or failed independent transcription checks; the mode is not a validated replacement for the cascade. See the [candidate record](docs/research/2026-11-17-lfm3-omni-candidate.md).
 
 The browser reports detected playback gaps over 30 ms in the conversation log. This can help distinguish delivery interruptions from pronunciation problems, but does not identify their cause or measure audio quality.
 
@@ -164,6 +164,8 @@ An explicitly invoked Windows command can record the enrollment WAV locally; see
 
 The client identifies the active voice mode. In experimental native speech mode it disables text and image inputs; an optional CPU Vosk sidecar can display a separate, imperfect transcript of the same audio. One synthetic real-model test exercised it alongside background delegation.
 
+The voice client also shows the latest gateway agent event independently from assistant speech. The model can claim it delegated a task without issuing a tool call; check the gateway event rather than assuming that spoken statement confirms execution. The indicator shows the latest event, not the status of every parallel task.
+
 For native-mode task notifications, the speech model receives a short excerpt of the completed result. One synthetic fixture test produced the correct result in generated text and nonzero audio; audible quality and reliability across tasks remain unverified.
 
 Native speech-session resets can restore a bounded recent context from the gateway's local session events. After two synthetic tests repeated a completed task, an exact-match reuse safeguard passed one real-model regression. Mock-service tests also cover restoring recent completed results, retaining in-flight task tracking and delivering a completion after an opt-in reconnect to the same gateway process. Gateway restarts, offline event replay and other duplicate-action risks remain.
@@ -179,6 +181,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The browser requests microphone access when capture starts. `GEMINI_API_KEY` is optional and only indicates that a key is present; the current prototype does not implement a complete Gemini Live conversation.
+
+On Windows, `npm ci` removes the existing dependency tree and can fail with `EPERM` if an OpenCode harness is using its executable. Stop the associated owned harness after its tasks have finished (for the editable fixture, `powershell -File scripts/stop-windows-harness.ps1 -EditFixture`), then rerun `npm ci`. Use the corresponding stop command for other configured harnesses; inspect any other process holding the executable before stopping it. A failed installation can leave `tsx` missing, so retry installation before `npm run dev`. Do not overwrite an existing `.env` when repeating setup.
 
 | Command | Purpose |
 | --- | --- |

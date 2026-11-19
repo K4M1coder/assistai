@@ -31,6 +31,28 @@ def expected_answer_present(text, expected):
     return bool(set(asr.tokens(text)) & expected)
 
 
+def straightforward_answer(text, scenario):
+    """Accept only a few unambiguous short forms; this is not a semantic judge."""
+    asr = load_module('coding_asr_tokens', 'probe-asr-coding.py')
+    tokens = asr.tokens(text)
+    if scenario == 'math':
+        choices = (['cinq'], ['5'], ['la', 'reponse', 'est', 'cinq'], ['la', 'reponse', 'est', '5'],
+                   ['deux', 'plus', 'trois', 'fait', 'cinq'], ['deux', 'plus', 'trois', 'fait', '5'],
+                   ['deux', 'plus', 'trois', 'fait', 'cinq', 'reponse', 'cinq'],
+                   ['deux', 'plus', 'trois', 'fait', 'cinq', 'la', 'reponse', 'est', 'cinq'])
+    else:
+        choices = (['paris'], ['la', 'reponse', 'est', 'paris'], ['la', 'capitale', 'de', 'la', 'france', 'est', 'paris'],
+                   ['la', 'capitale', 'de', 'la', 'france', 'et', 'paris'])
+    return tokens in choices
+
+
+def input_intent_preserved(text, scenario):
+    asr = load_module('coding_asr_tokens', 'probe-asr-coding.py')
+    tokens = asr.tokens(text)
+    if scenario == 'math': return any(tokens[i:i+3] == ['deux', 'plus', 'trois'] for i in range(len(tokens)-2))
+    return 'capitale' in tokens and 'france' in tokens
+
+
 async def main(scenario='math', input_asr='vosk'):
     spoken = load_module('spoken', 'probe-spoken-session-recall.py')
     asr = load_module('coding_asr', 'probe-asr-coding.py')
@@ -102,21 +124,26 @@ async def main(scenario='math', input_asr='vosk'):
         if input_asr == 'kyutai':
             heard = await asr.recognize(converted)
         else:
-            heard, _ = await asyncio.to_thread(asr.recognize_crisp, converted + bytes(32000), executable, candidate, 'kyutai-stt')
+            heard, _ = await asyncio.to_thread(asr.recognize_crisp, converted + bytes(32000), executable, candidate, 'kyutai-stt', allow_empty=True)
         elapsed = round((time.monotonic() - started) * 1000)
         answered = expected_answer_present(answer, expected)
         heard_answer = expected_answer_present(heard, expected)
+        intent_ok = input_intent_preserved(transcript, scenario)
+        answer_ok = straightforward_answer(answer, scenario)
+        audio_ok = straightforward_answer(heard, scenario)
         print(json.dumps({'question':question, 'input_transcript':transcript, 'assistant_text':answer,
                           'output_asr':heard, 'normalized_wer':asr.word_error(answer, heard),
                           'input_engine':input_asr, 'output_engine':'vosk' if input_asr == 'kyutai' else 'kyutai',
                           'input_audio_ms':round(len(pcm) / 32), 'input_send_ms':round((end_sent - turn_started) * 1000),
                           'end_to_transcript_ms':final_asr_ms, 'end_to_first_audio_ms':first_audio_ms,
                           'expected_answer_in_text':answered, 'expected_answer_in_output_asr':heard_answer,
+                          'input_intent_preserved':intent_ok, 'straightforward_text_answer':answer_ok,
+                          'straightforward_output_asr':audio_ok,
                           'output_audio_bytes':len(response), 'output_sample_rate':sample_rate,
                           'output_asr_ms':elapsed, 'audio_synthetic':True,
                           'physical_devices_opened':False, 'audio_saved_after_run':False}, ensure_ascii=False), flush=True)
-        if not answered or not heard_answer:
-            raise RuntimeError('Expected answer was not present in both text and output transcription')
+        if not (intent_ok and answer_ok and audio_ok):
+            raise RuntimeError('Input or response did not match the probe’s conservative acceptance forms')
     finally:
         if child.poll() is None:
             child.terminate()

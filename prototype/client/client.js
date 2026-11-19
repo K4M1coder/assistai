@@ -262,15 +262,15 @@ function handleSocketMessage({ data }) {
       else if (item.kind === 'task.status_restored') log(`Previous monitoring update: ${item.text}`);
     }
   }
-  else if (event.type === 'task.started') { if (event.task_id) activeTaskIds.add(event.task_id); refreshTaskButton(); log(`Agent started: ${event.task}`); }
-  else if (event.type === 'task.progress') { if (event.state === 'retrying') log(`Agent is retrying${Number.isSafeInteger(event.attempt) ? ` (attempt ${event.attempt})` : ''}.`); else if (event.state === 'running') log('Agent resumed work.'); }
-  else if (event.type === 'task.reused') log(`Agent result reused: ${event.task}`);
-  else if (event.type === 'task.rejected') { status(event.message); log(`Agent task rejected: ${event.message}`); }
-  else if (event.type === 'task.uncertain') { if (event.task_id) { activeTaskIds.add(event.task_id); cancellationRequested.delete(event.task_id); } refreshTaskButton(); log(`Agent task status uncertain: ${event.message}`); }
-  else if (event.type === 'task.status_restored') log(event.message);
-  else if (event.type === 'task.completed') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); if (typeof event.task_id === 'string' && event.task_id) { latestCompletedTask = event.task_id; $('replay-task').disabled = false; pendingNotifications.push(event.task_id); announceWhenIdle(); } }
-  else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
-  else if (event.type === 'notification.started') { if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; currentNotificationTurn = event.turn_id ?? null; notificationPending = false; responsePending = true; }
+  else if (event.type === 'task.started') { $('agent-activity').textContent = `Latest agent event: task submitted — ${event.task}`; if (event.task_id) activeTaskIds.add(event.task_id); refreshTaskButton(); log(`Agent started: ${event.task}`); }
+  else if (event.type === 'task.progress') { if (event.state === 'retrying') { $('agent-activity').textContent = 'Latest agent event: task retrying.'; log(`Agent is retrying${Number.isSafeInteger(event.attempt) ? ` (attempt ${event.attempt})` : ''}.`); } else if (event.state === 'running') { $('agent-activity').textContent = 'Latest agent event: task running.'; log('Agent resumed work.'); } }
+  else if (event.type === 'task.reused') { $('agent-activity').textContent = `Latest agent event: previous result reused — ${event.task}`; log(`Agent result reused: ${event.task}`); }
+  else if (event.type === 'task.rejected') { $('agent-activity').textContent = `Latest agent event: task rejected — ${event.message}`; status(event.message); log(`Agent task rejected: ${event.message}`); }
+  else if (event.type === 'task.uncertain') { $('agent-activity').textContent = `Latest agent event: task status uncertain — ${event.message}`; if (event.task_id) { activeTaskIds.add(event.task_id); cancellationRequested.delete(event.task_id); } refreshTaskButton(); log(`Agent task status uncertain: ${event.message}`); }
+  else if (event.type === 'task.status_restored') { $('agent-activity').textContent = `Latest agent event: ${event.message}`; log(event.message); }
+  else if (event.type === 'task.completed') { $('agent-activity').textContent = 'Latest agent event: task completed. See the conversation for its result.'; activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); log(`Agent completed: ${event.text}`); if (typeof event.task_id === 'string' && event.task_id) { latestCompletedTask = event.task_id; $('replay-task').disabled = false; pendingNotifications.push(event.task_id); announceWhenIdle(); } }
+  else if (event.type === 'task.cancel_requested' || event.type === 'task.cancel_rejected') { $('agent-activity').textContent = `Latest agent event: ${event.message}`; log(event.message); if (event.type === 'task.cancel_rejected') cancellationRequested.delete(event.task_id); refreshTaskButton(); }
+  else if (event.type === 'notification.started') { log('Speaking agent result.'); if (pendingNotifications[0] === event.task_id) pendingNotifications.shift(); notificationRetries = 0; currentNotification = event.task_id; currentNotificationTurn = event.turn_id ?? null; notificationPending = false; responsePending = true; }
   else if (event.type === 'notification.rejected') {
     if (!notificationPending || pendingNotifications[0] !== event.task_id) return;
     notificationPending = false;
@@ -283,7 +283,7 @@ function handleSocketMessage({ data }) {
       announceWhenIdle();
     }
   }
-  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
+  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { $('agent-activity').textContent = `Latest agent event: task failed — ${event.message}`; activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
   else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) { currentNotification = null; currentNotificationTurn = null; } responsePending = false; announceWhenIdle(); }
   else if (event.type === 'speech.cancelled') {
@@ -295,12 +295,12 @@ function connectGateway() {
   const socket = memoryToken ? new WebSocket(`ws://${location.host}/voice`, ['assistai-v1', `resume.${memoryToken}`]) : new WebSocket(`ws://${location.host}/voice`);
   ws = socket;
   socket.binaryType = 'arraybuffer';
-  socket.onopen = () => { if (socket !== ws) return; status('Connected. Waiting for speech recognition.'); };
+  socket.onopen = () => { if (socket !== ws) return; $('agent-activity').textContent = 'Agent activity: no task events received on this connection. Earlier activity may still be running.'; status('Connected. Waiting for speech recognition.'); };
   socket.onerror = () => { if (socket === ws) status('Gateway connection failed.'); };
   socket.onmessage = event => { if (socket === ws) handleSocketMessage(event); };
   socket.onclose = event => {
     if (socket !== ws) return;
-    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); $('approval-safety').textContent = 'Disconnected; agent tasks are unavailable.'; refreshTaskButton(); stopPlayback();
+    asrReady = false; spokenImageAvailable = false; speechReviewAvailable = false; pendingReviewId = null; $('speech-review').disabled = true; taskCancelAvailable = false; activeTaskIds.clear(); cancellationRequested.clear(); $('approval-safety').textContent = 'Disconnected; agent tasks are unavailable.'; $('agent-activity').textContent = 'Agent activity: disconnected; task status may be unknown.'; refreshTaskButton(); stopPlayback();
     speaking = false; voiceFrames = 0; silenceFrames = 0; pushToTalkActive = false;
     $('talk').textContent = 'Hold to talk'; $('talk').disabled = true;
     responsePending = false; notificationPending = false; currentNotification = null; currentNotificationTurn = null; pendingNotifications.length = 0;

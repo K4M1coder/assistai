@@ -1,4 +1,4 @@
-param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly,[switch]$DisableHostVisibleVidmem,[switch]$Q8Projector)
+param([int]$Port=18210,[int]$Seconds=30,[switch]$PreflightOnly,[switch]$DisableHostVisibleVidmem,[switch]$Q8Projector,[switch]$ReasoningOff)
 $ErrorActionPreference='Stop'
 if($Port -lt 1024 -or $Port -gt 65535 -or $Seconds -lt 1 -or $Seconds -gt 120){throw 'Invalid port or duration'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -27,6 +27,7 @@ if(!$allowed){throw 'Insufficient observed trial headroom; no process was starte
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix=Join-Path $root ".cache/assistant/lfm3-omni-idle-$stamp"
 $argsList=@('-m',('"'+$model+'"'),'--mmproj',('"'+$projector+'"'),'--host','127.0.0.1','--port',[string]$Port,'-c','4096','-ngl','99','-np','1','-b','512','-ub','256','-fa','on','-ctk','q8_0','-ctv','q8_0','--load-mode','none','--no-host','--cache-ram','0')
+if($ReasoningOff){$argsList+=@('--reasoning','off')}
 $envNames=@('GGML_VK_DISABLE_COOPMAT','GGML_VK_ALLOW_SYSMEM_FALLBACK','GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM')
 $savedEnv=@{};foreach($name in $envNames){$savedEnv[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 try {
@@ -47,5 +48,5 @@ try {
 } finally {
   $process.Refresh();if(!$process.HasExited){Stop-Process -Id $process.Id -Force;$process.WaitForExit()}
 }
-@{reason=$reason;ready=$ready;baseline=$baseline;disableHostVisibleVidmem=[bool]$DisableHostVisibleVidmem;q8Projector=[bool]$Q8Projector;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
+@{reason=$reason;ready=$ready;baseline=$baseline;disableHostVisibleVidmem=[bool]$DisableHostVisibleVidmem;q8Projector=[bool]$Q8Projector;reasoningOff=[bool]$ReasoningOff;exitCode=$process.ExitCode;logs=$prefix}|ConvertTo-Json -Compress
 if($reason -ne 'duration elapsed' -or !$ready){exit 1}

@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification')][string]$NativeSample, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -12,6 +12,9 @@ if($FixedSyntheticFixture -and !$PersistentTrial){throw 'FixedSyntheticFixture r
 if($NaturalFixture -and (!$PersistentTrial -or $FixedSyntheticFixture)){throw 'NaturalFixture requires PersistentTrial and excludes FixedSyntheticFixture'}
 if($NaturalGain -ne 1 -and !$NaturalFixture){throw 'NaturalGain requires NaturalFixture'}
 if($ASRThreads -ne 2 -and !$PersistentTrial){throw 'ASRThreads requires PersistentTrial'}
+if($NativeOutput -and ($PersistentTrial -or $VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'NativeOutput is a separate probe'}
+if($NativeConcurrentOutput -and !$NativeOutput){throw 'NativeConcurrentOutput requires NativeOutput'}
+if($NativeSample -and (!$NativeOutput -or $NativeConcurrentOutput)){throw 'NativeSample requires NativeOutput and excludes NativeConcurrentOutput'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -27,6 +30,9 @@ $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
 if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario,'--threads',[string]$ASRThreads)}
+if($NativeOutput){$probeArgs=@((Join-Path $root 'scripts/probe-native-output.py'))}
+if($NativeConcurrentOutput){$probeArgs+='--concurrent'}
+if($NativeSample){$probeArgs+=@('--sample',$NativeSample)}
 if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}
 if($NaturalFixture){$probeArgs+=@('--natural-fixture','--natural-gain',[string]$NaturalGain,'--natural-voice',$NaturalVoice)}
 if($FixtureOnly){$probeArgs+='--fixture-only'}

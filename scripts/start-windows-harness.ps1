@@ -36,7 +36,7 @@ try {
     if(!$ready){Start-Sleep -Milliseconds 300}
   } until($ready -or [DateTime]::UtcNow -gt $deadline)
   if(!$ready){throw 'Harness readiness timed out'}
-  $listener=Get-NetTCPConnection -LocalPort $port -State Listen
+  $listener=@(Get-NetTCPConnection -LocalPort $port -State Listen)
   if($listener.Count -ne 1 -or $listener.OwningProcess -ne $process.Id){throw 'Harness listener ownership mismatch'}
   $info=Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
   @{id=$process.Id;started=$process.StartTime.ToUniversalTime().ToString('o');command=$info.CommandLine} | ConvertTo-Json -Compress | Set-Content -LiteralPath $record -Encoding utf8
