@@ -12,14 +12,15 @@ from websockets.asyncio.client import connect
 ROOT = Path(__file__).resolve().parents[1]
 
 
-async def main(mode, variant, repeat):
-    fixture = ROOT / '.cache/kyutai-persistent-synthetic-capital.wav'
+async def main(mode, variant, repeat, scenario):
+    fixture = ROOT / ('.cache/lfm3-math-windows.wav' if scenario == 'math-windows' else f'.cache/kyutai-persistent-synthetic-{scenario}.wav')
     with wave.open(str(fixture), 'rb') as source:
         if (source.getnchannels(), source.getsampwidth(), source.getframerate()) != (1, 2, 16000):
             raise ValueError('Expected mono 16 kHz PCM16')
         pcm = source.readframes(source.getnframes())
     suffix = '' if repeat == 1 else f'-repeat{repeat}'
-    output = ROOT / f'.cache/lfm3-omni-{mode}-{variant}{suffix}-output.wav'
+    scenario_prefix = '' if scenario == 'capital' else f'{scenario}-'
+    output = ROOT / f'.cache/lfm3-omni-{scenario_prefix}{mode}-{variant}{suffix}-output.wav'
     if output.exists(): raise FileExistsError('Output exists; preserve it and choose another run')
     modalities = ['text', 'audio'] if mode == 'interleaved' else ['audio']
     chunks = []; audio_bytes = 0; text = ''; counts = {}; sent_at = None; first_audio = None
@@ -63,7 +64,7 @@ async def main(mode, variant, repeat):
                 with output.open('xb') as raw:
                     with wave.open(raw, 'wb') as wav:
                         wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(24000); wav.writeframes(b''.join(chunks))
-                print(json.dumps({'mode':mode, 'variant_label':variant, 'repeat':repeat, 'text':text, 'audio_bytes':audio_bytes,
+                print(json.dumps({'mode':mode, 'variant_label':variant, 'repeat':repeat, 'scenario':scenario, 'text':text, 'audio_bytes':audio_bytes,
                     'audio_seconds':audio_bytes/48000, 'response_ms':round((time.monotonic()-sent_at)*1000),
                     'first_audio_ms':first_audio, 'total_ms':round((time.monotonic()-started)*1000),
                     'events':counts, 'output_audio_chunk_bytes':[len(chunk) for chunk in chunks],
@@ -76,4 +77,5 @@ if __name__ == '__main__':
     parser=argparse.ArgumentParser(); parser.add_argument('--mode', choices=('audio','interleaved'), required=True)
     parser.add_argument('--variant', choices=('f16','q8'), required=True)
     parser.add_argument('--repeat', type=int, choices=range(1,11), default=1)
-    args=parser.parse_args(); asyncio.run(main(args.mode, args.variant, args.repeat))
+    parser.add_argument('--scenario', choices=('capital','math','math-windows'), default='capital')
+    args=parser.parse_args(); asyncio.run(main(args.mode, args.variant, args.repeat, args.scenario))

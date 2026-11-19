@@ -1,0 +1,17 @@
+# Sophon-Realtime 4B W4: initial source review
+
+## Hypothesis
+
+A newly published French-capable, full-duplex model with a quantized language component and a delegation interface might address the native interruption and background-task requirements. It must also coexist with the coding and vision agent inside the user's 24 GB GPU budget on Windows and Intel Arc Pro B60. Claims below are from the authors unless explicitly described as local observations.
+
+## Primary sources and constraints
+
+The [project README](https://github.com/adventists-ai/sophon-realtime/tree/0f692461a414b53d0b245d609395f81a25f6e7d0) describes simultaneous listening, interruption, French conversation and a Live gateway that delegates work to another backend. Its French figures are internal tests, not independent benchmarks or evidence on this machine. The 4B models are speech-only; they do not provide the requested image understanding themselves. Their authors explicitly report weaker knowledge and reasoning than their 32B variants. The model and project list Apache-2.0; review the bundled third-party `NOTICE` before distribution.
+
+The [Tag-W4 model card](https://huggingface.co/adventists-ai/Sophon-Realtime-4B-Tag-W4/tree/95929643fc4e42d4b4513d16bc14a47dbf98fb08) says only the thinker's language model is GPTQ W4A16; its audio encoder, projector, speech model and voice assets are not thereby proven quantized. The repository lists approximately 11.3 GB of files, while the authors report approximately 21 GB runtime GPU memory for the three stages. That figure was measured on an H100 with a simulated 24 GB budget, not a physical 24 GB card, and excludes any separate coding agent. The project's default deployment is Linux, CUDA and vLLM-Omni. The [vLLM GPU installation documentation](https://docs.vllm.ai/en/latest/getting_started/installation/gpu/) describes Intel XPU support on Linux and says native Windows is unsupported, but generic vLLM XPU support is not evidence that Sophon's custom vLLM-Omni plugins, GPTQ kernels, audio stack or full-duplex server run on Intel or Windows.
+
+## Local observation and decision
+
+Read-only checks on 2026-11-19 found project branch `0f692461a414b53d0b245d609395f81a25f6e7d0` and model revision `95929643fc4e42d4b4513d16bc14a47dbf98fb08`; the model metadata reported public, ungated and Apache-2.0. No checkpoint was downloaded, loaded or run. A local sample with the existing services showed approximately 11.1 GB of dedicated GPU use. It is not valid to add that sample to an H100 benchmark as a measured prediction, but a roughly 21 GB voice stack leaves insufficient demonstrated headroom for the existing agent, contexts, display and transient allocations under the 24 GB target. The available installation instructions also do not establish a native Windows B60 path. This candidate should not replace the current stack or be loaded alongside it on present evidence.
+
+Revisit if authors or another primary implementation demonstrate a smaller quantized full pipeline with Intel B60 support, bounded memory and an independently usable local delegation interface. Before an isolated trial, verify all component licenses, pinned files, Windows/Linux runtime compatibility and complete per-device memory including the agent; then run French synthetic interruption, concurrent delegation, quality and no-spill measurements. Hosted APIs are not a local-only substitute. These are proposed tests, not locally reproduced results.

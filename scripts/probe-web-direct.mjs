@@ -1,8 +1,10 @@
 // Public-site probe through the direct-delegation gateway and web fixture.
 import WebSocket from 'ws';
 
+const search = process.argv.includes('--search');
 const target = process.argv.includes('--official') ? 'https://metropole.nantes.fr/' : 'https://www.nantes.fr/';
-const request = `Visite ${target} avec webfetch et indique le titre de la page et son adresse.`;
+const request = search ? 'Recherche sur internet le site officiel de Nantes et donne son adresse avec une source.'
+  : `Visite ${target} avec webfetch et indique le titre de la page et son adresse.`;
 const socket = new WebSocket('ws://127.0.0.1:18121/voice');
 let sent=false, started=null, completed=null, initialEnd=false, notification=false, notificationBytes=0, failure=null;
 const timer=setTimeout(()=>{failure='Timed out; task may still be running';socket.terminate();},150000);
@@ -25,7 +27,7 @@ const finished = new Promise((resolve,reject)=>{
   });
 });
 try { await finished; } finally { clearTimeout(timer); }
-let webfetch=[], tools=[];
+let webfetch=[], websearch=[], tools=[];
 if(started?.task_id){
   const response=await fetch(`http://127.0.0.1:18120/session/${encodeURIComponent(started.task_id)}/message`,{signal:AbortSignal.timeout(5000)});
   if(response.ok){
@@ -34,9 +36,12 @@ if(started?.task_id){
     tools=parts.map(part=>({name:part.tool,status:part.state?.status}));
     webfetch=parts.filter(part=>part.tool==='webfetch')
       .map(part=>({status:part.state?.status,url:part.state?.input?.url,output_excerpt:String(part.state?.output??'').slice(0,300),error:part.state?.error??null}));
+    websearch=parts.filter(part=>part.tool==='websearch')
+      .map(part=>({status:part.state?.status,query:part.state?.input?.query,output_excerpt:String(part.state?.output??'').slice(0,300),error:part.state?.error??null}));
   }
 }
 console.log(JSON.stringify({request,started:Boolean(started),taskId:started?.task_id??null,task:started?.task??null,completed:Boolean(completed),
-  result:completed?.text??null,notificationBytes,tools,webfetch,failure,physicalDevicesOpened:false},null,2));
-if(!started||!completed||failure||!notificationBytes||!completed.text?.includes(target)||
-   !/nantes/i.test(completed.text)||!webfetch.some(item=>item.status==='completed'&&item.url===target))process.exitCode=1;
+  result:completed?.text??null,notificationBytes,tools,webfetch,websearch,failure,physicalDevicesOpened:false},null,2));
+const retrieved=search ? websearch.some(item=>item.status==='completed') : webfetch.some(item=>item.status==='completed'&&item.url===target);
+const hasSource=search ? /https?:\/\//i.test(completed?.text??'') : completed?.text?.includes(target);
+if(!started||!completed||failure||!notificationBytes||!hasSource||!/nantes/i.test(completed.text)||!retrieved)process.exitCode=1;

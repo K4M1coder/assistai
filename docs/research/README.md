@@ -90,7 +90,9 @@ EXP-084 through EXP-107 cover CPU target-speaker extraction, user-reported manua
 
 [Disposable coding demonstration 2026-11-17](2026-11-17-edit-fixture.md) records the separately configured editable fixture and the pending live approved-task check.
 
-[Opt-in web research 2026-11-17](2026-11-17-web-research-fixture.md) records the hosted-search configuration, a successful direct retrieval of one official public page, and the remaining unverified search and speech behavior.
+[Opt-in web research 2026-11-17](2026-11-17-web-research-fixture.md) records the hosted-search configuration, one successful public search and direct retrieval of an official page, and the remaining unverified search and speech behavior.
+
+[Sophon-Realtime 4B W4 2026-11-19](2026-11-19-sophon-realtime-candidate.md) records a new full-duplex candidate and why its published memory and runtime evidence do not yet fit the Windows Intel plus concurrent-agent target.
 
 [Reactive pressure cancellation 2026-11-17](2026-11-17-pressure-cancellation.md) documents the opt-in, mock-tested cancellation request and its memory-enforcement limitations.
 

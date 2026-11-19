@@ -317,7 +317,7 @@ wss.on('connection', (client, req) => {
       .catch(() => send({ type: 'task.cancel_rejected', task_id: event.task_id, message: 'Could not request cancellation; task status is uncertain.' }));
   });
   if (lfmRealtimeUrl) {
-    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
+    attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory, agentAvailable: Boolean(opencodeUrl),
       streamNotification: lfmNotificationTts ? (text, callbacks) => streamTtsNotification({ url: ttsUrl, text, timeoutMs: ttsStallMs, ...callbacks }) : undefined,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
       getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--concurrent', action='store_true')
 parser.add_argument('--browser-run-id')
-parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification'))
+parser.add_argument('--sample', choices=('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows'))
 options = parser.parse_args()
 if options.browser_run_id is not None and (options.sample != 'browser-agent-notification' or
         not re.fullmatch(r'[A-Za-z0-9_-]{1,40}', options.browser_run_id)):
@@ -32,7 +32,8 @@ if options.sample:
                 'agent-notification':'native-agent-notification.wav',
                 'browser-agent-notification':'native-browser-notification.wav',
                 'browser-capture-roundtrip':'native-browser-capture-roundtrip.wav',
-                'pocket-agent-notification':'pocket-agent-notification.wav'}[options.sample]
+                'pocket-agent-notification':'pocket-agent-notification.wav',
+                'math-windows':'lfm3-omni-math-windows-interleaved-q8-output.wav'}[options.sample]
     if options.browser_run_id:
         filename = f'native-browser-notification-{options.browser_run_id}.wav'
 with wave.open(str(ROOT / '.cache' / filename), 'rb') as source:
@@ -44,6 +45,8 @@ executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64
 model = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
 text, elapsed = asr.recognize_crisp(pcm + bytes(32000), executable, model, 'kyutai-stt', allow_empty=True)
 reference = 'Le mot secret est BLUEBIRD.' if options.sample in ('agent-notification','browser-agent-notification','browser-capture-roundtrip') else 'La capitale de la France est Paris.'
+if options.sample == 'math-windows':
+    reference = 'cinq'
 if options.sample in ('browser-agent-notification','pocket-agent-notification'):
     metadata_file = (f'native-browser-notification-{options.browser_run_id}.json' if options.browser_run_id else 'native-browser-notification.json') if options.sample == 'browser-agent-notification' else 'pocket-agent-notification.json'
     metadata = json.loads((ROOT / '.cache' / metadata_file).read_text(encoding='utf-8'))
