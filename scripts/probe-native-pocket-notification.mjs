@@ -7,6 +7,8 @@ import WebSocket, { WebSocketServer } from 'ws';
 
 async function listen(server){server.listen(0,'127.0.0.1');await once(server,'listening');return server.address().port;}
 const realAgent=process.argv.includes('--real-agent');
+const unavailableTts=process.argv.includes('--tts-unavailable');
+if(realAgent&&unavailableTts)throw Error('Use the simulated agent for the unavailable-TTS probe');
 const agent=http.createServer((req,res)=>{
   res.setHeader('content-type','application/json');
   if(req.method==='POST'&&req.url==='/session')return res.end(JSON.stringify({id:'fixture-session'}));
@@ -31,8 +33,11 @@ wss.on('connection',socket=>{
   });
 });
 const backendPort=await listen(backend);const reservation=net.createServer();const port=await listen(reservation);await new Promise(resolve=>reservation.close(resolve));
+const ttsReservation=unavailableTts?net.createServer():null;
+const ttsPort=ttsReservation?await listen(ttsReservation):18081;
+if(ttsReservation)await new Promise(resolve=>ttsReservation.close(resolve));
 const env={...process.env,ASSISTAI_GATEWAY_PORT:String(port),ASSISTAI_DB_PATH:':memory:',ASSISTAI_LFM_REALTIME_URL:`ws://127.0.0.1:${backendPort}/v1/realtime`,
-  ASSISTAI_LFM_TRANSCRIPT_ASR_URL:'',ASSISTAI_LFM_NOTIFICATION_TTS:'1',ASSISTAI_TTS_URL:'http://127.0.0.1:18081',ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,
+  ASSISTAI_LFM_TRANSCRIPT_ASR_URL:'',ASSISTAI_LFM_NOTIFICATION_TTS:'1',ASSISTAI_TTS_URL:`http://127.0.0.1:${ttsPort}`,ASSISTAI_OPENCODE_URL:`http://127.0.0.1:${agentPort}`,
   ASSISTAI_BUDGET_SAMPLE_PATH:realAgent?'.cache/assistant/demo-18131-resource.json':'',ASSISTAI_RESOURCE_STATUS_PATH:'',
   ASSISTAI_SHARED_RESERVATIONS_PATH:realAgent?'.cache/assistant/task-reservations.sqlite':'',ASSISTAI_BUDGET_BASELINE_SHARED_BYTES:'0',
   ASSISTAI_TASK_VRAM_ESTIMATE_BYTES:String(512*1024**2),ASSISTAI_TASK_RAM_ESTIMATE_BYTES:String(3*1024**3)};
@@ -43,7 +48,7 @@ try {
   const status=await (await fetch(`http://127.0.0.1:${port}/services`)).json();
   const tts=status.services.find(item=>item.role==='Task notification synthesis');
   client=new WebSocket(`ws://127.0.0.1:${port}/voice`);
-  let taskId=null,initialEnd=false,notification=false,notificationBytes=0,text='',capability=null;
+  let taskId=null,initialEnd=false,notification=false,notificationTurn=null,notificationBytes=0,text='',capability=null,notificationError=null;
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Notification probe timed out; task may still be running')),90000);
     const maybeNotify=()=>{if(taskId&&initialEnd){initialEnd=false;client.send(JSON.stringify({type:'notification.speak',task_id:taskId}));}};
@@ -54,14 +59,16 @@ try {
       if(event.type==='session.capabilities')capability=event.notification_synthesis;
       else if(event.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
       else if(event.type==='task.completed'){taskId=event.task_id;maybeNotify();}
-      else if(event.type==='notification.started')notification=true;
+      else if(event.type==='notification.started'){notification=true;notificationTurn=event.turn_id;}
       else if(event.type==='assistant.text'&&notification)text=event.text;
       else if(event.type==='speech.end'){if(notification){clearTimeout(timer);resolve();}else{initialEnd=true;maybeNotify();}}
+      else if(event.type==='error'&&notification&&unavailableTts&&event.turn_id===notificationTurn){notificationError=event.message;clearTimeout(timer);resolve();}
       else if(['error','task.error','task.rejected','notification.rejected'].includes(event.type)){clearTimeout(timer);reject(Error(JSON.stringify(event)));}
     });
   });
-  console.log(JSON.stringify({notificationBytes,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:'real local service',physicalDevicesOpened:false}));
-  if(!notificationBytes||!text.includes('BLUEBIRD')||capability!=='local-tts'||!tts?.available||requests!==2)process.exitCode=1;
+  console.log(JSON.stringify({notificationBytes,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,notificationError,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:unavailableTts?'unavailable loopback endpoint':'real local service',physicalDevicesOpened:false}));
+  if(!text.includes('BLUEBIRD')||capability!=='local-tts'||requests!==2||
+     (unavailableTts ? tts?.available!==false||notificationBytes!==0||notificationError!=='Task notification speech failed.' : !notificationBytes||!tts?.available))process.exitCode=1;
 } finally {
   client?.terminate();gateway.kill();for(const socket of wss.clients)socket.terminate();
   await Promise.all([new Promise(resolve=>wss.close(resolve)),new Promise(resolve=>backend.close(resolve)),...(realAgent?[]:[new Promise(resolve=>agent.close(resolve))])]);
