@@ -50,6 +50,8 @@ An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option
 
 LFM3-Omni-2B is an additional native audio-and-vision research candidate. A guarded Windows trial loaded its Q4 weights with Q8 or F16 projector and returned correct text for a synthetic French question, but generated audio was often short or did not match that text in independent ASR checks. Full-duplex, intelligible speech and concurrent agent tasks remain unverified. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).
 
+An interrupted native-mode agent trial exposed a fabricated spoken task result. The updated gateway no longer generates free-form task-result summaries: results are displayed, and spoken notifications require the separately configured local TTS service. This mitigation does not validate the agent's answer or guarantee pronunciation. Existing gateway processes must be restarted to use it.
+
 The operator has reported one successfully approved read of the disposable `calculator.py` fixture and confirmed hearing an understandable result. This used typed input and does not establish a completed voice-input or edit demonstration. See the [fixture notes](docs/research/2026-11-17-edit-fixture.md).
 
 The earlier approval-based experiment and operator report remain documented in the [investigation](docs/research/2026-11-17-reported-premature-task.md). The approval gate was subsequently removed at the operator's request.

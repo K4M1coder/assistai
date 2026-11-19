@@ -158,7 +158,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: false, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel, ...(lfmRealtimeUrl && lfmNotificationTts ? { notification_synthesis:'local-tts' } : {}) });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: false, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel, ...(lfmRealtimeUrl ? { notification_synthesis:lfmNotificationTts?'local-tts':'disabled' } : {}) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {

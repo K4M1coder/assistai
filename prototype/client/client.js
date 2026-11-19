@@ -240,7 +240,7 @@ function handleSocketMessage({ data }) {
     $('text').disabled = !textInputAvailable;
     $('send').disabled = !textInputAvailable;
     $('image').disabled = event.image_input !== true;
-    $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} ${event.notification_synthesis === 'local-tts' ? 'Task notifications use a separate local TTS service. ' : ''}Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
+    $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} ${event.notification_synthesis === 'local-tts' ? 'Task notifications use a separate local TTS service. ' : event.notification_synthesis === 'disabled' ? 'Task results are displayed; spoken notifications require local TTS. ' : ''}Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
   else if (event.type === 'asr.reconnecting') { asrReady = false; $('talk').disabled = true; status('Reconnecting the voice session.'); }
   else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; if (speechReviewAvailable) send(JSON.stringify({type:'speech.review.configure',enabled:$('speech-review').checked})); $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
@@ -279,7 +279,7 @@ function handleSocketMessage({ data }) {
       setTimeout(() => { if (pendingNotifications[0] === event.task_id) announceWhenIdle(); }, 500);
     } else {
       pendingNotifications.shift(); notificationRetries = 0;
-      log('Could not speak the completed task notification; its result remains in the conversation.');
+      log(event.reason === 'tts_not_configured' ? 'Task result is displayed; configure local TTS to speak notifications.' : 'Could not speak the completed task notification; its result remains in the conversation.');
       announceWhenIdle();
     }
   }

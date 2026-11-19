@@ -12,7 +12,7 @@ async function listen(server) { server.listen(0, '127.0.0.1'); await once(server
 async function fetchJson(req) { const parts=[];for await(const b of req)parts.push(b);return JSON.parse(Buffer.concat(parts).toString()||'{}'); }
 function clearMessageListeners(client) { client.removeAllListeners('message'); }
 
-test('opt-in gateway delegates a task and speaks its completion notification', {timeout:20000}, async t => {
+test('native gateway delegates a task and refuses generative result notifications', {timeout:20000}, async t => {
   const calls=[]; const sessionInstructions=[]; let requestNumber=0; let notificationPrompt=''; let rejectedToolResult=''; let nextToolOnResume=false; let agentBusy=false; let agentResult='BLUEBIRD'; let messagePolls=0;
   const agent=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
@@ -81,10 +81,13 @@ test('opt-in gateway delegates a task and speaks its completion notification', {
       else if(e.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
       else if(e.type==='task.completed'){completed=true;assert.ok(messagePolls>=2);assert.equal(e.text,'BLUEBIRD');maybeNotify();}
       else if(e.type==='speech.end'){if(notified){clearTimeout(timer);return resolve();}initialEnd=true;maybeNotify();}
+      else if(e.type==='notification.rejected' && notified){assert.equal(e.reason,'tts_not_configured');clearTimeout(timer);resolve();}
       else if(e.type==='error'||e.type==='task.error'||e.type==='notification.rejected'){clearTimeout(timer);reject(Error(JSON.stringify(e)));}
     });
   });
-  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,spoken_image_input:false,speech_review:false,task_cancel:true,task_approval:false,input_transcript:true,workspace_label:''});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.equal(calls.length,1);assert.match(calls[0],/^Read fixture\.txt and report the secret word/);assert.ok(notificationAudio>0);assert.match(notificationPrompt,/BLUEBIRD/);assert.equal(requestNumber,3);
+  assert.deepEqual(capabilities,{type:'session.capabilities',mode:'native-speech',text_input:false,image_input:false,spoken_image_input:false,speech_review:false,task_cancel:true,task_approval:false,input_transcript:true,workspace_label:'',notification_synthesis:'disabled'});assert.equal(transcript?.text,'spoken fixture');assert.equal(transcript?.source,'parallel-asr');assert.equal(calls.length,1);assert.match(calls[0],/^Read fixture\.txt and report the secret word/);assert.equal(notificationAudio,0);assert.equal(notificationPrompt,'');assert.equal(requestNumber,2);
+  // The remaining mock scenarios use their original ordinal labels; no response was generated here.
+  requestNumber++;
   await unlink(budgetPath);
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Missing-sample rejection timed out')),5000);
