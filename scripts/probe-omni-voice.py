@@ -75,5 +75,5 @@ async def main(mode, variant, repeat):
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(); parser.add_argument('--mode', choices=('audio','interleaved'), required=True)
     parser.add_argument('--variant', choices=('f16','q8'), required=True)
-    parser.add_argument('--repeat', type=int, choices=(1,2), default=1)
+    parser.add_argument('--repeat', type=int, choices=range(1,11), default=1)
     args=parser.parse_args(); asyncio.run(main(args.mode, args.variant, args.repeat))
