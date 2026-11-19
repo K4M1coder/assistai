@@ -2,6 +2,8 @@
 
 Recent experiment: [Piper French voice with DirectML](2026-11-19-piper-directml-candidate.md) found that strict no-CPU-fallback initialization fails; no speech was generated.
 
+[Process-level GPU counters](2026-11-19-process-gpu-counters.md) supplement whole-adapter readings, with explicit limitations on attribution and residency.
+
 This directory records the product's research. Never overwrite an experiment: give it an identifier, a falsifiable hypothesis, the exact configuration, raw measurements, and a conclusion. Negative results are valuable too.
 
 ## Objective
