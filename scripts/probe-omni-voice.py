@@ -23,6 +23,7 @@ async def main(mode, variant, repeat):
     if output.exists(): raise FileExistsError('Output exists; preserve it and choose another run')
     modalities = ['text', 'audio'] if mode == 'interleaved' else ['audio']
     chunks = []; audio_bytes = 0; text = ''; counts = {}; sent_at = None; first_audio = None
+    boundary_jumps = []
     started = time.monotonic(); configured = False
     async with connect('ws://127.0.0.1:18210/v1/realtime', open_timeout=5, max_size=4*1024*1024) as socket:
         event = json.loads(await asyncio.wait_for(socket.recv(), 5))
@@ -46,8 +47,12 @@ async def main(mode, variant, repeat):
                 if sent_at is None: raise RuntimeError('Audio arrived before request')
                 if first_audio is None: first_audio = round((time.monotonic()-sent_at)*1000)
                 chunk = base64.b64decode(event.get('delta', ''), validate=True)
+                if not chunk: continue
                 audio_bytes += len(chunk)
-                if audio_bytes > 4*1024*1024 or len(chunk)%2: raise RuntimeError('Invalid or excessive output audio')
+                if audio_bytes > 4*1024*1024 or len(chunk)%2 or len(chunks) >= 4096: raise RuntimeError('Invalid or excessive output audio')
+                if chunks:
+                    boundary_jumps.append(abs(int.from_bytes(chunk[:2], 'little', signed=True) -
+                                              int.from_bytes(chunks[-1][-2:], 'little', signed=True)))
                 chunks.append(chunk)
             elif kind in ('response.output_text.delta', 'response.output_audio_transcript.delta'):
                 text += event.get('delta', '')
@@ -61,7 +66,9 @@ async def main(mode, variant, repeat):
                 print(json.dumps({'mode':mode, 'variant_label':variant, 'repeat':repeat, 'text':text, 'audio_bytes':audio_bytes,
                     'audio_seconds':audio_bytes/48000, 'response_ms':round((time.monotonic()-sent_at)*1000),
                     'first_audio_ms':first_audio, 'total_ms':round((time.monotonic()-started)*1000),
-                    'events':counts, 'output':str(output), 'physical_devices_opened':False}, ensure_ascii=False), flush=True)
+                    'events':counts, 'output_audio_chunk_bytes':[len(chunk) for chunk in chunks],
+                    'output_audio_boundary_jumps':boundary_jumps,
+                    'output':str(output), 'physical_devices_opened':False}, ensure_ascii=False), flush=True)
                 return
 
 
