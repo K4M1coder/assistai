@@ -20,6 +20,6 @@ export function plausibleFollowupTranscript(text,different){
 export function correctFollowup(text,different){
  if(typeof text!=='string')return false;
  return different
-  ? /^(?:(?:cinq|5)|la réponse est (?:cinq|5)|deux plus trois (?:font|fait|égale|égalent) (?:cinq|5))[.!]?$/i.test(text)
+  ? /^(?:(?:cinq|5)|la réponse est (?:cinq|5)|(?:deux|2) plus (?:trois|3) (?:font|fait|égale|égalent) (?:cinq|5))[.!]?$/i.test(text)
   : /^(?:paris|la capitale de la france est paris)[.!]?$/i.test(text);
 }
