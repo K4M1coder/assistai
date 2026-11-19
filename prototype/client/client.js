@@ -240,7 +240,7 @@ function handleSocketMessage({ data }) {
     $('text').disabled = !textInputAvailable;
     $('send').disabled = !textInputAvailable;
     $('image').disabled = event.image_input !== true;
-    $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
+    $('mode').textContent = event.mode === 'native-speech' ? `Experimental native speech mode: speech input and output. ${event.input_transcript ? 'Parallel transcription is enabled.' : 'Input transcription is unavailable.'} ${event.notification_synthesis === 'local-tts' ? 'Task notifications use a separate local TTS service. ' : ''}Text and image input are unavailable.` : 'Cascade mode: speech recognition, text controller and speech synthesis.';
   }
   else if (event.type === 'asr.reconnecting') { asrReady = false; $('talk').disabled = true; status('Reconnecting the voice session.'); }
   else if (event.type === 'asr.ready') { asrReady = true; reconnectAttempts = 0; if (speechReviewAvailable) send(JSON.stringify({type:'speech.review.configure',enabled:$('speech-review').checked})); $('talk').disabled = !$('push-to-talk').checked || !stream?.active; status(stream?.active ? 'Listening in French.' : 'Ready. Start the microphone to speak French.'); }
@@ -283,9 +283,9 @@ function handleSocketMessage({ data }) {
       announceWhenIdle();
     }
   }
-  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { $('agent-activity').textContent = `Latest agent event: task failed — ${event.message}`; activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
+  else if (event.type === 'task.error' || event.type === 'error') { if (event.type === 'task.error') { $('agent-activity').textContent = `Latest agent event: task failed — ${event.message}`; activeTaskIds.delete(event.task_id); cancellationRequested.delete(event.task_id); refreshTaskButton(); } if (event.type === 'error' && event.turn_id && event.turn_id === activeSpeechTurn) stopPlayback(); if (event.type === 'error' && event.turn_id && event.turn_id === currentNotificationTurn) { currentNotification = null; currentNotificationTurn = null; } responsePending = false; notificationPending = false; status(event.message); log(`Error: ${event.message}`); announceWhenIdle(); }
   else if (event.type === 'speech.start') { outputRate = event.sample_rate; speechOpen = true; speechHasAudio = false; playbackGapCount = 0; playbackGapMaxMs = 0; activeSpeechTurn = event.turn_id ?? null; if ($('speaker-safe').checked) send(JSON.stringify({ type: 'audio.reset' })); }
-  else if (event.type === 'speech.end') { if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) { currentNotification = null; currentNotificationTurn = null; } responsePending = false; announceWhenIdle(); }
+  else if (event.type === 'speech.end') { if (currentNotification && (!event.turn_id || event.turn_id === currentNotificationTurn)) log('Agent result audio received.'); if (playbackGapCount) log(`Playback detected ${playbackGapCount} gap(s) over 30 ms; longest approximately ${Math.round(playbackGapMaxMs)} ms.`); speechOpen = false; activeSpeechTurn = null; if (!playbackSources.size) { currentNotification = null; currentNotificationTurn = null; } responsePending = false; announceWhenIdle(); }
   else if (event.type === 'speech.cancelled') {
     if (event.turn_id && event.turn_id !== activeSpeechTurn && event.turn_id !== currentNotificationTurn) return;
     deferCurrentNotification(); stopPlayback();

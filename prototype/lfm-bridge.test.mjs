@@ -53,3 +53,31 @@ test('preserves an uncertain task refusal in the tool result',async()=>{const cl
 test('delivers output and completes a text-only response',()=>{const {client,sessions}=setup();const s=sessions[0];client.event({type:'audio.start'});s.emit('responseStart');s.emit('text','hello');s.emit('responseDone');assert.equal(client.sent.at(-2).type,'assistant.text');assert.equal(client.sent.at(-1).type,'speech.end')});
 
 test('only completed tasks can trigger a spoken notification containing the result',()=>{const {client,sessions}=setup();client.event({type:'notification.speak',task_id:'unknown'});assert.equal(client.sent.at(-1).reason,'unavailable');sessions[0].state='waiting';client.event({type:'notification.speak',task_id:'completed'});assert.equal(client.sent.at(-1).reason,'busy');sessions[0].state='ready';client.event({type:'notification.speak',task_id:'completed'});assert.equal(client.sent.at(-1).type,'notification.started');assert.match(sessions[0].spoken,/BLUEBIRD/)});
+
+test('optional notification TTS is interruptible and ignores late audio',async()=>{
+ const client=new Client();let callbacks,resolveSpeech;const task=new Promise(resolve=>resolveSpeech=resolve);let session;
+ attachLfmBridge(client,{makeTurnId:()=> 'tts-turn',sessionFactory:()=>session=new Session(),getCompletedTask:()=>'<think>hidden</think>Le mot secret est BLUEBIRD.',
+  streamNotification:(text,options)=>{assert.doesNotMatch(text,/hidden|think/);callbacks=options;return task;}});
+ client.event({type:'notification.speak',task_id:'done'});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(client.sent[0].type,'notification.started');assert.match(client.sent[1].text,/BLUEBIRD/);
+ callbacks.onFormat(24000);callbacks.onAudio(Buffer.from([1,0]));client.event({type:'interrupt'});
+ assert.equal(callbacks.signal.aborted,true);assert.equal(client.sent.at(-1).type,'speech.cancelled');
+ const count=client.sent.length;callbacks.onAudio(Buffer.from([2,0]));resolveSpeech();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(client.sent.length,count);assert.equal(session.state,'ready');
+});
+test('optional notification TTS reports failure and allows a later attempt',async()=>{
+ const client=new Client();let session,attempts=0;
+ attachLfmBridge(client,{makeTurnId:()=> 'tts-turn',sessionFactory:()=>session=new Session(),getCompletedTask:()=> 'Result',
+  streamNotification:async()=>{attempts++;throw Error('service unavailable');}});
+ client.event({type:'notification.speak',task_id:'done'});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(client.sent.at(-1).type,'error');assert.equal(client.sent.at(-1).turn_id,'tts-turn');assert.equal(session.state,'ready');
+ client.event({type:'notification.speak',task_id:'done'});await new Promise(resolve=>setImmediate(resolve));assert.equal(attempts,2);
+});
+test('optional notification TTS blocks a new turn until interrupted and stops on disconnect',async()=>{
+ const client=new Client();let session,options;
+ attachLfmBridge(client,{makeTurnId:()=> 'tts-turn',sessionFactory:()=>session=new Session(),getCompletedTask:()=> 'Result',
+  streamNotification:(_text,value)=>{options=value;return new Promise(()=>{});}});
+ client.event({type:'notification.speak',task_id:'done'});await new Promise(resolve=>setImmediate(resolve));
+ client.event({type:'audio.start'});assert.match(client.sent.at(-1).message,/busy/);assert.equal(session.frames.length,0);
+ client.close();assert.equal(options.signal.aborted,true);assert.equal(session.closed,true);
+});

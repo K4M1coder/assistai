@@ -6,7 +6,7 @@ function displayUrl(value) {
     return url.href.replace(/\/$/, '');
   } catch { return null; }
 }
-export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech = false, nativeTranscriptUrl }, fetcher = fetch) {
+export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech = false, nativeTranscriptUrl, nativeNotificationTts = false }, fetcher = fetch) {
   const get = async url => {
     const response = await fetcher(url, { signal: AbortSignal.timeout(3000) });
     if (!response.ok) throw Error(`HTTP ${response.status}`);
@@ -25,8 +25,8 @@ export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, 
   };
   const voice = models(nativeSpeech ? 'Speech-to-speech model' : 'Voice controller', voiceUrl);
   const asr = nativeSpeech && !nativeTranscriptUrl ? null : service(nativeSpeech ? 'Parallel transcription' : 'Speech recognition', httpAsr.href);
-  const tts = nativeSpeech ? null : (async () => {
-    const result = await service('Speech synthesis', `${ttsUrl.replace(/\/$/, '')}/health`);
+  const tts = nativeSpeech && !nativeNotificationTts ? null : (async () => {
+    const result = await service(nativeSpeech ? 'Task notification synthesis' : 'Speech synthesis', `${ttsUrl.replace(/\/$/, '')}/health`);
     if (result.available) {
       try { result.engine = (await get(`${ttsUrl.replace(/\/$/, '')}/openapi.json`)).info?.title ?? null; } catch {}
     }
@@ -43,5 +43,5 @@ export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, 
       return { ...result, harness: displayUrl(opencodeUrl) };
     } catch { return { role: 'Agent model', available: false, harness: displayUrl(opencodeUrl), message: 'Model endpoint unavailable or not reported' }; }
   })();
-  return Promise.all([voice, agent, ...(asr ? [asr] : []), ...(!nativeSpeech ? [tts] : [])]);
+  return Promise.all([voice, agent, ...(asr ? [asr] : []), ...(tts ? [tts] : [])]);
 }

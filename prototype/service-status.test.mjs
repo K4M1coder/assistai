@@ -39,6 +39,13 @@ test('native mode reports only the configured parallel transcription engine', as
   assert.ok(!requested.some(url => url.includes(':18081') || url.includes(':18082')));
 });
 
+test('native mode reports the optional notification synthesis service', async () => {
+  const fetcher=async url=>({ok:true,json:async()=>url.endsWith('/health')?{status:'healthy',engine:'Pocket TTS'}:url.endsWith('/openapi.json')?{info:{title:'Pocket TTS API'}}:{data:[]}});
+  const services=await getServiceStatus({voiceUrl:'http://127.0.0.1:18092/v1',asrUrl:'ws://127.0.0.1:18082/asr',ttsUrl:'http://127.0.0.1:18081',nativeSpeech:true,nativeNotificationTts:true},fetcher);
+  const tts=services.find(service=>service.role==='Task notification synthesis');
+  assert.equal(tts.available,true);assert.equal(tts.engine,'Pocket TTS API');
+});
+
 test('reports buffered recognition mode when the provider supplies it', async () => {
   const fetcher = async url => ({ok:true,json:async()=>url.includes('/health')
     ? {status:'ready',engine:'CrispASR CPU',model:'kyutai',language:'fr',mode:'buffered-utterance'} : {data:[]}});

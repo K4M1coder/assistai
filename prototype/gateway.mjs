@@ -22,6 +22,7 @@ import { speechText, visibleAnswer } from './speech-text.mjs';
 import { latestCompletedAssistant } from './agent-task-status.mjs';
 import { openSharedTaskReservations } from './shared-task-reservations.mjs';
 import { agentProgress } from './agent-progress.mjs';
+import { streamTtsNotification } from './tts-notification.mjs';
 
 function validImage(image) {
   const match = typeof image === 'string' && /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
@@ -41,6 +42,7 @@ if (!Number.isSafeInteger(ttsStallMs) || ttsStallMs < 100 || ttsStallMs > 120000
 const opencodeUrl = process.env.ASSISTAI_OPENCODE_URL;
 const workspaceLabel = (process.env.ASSISTAI_WORKSPACE_LABEL ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300);
 const lfmRealtimeUrl = process.env.ASSISTAI_LFM_REALTIME_URL;
+const lfmNotificationTts = process.env.ASSISTAI_LFM_NOTIFICATION_TTS === '1';
 const lfmTranscriptUrl = process.env.ASSISTAI_LFM_TRANSCRIPT_ASR_URL;
 const lfmWorkspaceContext = process.env.ASSISTAI_LFM_WORKSPACE_CONTEXT ?? '';
 const sessionResumeEnabled = process.env.ASSISTAI_ENABLE_SESSION_RESUME === '1';
@@ -97,7 +99,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/health') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'running', mode: 'experimental', history_storage: dbPath === ':memory:' ? 'volatile' : 'file', session_resume_enabled: sessionResumeEnabled }));
   if (req.method === 'GET' && req.url === '/resources') return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(await getResources()));
   if (req.method === 'GET' && req.url === '/services') {
-    const services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech: Boolean(lfmRealtimeUrl), nativeTranscriptUrl: lfmTranscriptUrl });
+    const services = await getServiceStatus({ voiceUrl: lfmRealtimeUrl ? `${new URL(lfmRealtimeUrl).protocol === 'wss:' ? 'https:' : 'http:'}//${new URL(lfmRealtimeUrl).host}/v1` : llmUrl, asrUrl, ttsUrl, opencodeUrl, nativeSpeech: Boolean(lfmRealtimeUrl), nativeTranscriptUrl: lfmTranscriptUrl, nativeNotificationTts: lfmNotificationTts });
     return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ services }));
   }
   const file = staticFiles.get(req.url) ?? aecFiles.get(req.url);
@@ -156,7 +158,7 @@ wss.on('connection', (client, req) => {
     const destination = resumedSession ? taskState.client : client;
     if (destination?.readyState === WebSocket.OPEN) destination.send(JSON.stringify(value));
   };
-  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: false, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel });
+  send({ type: 'session.capabilities', mode: lfmRealtimeUrl ? 'native-speech' : 'cascade', text_input: !lfmRealtimeUrl, image_input: !lfmRealtimeUrl, spoken_image_input: !lfmRealtimeUrl, speech_review: !lfmRealtimeUrl, task_cancel: Boolean(opencodeUrl), task_approval: false, input_transcript: !lfmRealtimeUrl || Boolean(lfmTranscriptUrl), workspace_label: workspaceLabel, ...(lfmRealtimeUrl && lfmNotificationTts ? { notification_synthesis:'local-tts' } : {}) });
   if (resumedSession) {
     const events = [];
     for (const row of taskSnapshot.all(session).reverse()) {
@@ -316,6 +318,7 @@ wss.on('connection', (client, req) => {
   });
   if (lfmRealtimeUrl) {
     attachLfmBridge(client, { url: lfmRealtimeUrl, transcriptUrl: lfmTranscriptUrl, launchTask, makeTurnId: randomUUID, workspaceContext: lfmWorkspaceContext, resumed: hasPreviousHistory,
+      streamNotification: lfmNotificationTts ? (text, callbacks) => streamTtsNotification({ url: ttsUrl, text, timeoutMs: ttsStallMs, ...callbacks }) : undefined,
       recordEvent: event => record(session, event.turn_id, event.type, { text: event.text, source: event.source ?? 'native-model' }),
       getContext: () => buildNativeContext(nativeHistory.all(session).reverse()),
       getCompletedTask: taskId => {

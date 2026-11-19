@@ -117,8 +117,9 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.match(elements.log.textContent, /Could not speak/);
   assert.equal(timers.length, 0);
   // The gateway can finish sending while audio is still queued in the browser.
-  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.completed', task_id:'task-playback', text:'done'})}); ws.onmessage({data: JSON.stringify({type:'notification.started', task_id:'task-playback'})}); ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'notification-turn', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end', turn_id:'notification-turn'})})", context);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.completed', task_id:'task-playback', text:'done'})}); ws.onmessage({data: JSON.stringify({type:'notification.started', task_id:'task-playback', turn_id:'notification-turn'})}); ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'notification-turn', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end', turn_id:'notification-turn'})})", context);
   assert.match(elements.log.textContent, /Speaking agent result\./);
+  assert.match(elements.log.textContent, /Agent result audio received\./);
   assert.equal(vm.runInContext('currentNotification', context), 'task-playback');
   const stoppedSource = vm.runInContext('[...playbackSources][0]', context);
   elements.interrupt.onclick();
@@ -143,6 +144,9 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), false);
   assert.equal(elements.status.textContent, 'TTS failed');
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.started',task_id:'broken',turn_id:'broken-turn'})}); ws.onmessage({data: JSON.stringify({type:'error',turn_id:'broken-turn',message:'Notification failed'})})", context);
+  assert.equal(vm.runInContext('currentNotification', context), null);
+  assert.equal(vm.runInContext('currentNotificationTurn', context), null);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.capabilities', mode:'cascade', text_input:true, image_input:true, spoken_image_input:true})})", context);
   elements.image.files = [{ type:'image/png', size:8 }]; elements.image.onchange();
   elements.talk.onpointerdown({ button: 0, pointerId: 1, preventDefault() {} }); elements.talk.onpointerup();

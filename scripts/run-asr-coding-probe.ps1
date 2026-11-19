@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip')][string]$NativeSample, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip')][string]$NativeSample, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -15,6 +15,7 @@ if($ASRThreads -ne 2 -and !$PersistentTrial){throw 'ASRThreads requires Persiste
 if($NativeOutput -and ($PersistentTrial -or $VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'NativeOutput is a separate probe'}
 if($NativeConcurrentOutput -and !$NativeOutput){throw 'NativeConcurrentOutput requires NativeOutput'}
 if($NativeSample -and (!$NativeOutput -or $NativeConcurrentOutput)){throw 'NativeSample requires NativeOutput and excludes NativeConcurrentOutput'}
+if($NotificationTts -and ($NativeOutput -or $PersistentTrial -or $VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'NotificationTts is a separate probe'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -31,6 +32,7 @@ $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
 if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
 if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario,'--threads',[string]$ASRThreads)}
 if($NativeOutput){$probeArgs=@((Join-Path $root 'scripts/probe-native-output.py'))}
+if($NotificationTts){$probeArgs=@((Join-Path $root 'scripts/probe-notification-tts.py'))}
 if($NativeConcurrentOutput){$probeArgs+='--concurrent'}
 if($NativeSample){$probeArgs+=@('--sample',$NativeSample)}
 if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}

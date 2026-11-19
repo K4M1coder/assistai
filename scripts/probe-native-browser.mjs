@@ -73,7 +73,7 @@ try {
     if (!stopped && state.log.includes('You:')) { stopped = true; await evaluate("document.querySelector('#stop').click(); true"); }
     const completedAt = state.log.indexOf('Agent completed:');
     if (completedAt >= 0 && !completionObserved) { completionObserved = true; audioAtCompletion = state.audioBytes; }
-    if (completionObserved && state.audioBytes > audioAtCompletion && state.log.slice(completedAt).includes('Speaking agent result.') && state.log.slice(completedAt).includes('Assistant:')) { notificationObserved = true; break; }
+    if (completionObserved && state.audioBytes > audioAtCompletion && state.log.slice(completedAt).includes('Speaking agent result.') && state.log.slice(completedAt).includes('Agent result audio received.') && state.log.slice(completedAt).includes('Assistant:')) { notificationObserved = true; break; }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   let notificationFile = null, notificationText = null;
