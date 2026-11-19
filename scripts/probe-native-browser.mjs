@@ -8,8 +8,14 @@ import path from 'node:path';
 import net from 'node:net';
 import WebSocket from 'ws';
 
-const notificationPath = '.cache/native-browser-notification.wav';
-const notificationMetadataPath = '.cache/native-browser-notification.json';
+const args = process.argv.slice(2);
+if (args.length > 1 || args.some(value => !value.startsWith('--run-id='))) throw Error('Expected at most one --run-id=ID argument');
+const runIdArg = args[0];
+const runId = runIdArg?.slice('--run-id='.length);
+if (runIdArg && !/^[A-Za-z0-9_-]{1,40}$/.test(runId)) throw Error('Run ID must contain 1 to 40 letters, numbers, underscores or hyphens');
+const captureStem = `.cache/native-browser-notification${runId ? `-${runId}` : ''}`;
+const notificationPath = `${captureStem}.wav`;
+const notificationMetadataPath = `${captureStem}.json`;
 for (const output of [notificationPath, notificationMetadataPath]) {
   try { await access(output); throw Error('Preserve or move the existing browser notification before this probe'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
