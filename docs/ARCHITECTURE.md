@@ -162,7 +162,9 @@ LFM3-Omni-2B is a separate experimental candidate, not the default cascade. In t
 
 The browser separately displays the latest agent event received from the gateway, including submission, rejection, uncertainty, completion or failure. Assistant-generated text alone does not change that indicator. It describes the latest event rather than a complete parallel-task dashboard; after reconnect, earlier work may still be running. This does not prevent the speech model from incorrectly asserting that it delegated a task. The observed false assertion and the reverted configuration that exposed it are documented in the candidate notebook.
 
-An isolated headless Chrome test used a synthetic WAV as its fake microphone and a temporary native gateway connected to the real model and read-only harness. It showed a correct fixture result and later browser audio, with the limitations recorded in the candidate notebook. The client now logs notification start explicitly; the tightened browser probe that checks this event has not yet been run against the real model.
+An isolated headless Chrome test used a synthetic WAV as its fake microphone and a temporary native gateway connected to the real model and read-only harness. A later run also observed explicit notification start, captured the browser's scheduled notification audio and returned the correct fixture result. Two independent recognizers did not faithfully transcribe the French notification; human intelligibility and real-room behavior remain unverified. See the candidate notebook for the test and sampled resource limitations.
+
+The separately configured web fixture can delegate direct website retrieval to OpenCode. One actual task fetched the official Nantes metropolitan site and returned its title and URL; another hostname failed at TLS. The fixture can also send search queries to hosted Exa, so it is not an offline web-search engine. Its notification audio was not evaluated for intelligibility, and application permissions do not provide OS isolation. See the [web fixture record](research/2026-11-17-web-research-fixture.md).
 
 ## Separate React mockup
 
