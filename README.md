@@ -56,7 +56,7 @@ The earlier approval-based experiment and operator report remain documented in t
 
 The current editable-fixture demonstration is available at `http://127.0.0.1:18131/` while the owned services remain running. Delegated tasks start directly. The prior demonstration gateways were stopped after checking for active clients; their volatile histories were discarded.
 
-The separate mockup runs with `npm run dev` at `http://localhost:3000/`. For a lower-memory static server, run `npm run build` and `npm run start:mockup`. On Windows, stop any owned OpenCode harness before `npm ci` so its executable is not locked. The mockup and local voice gateway are separate systems. See [direct delegation and audio tests](docs/research/2026-11-17-direct-delegation-audio-loopback.md).
+The separate mockup runs with `npm run dev` at `http://localhost:3000/`. For a lower-memory static server, run `npm run build` and `npm run start:mockup`. The page identifies itself as a mockup and links to the experimental local voice client; its example actions and telemetry are not proof of real execution. On Windows, stop any owned OpenCode harness before `npm ci` so its executable is not locked. The mockup and local voice gateway are separate systems. See [direct delegation and audio tests](docs/research/2026-11-17-direct-delegation-audio-loopback.md).
 
 A second synthetic spoken-image check on the running cascade returned the expected blue color and produced audio. It did not use a physical microphone or speaker; see the [spoken-image notes](docs/research/2026-11-12-spoken-image.md).
 

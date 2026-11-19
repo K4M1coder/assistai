@@ -378,6 +378,11 @@ export default function App() {
 
       {/* Main Workspace Area */}
       <main className="flex-1 max-w-[1700px] w-full mx-auto p-3 sm:p-5 flex flex-col space-y-4">
+        <div role="status" className="rounded-xl border border-amber-700 bg-amber-950/70 px-4 py-3 text-sm text-amber-100">
+          <strong>Interface mockup.</strong> Example conversations, actions, integrations and telemetry may be simulated.
+          {' '}The separate experimental voice client is available at{' '}
+          <a className="underline" href="http://127.0.0.1:18131/">127.0.0.1:18131</a> when its local services are running.
+        </div>
         {/* Hardware VRAM & Shared Memory Telemetry HUD */}
         <HardwareTelemetryHUD vramStatus={vramStatus} onRefresh={fetchVram} />
 

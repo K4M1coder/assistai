@@ -59,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </h1>
               <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800/80 text-[10px] text-cyan-300 font-mono font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                Full-Duplex Interruption
+                Interface Mockup
               </span>
             </div>
             <p className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono">
