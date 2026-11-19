@@ -1,5 +1,6 @@
 """Research-only Piper/DirectML probe; run under the Windows resource watchdog."""
 import json
+import hashlib
 from pathlib import Path
 import time
 import wave
@@ -13,6 +14,10 @@ model = root / '.cache/piper-directml-research/fr_FR-siwis-medium.onnx'
 output = root / '.cache/piper-directml-research/notification.wav'
 if output.exists():
     raise FileExistsError(output)
+with model.open('rb') as source:
+    model_hash = hashlib.file_digest(source, 'sha256').hexdigest()
+if model_hash != '641d1ab097da2b81128c076810edb052b385decc8be3381814802a64a73baf99':
+    raise ValueError('Unexpected model hash')
 options = ort.SessionOptions()
 options.enable_mem_pattern = False
 options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL

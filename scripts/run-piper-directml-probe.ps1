@@ -10,12 +10,15 @@ function Resources {
   @{at=[DateTimeOffset]::UtcNow.ToString('o');dedicated=[long]$d[0].CookedValue;shared=[long]$s[0].CookedValue;availableRam=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024}
 }
 $base=Resources
-if($base.availableRam -lt 10GB -or $base.dedicated -gt 18GB -or $base.shared -gt 128MB){throw 'Insufficient preflight headroom'}
+if($base.availableRam -lt 10GB -or $base.dedicated -gt 18GB -or $base.shared -gt 128MB){
+  @{reason='insufficient preflight headroom';baseline=$base;sharedLimit=128MB;dedicatedLimit=18GB;minimumAvailableRam=10GB}|ConvertTo-Json -Compress
+  exit 1
+}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/piper-directml-research/probe-$stamp"
 $previousEncoding=[Environment]::GetEnvironmentVariable('PYTHONIOENCODING','Process')
 try {
   $env:PYTHONIOENCODING='utf-8'
-  $p=Start-Process -FilePath (Join-Path $root '.cache/piper-directml-env/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-piper-directml.py')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+  $p=Start-Process -FilePath (Join-Path $root '.cache/piper-directml-clean/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-piper-directml.py')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 } finally {[Environment]::SetEnvironmentVariable('PYTHONIOENCODING',$previousEncoding,'Process')}
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {
