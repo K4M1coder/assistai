@@ -4,6 +4,8 @@ Recent experiment: [Piper French voice with DirectML](2026-11-19-piper-directml-
 
 [Process-level GPU counters](2026-11-19-process-gpu-counters.md) supplement whole-adapter readings, with explicit limitations on attribution and residency.
 
+[Natural French competing speech](2026-11-20-vosk-natural-overlap.md) measures Vosk on a controlled two-speaker digital mixture.
+
 This directory records the product's research. Never overwrite an experiment: give it an identifier, a falsifiable hypothesis, the exact configuration, raw measurements, and a conclusion. Negative results are valuable too.
 
 ## Objective
