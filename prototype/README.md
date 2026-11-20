@@ -14,6 +14,8 @@ For research, `--speaker-enrollment path/to/voice.wav` enables CPU target-speake
 
 With speaker extraction enabled, `--speaker-chunk-ms 40` opts into batching two 20 ms input frames before extraction; the default remains 20 ms. This can reduce per-call overhead but adds input buffering, and a final unpaired 20 ms frame is discarded when an extraction stream resets. Unit tests cover framing and a paced offline fixture used the actual extractor and framing adapter; the complete client, worker scheduling, live devices and recognition quality with this option are not yet validated. This CPU model uses system RAM and is not an all-models-in-VRAM solution. See [the competing-speech experiments](../docs/research/2026-11-20-vosk-natural-overlap.md).
 
+`--end-silence-ms` sets the native client's quiet interval before sending a turn, from 200 to 3,000 ms in 20 ms steps; the default remains 700 ms. A 1,400 ms setting preserved a longer phrase in one synthetic competing-voice test where 700 ms split it, at the cost of waiting longer after speech. It is not validated for arbitrary pauses or real rooms.
+
 To record an enrollment sample explicitly on Windows, first install `python -m pip install -r prototype/requirements-native-audio.txt` into the voice environment and set up VoxLock as described in the noisy-room research notes. Choose a quiet room and run the following from the repository root. Recording starts when the command says so; speak naturally for the requested duration. The file contains your voice and persists until you delete it yourself. Choose a different new path if it already exists. The command will not overwrite an existing file and does not check that the sample contains the intended speaker.
 
 ```powershell

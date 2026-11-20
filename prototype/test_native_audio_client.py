@@ -31,6 +31,8 @@ class NativeAudioClientTests(unittest.TestCase):
             asyncio.run(run('ws://127.0.0.1:18088/voice', aec=True, speaker_enrollment='unused.wav'))
         with self.assertRaisesRegex(ValueError, 'chunk size'):
             asyncio.run(run('ws://127.0.0.1:18088/voice', speaker_chunk_ms=40))
+        with self.assertRaisesRegex(ValueError, 'End silence'):
+            asyncio.run(run('ws://127.0.0.1:18088/voice', end_silence_ms=710))
 
     def test_speaker_stream_is_primed_before_first_capture(self):
         stream = Mock()

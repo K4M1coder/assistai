@@ -83,7 +83,7 @@ async def _keyboard_action(key, playback, detector, socket, speech_detector=None
     return None
 
 
-async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx', speaker_enrollment=None, speaker_chunk_ms=20):
+async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx', speaker_enrollment=None, speaker_chunk_ms=20, end_silence_ms=700):
     address = urlsplit(url)
     if address.scheme != 'ws' or address.hostname not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('The experimental client accepts only local loopback WebSocket URLs')
@@ -91,6 +91,8 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
         raise ValueError('Experimental speaker extraction requires speaker-safe mode')
     if speaker_chunk_ms not in (20, 40) or (speaker_enrollment is None and speaker_chunk_ms != 20):
         raise ValueError('Speaker chunk size requires speaker extraction and must be 20 or 40 ms')
+    if not isinstance(end_silence_ms, int) or end_silence_ms < 200 or end_silence_ms > 3000 or end_silence_ms % 20:
+        raise ValueError('End silence must be 200 to 3000 ms in 20 ms increments')
     import sounddevice as sd
 
     if sys.platform != 'win32':
@@ -100,7 +102,7 @@ async def run(url, *, threshold=0.025, aec=False, vad='energy', vad_model='.cach
         raise RuntimeError('Default WASAPI input and output devices are required')
     echo = _load_echo_canceller() if aec else None
     extractor_factory = await asyncio.to_thread(_load_speaker_extractor, speaker_enrollment, speaker_chunk_ms) if speaker_enrollment is not None else None
-    detector, playback = NativeTurnDetector(threshold=threshold), NativePlayback()
+    detector, playback = NativeTurnDetector(threshold=threshold, silence_frames=end_silence_ms // 20), NativePlayback()
     notifications = NotificationScheduler()
     if vad not in ('energy', 'silero'): raise ValueError('Unsupported voice detector')
     if vad == 'silero':
@@ -285,8 +287,9 @@ def main():
     parser.add_argument('--vad-model', default='.cache/silero-vad-research/silero_vad/data/silero_vad.onnx')
     parser.add_argument('--speaker-enrollment', help='Experimental: local mono 16 kHz PCM16 WAV of the intended speaker (3–30 seconds); speaker-safe only')
     parser.add_argument('--speaker-chunk-ms', type=int, choices=(20, 40), default=20, help='Experimental extraction batch size; 40 ms adds input buffering')
+    parser.add_argument('--end-silence-ms', type=int, default=700, help='Quiet time before sending a turn, 200–3000 ms in 20 ms increments')
     args = parser.parse_args()
-    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec, vad=args.vad, vad_model=args.vad_model, speaker_enrollment=args.speaker_enrollment, speaker_chunk_ms=args.speaker_chunk_ms))
+    try: asyncio.run(run(args.url, threshold=args.threshold, aec=args.aec, vad=args.vad, vad_model=args.vad_model, speaker_enrollment=args.speaker_enrollment, speaker_chunk_ms=args.speaker_chunk_ms, end_silence_ms=args.end_silence_ms))
     except KeyboardInterrupt: print('\nStopped.')
 
 

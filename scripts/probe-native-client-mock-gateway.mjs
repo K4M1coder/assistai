@@ -75,7 +75,7 @@ try {
   const timeout = setTimeout(() => child.kill(), 30000);
   const [code] = await once(child, 'exit');
   clearTimeout(timeout);
-  assert.equal(code, 0, error);
+  assert.equal(code, 0, `${error}\nSynthetic probe output: ${output}`);
   const result = JSON.parse(output.trim().split(/\r?\n/).at(-1));
   assert.deepEqual(result.modes, ['native-speech']);
   assert.ok(audioBytes > 0, 'mock native model received no audio');
