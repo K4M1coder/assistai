@@ -171,9 +171,12 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.equal(elements['stop-task'].disabled, true);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.uncertain',task_id:'agent-2',message:'status unavailable'})})", context);
   assert.equal(elements['stop-task'].disabled, false);
-  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'task.error',task_id:'agent-2',message:'Agent response was truncated before the task could be confirmed complete'})})", context);
+  vm.runInContext("responsePending = true; notificationPending = true; ws.onmessage({data: JSON.stringify({type:'task.error',task_id:'agent-2',message:'Agent response was truncated before the task could be confirmed complete'})})", context);
   assert.match(elements['agent-activity'].textContent, /task failed.*truncated/i);
   assert.match(elements.log.textContent, /Error: Agent response was truncated/i);
+  assert.equal(vm.runInContext('responsePending', context), true, 'a background failure must not clear the active voice turn');
+  assert.equal(vm.runInContext('notificationPending', context), true, 'a background failure must not clear another notification');
+  vm.runInContext('responsePending = false; notificationPending = false', context);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'session.capabilities',mode:'cascade',text_input:true,image_input:true,speech_review:true})}); ws.onmessage({data: JSON.stringify({type:'speech.review',review_id:'review-1',text:'incorrect transcript',has_image:false})})", context);
   elements.image.files = []; elements.text.value = 'corrected transcript';
   await elements.form.onsubmit({ preventDefault() {} });
