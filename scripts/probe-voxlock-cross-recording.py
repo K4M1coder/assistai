@@ -1,5 +1,6 @@
 """Offline target-speaker diagnostic using separate public recordings."""
 import asyncio
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -12,6 +13,11 @@ import soxr
 from voxlock import VoxLock
 
 ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser()
+parser.add_argument('--threads', type=int, choices=(1, 2, 4), default=2)
+parser.add_argument('--chunk-ms', type=int, choices=(20, 40, 80), default=20)
+parser.add_argument('--target-only', action='store_true')
+args = parser.parse_args()
 def module(name, filename):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / filename)
     item = importlib.util.module_from_spec(spec); spec.loader.exec_module(item)
@@ -44,19 +50,25 @@ async def main():
     other = other * (target_rms / other_rms)
     scale = min(1.0, 0.95 / np.max(np.abs(target + other)))
     target *= scale; other *= scale; mixture = target + other
-    model = VoxLock(model_dir=ROOT / '.cache/voxlock/onnx/v2', precision='int8', threads=2)
+    model = VoxLock(model_dir=ROOT / '.cache/voxlock/onnx/v2', precision='int8', threads=args.threads)
     references = {'target': target, 'other': other}; results = {}
     for label, enrollment in [('target', enroll), ('other', other_enroll * 64)]:
+        if args.target_only and label != 'target': continue
         if np.max(np.abs(enrollment)) >= 1: raise ValueError('Enrollment clips')
         stream = model.stream(enrollment)
-        started = time.perf_counter()
-        chunks = [stream.push(mixture[i:i+320]) for i in range(0, len(mixture), 320)]
+        started = time.perf_counter(); durations = []; chunks = []; chunk_samples = args.chunk_ms * 16
+        for i in range(0, len(mixture), chunk_samples):
+            chunk_started = time.perf_counter()
+            chunks.append(stream.push(mixture[i:i+chunk_samples]))
+            durations.append((time.perf_counter()-chunk_started)*1000)
         chunks.append(stream.flush()); output = np.concatenate(chunks)[:len(mixture)]
         results[label] = {'processing_seconds': round(time.perf_counter()-started, 3), 'transcript': await probe.recognize(output),
+                          'push_latency_ms': {'p50': round(float(np.percentile(durations, 50)), 2), 'p95': round(float(np.percentile(durations, 95)), 2), 'max': round(max(durations), 2)},
                           'source_correlations': {key: metrics.peak_correlation(output, value) for key, value in references.items()}}
     print(json.dumps({'target_samples': len(target), 'mixture_sha256': hashlib.sha256(mixture.astype('<f4').tobytes()).hexdigest(),
                       'common_scale': float(scale), 'input_correlations': {key: metrics.peak_correlation(mixture, value) for key, value in references.items()},
                       'clean_target_transcript': await probe.recognize(target), 'mixture_transcript': await probe.recognize(mixture),
+                      'threads': args.threads, 'chunk_ms': args.chunk_ms, 'target_only': args.target_only,
                       'results': results, 'physical_devices_opened': False}, ensure_ascii=False), flush=True)
 
 
