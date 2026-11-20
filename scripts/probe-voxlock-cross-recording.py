@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--threads', type=int, choices=(1, 2, 4), default=2)
 parser.add_argument('--chunk-ms', type=int, choices=(20, 40, 80), default=20)
 parser.add_argument('--target-only', action='store_true')
+parser.add_argument('--paced', action='store_true')
 args = parser.parse_args()
 def module(name, filename):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / filename)
@@ -56,19 +57,25 @@ async def main():
         if args.target_only and label != 'target': continue
         if np.max(np.abs(enrollment)) >= 1: raise ValueError('Enrollment clips')
         stream = model.stream(enrollment)
-        started = time.perf_counter(); durations = []; chunks = []; chunk_samples = args.chunk_ms * 16
+        started = time.perf_counter(); durations = []; end_to_end = []; chunks = []; chunk_samples = args.chunk_ms * 16
         for i in range(0, len(mixture), chunk_samples):
+            available_at = started + min(i + chunk_samples, len(mixture)) / 16000
+            if args.paced:
+                delay = available_at - time.perf_counter()
+                if delay > 0: time.sleep(delay)
             chunk_started = time.perf_counter()
             chunks.append(stream.push(mixture[i:i+chunk_samples]))
             durations.append((time.perf_counter()-chunk_started)*1000)
+            if args.paced: end_to_end.append((time.perf_counter()-available_at)*1000)
         chunks.append(stream.flush()); output = np.concatenate(chunks)[:len(mixture)]
         results[label] = {'processing_seconds': round(time.perf_counter()-started, 3), 'transcript': await probe.recognize(output),
                           'push_latency_ms': {'p50': round(float(np.percentile(durations, 50)), 2), 'p95': round(float(np.percentile(durations, 95)), 2), 'max': round(max(durations), 2)},
+                          'availability_to_push_end_ms': ({'p50': round(float(np.percentile(end_to_end, 50)), 2), 'p95': round(float(np.percentile(end_to_end, 95)), 2), 'max': round(max(end_to_end), 2)} if args.paced else None),
                           'source_correlations': {key: metrics.peak_correlation(output, value) for key, value in references.items()}}
     print(json.dumps({'target_samples': len(target), 'mixture_sha256': hashlib.sha256(mixture.astype('<f4').tobytes()).hexdigest(),
                       'common_scale': float(scale), 'input_correlations': {key: metrics.peak_correlation(mixture, value) for key, value in references.items()},
                       'clean_target_transcript': await probe.recognize(target), 'mixture_transcript': await probe.recognize(mixture),
-                      'threads': args.threads, 'chunk_ms': args.chunk_ms, 'target_only': args.target_only,
+                      'threads': args.threads, 'chunk_ms': args.chunk_ms, 'target_only': args.target_only, 'paced': args.paced,
                       'results': results, 'physical_devices_opened': False}, ensure_ascii=False), flush=True)
 
 
