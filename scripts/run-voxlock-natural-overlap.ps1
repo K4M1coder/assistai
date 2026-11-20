@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=90)
+param([int]$TimeoutSeconds=90,[switch]$CrossRecording)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -15,7 +15,8 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $previousEncoding=[Environment]::GetEnvironmentVariable('PYTHONIOENCODING','Process')
 try {
   $env:PYTHONIOENCODING='utf-8'
-  $p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -ArgumentList @((Join-Path $root 'scripts/probe-voxlock-natural-overlap.py')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+  $probe=if($CrossRecording){'scripts/probe-voxlock-cross-recording.py'}else{'scripts/probe-voxlock-natural-overlap.py'}
+  $p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -ArgumentList @((Join-Path $root $probe)) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 } finally {[Environment]::SetEnvironmentVariable('PYTHONIOENCODING',$previousEncoding,'Process')}
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {
