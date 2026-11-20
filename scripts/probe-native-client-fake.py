@@ -128,9 +128,13 @@ async def main():
         sys.modules['msvcrt'] = FakeKeyboard
         sys.stdin = SimpleNamespace(isatty=lambda:True)
     with redirect_stdout(captured):
-        task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy'), speaker_enrollment=os.environ.get('ASSISTAI_TEST_SPEAKER_ENROLLMENT')))
+        task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy'), speaker_enrollment=os.environ.get('ASSISTAI_TEST_SPEAKER_ENROLLMENT'), speaker_chunk_ms=int(os.environ.get('ASSISTAI_TEST_SPEAKER_CHUNK_MS', '20'))))
         try:
-            if not await asyncio.to_thread(finished.wait, 25): raise TimeoutError('No synthetic output')
+            deadline = time.monotonic() + 25
+            while not finished.is_set() and time.monotonic() < deadline:
+                if task.done(): await task
+                await asyncio.sleep(0.1)
+            if not finished.is_set(): raise TimeoutError(f'No synthetic output; events: {captured.getvalue()}')
             if task.done(): await task
         finally:
             task.cancel()
