@@ -170,6 +170,8 @@ An opt-in native-mode setting, `ASSISTAI_LFM_NOTIFICATION_TTS=1`, routes only co
 
 Background task failures update task state and are displayed without clearing an unrelated in-flight voice response or notification request. A simulated client regression test covers this separation; it has not yet been verified during a real concurrent failure.
 
+When a speech turn with an identifier is active, the browser ignores a late `speech.end` carrying a different turn identifier. This prevents an old end event from closing the newer playback; untagged or text-only completion remains supported. The behavior is covered by a simulated client test, not yet a real-network race trial.
+
 In a separate synthetic Chrome fake-microphone test, the client detected a second utterance while native-model audio was scheduled, interrupted playback and received a correct follow-up text and further audio. Speaker-safe was disabled and browser output was muted, so this is not evidence of acoustic echo cancellation or reliable real-room barge-in. It also does not demonstrate a truly full-duplex model. See the [candidate notebook](research/2026-11-17-lfm3-omni-candidate.md).
 
 When no OpenCode endpoint is configured, the native bridge no longer advertises a delegation tool and tells the voice model to answer ordinary questions directly. This follows a synthetic interruption test where a math follow-up yielded an unavailable-agent response. In a real-model retest with the original synthetic voice the model instead answered the arithmetic incorrectly; with a different Windows-synthesized voice it answered correctly after interruption. These isolated tests do not establish the cause or general reliability. A configured agent continues to be advertised for direct delegation.

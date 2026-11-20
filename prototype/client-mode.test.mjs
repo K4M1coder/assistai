@@ -130,6 +130,10 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   stoppedSource.onended();
   assert.equal(vm.runInContext('currentNotification', context), 'next-notification');
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'notification.started',task_id:'new-task',turn_id:'new-turn'})}); ws.onmessage({data: JSON.stringify({type:'speech.start',turn_id:'new-turn',sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.cancelled',turn_id:'notification-turn'})})", context);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.end',turn_id:'notification-turn'})})", context);
+  assert.equal(vm.runInContext('speechOpen', context), true, 'an old speech end must not close a newer turn');
+  assert.equal(vm.runInContext('activeSpeechTurn', context), 'new-turn');
+  assert.equal(vm.runInContext('responsePending', context), true);
   assert.equal(vm.runInContext('currentNotification', context), 'new-task');
   assert.equal(vm.runInContext('speechOpen', context), true);
   assert.equal(vm.runInContext('playbackSources.size', context), 1);
