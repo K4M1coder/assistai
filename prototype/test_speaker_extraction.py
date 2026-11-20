@@ -16,6 +16,22 @@ class FakeStream:
 
 
 class ExtractionFramerTests(unittest.TestCase):
+    def test_two_frame_batches_preserve_order_and_never_pass_raw_input(self):
+        class EchoStream:
+            def __init__(self): self.inputs = []
+            def push(self, samples): self.inputs.append(samples.copy()); return samples
+        stream = EchoStream()
+        framer = ExtractionFramer(stream, batch_frames=2)
+        first = np.arange(320, dtype='<i2').tobytes()
+        second = np.arange(320, 640, dtype='<i2').tobytes()
+        self.assertEqual(framer.feed(first), [])
+        self.assertEqual(len(stream.inputs), 0)
+        self.assertEqual(framer.feed(second), [first, second])
+        self.assertEqual(len(stream.inputs[0]), 640)
+
+    def test_invalid_batch_is_rejected(self):
+        with self.assertRaises(ValueError): ExtractionFramer(FakeStream([]), batch_frames=3)
+
     def test_reframes_variable_output_and_preserves_order(self):
         samples = np.arange(640, dtype=np.float32) / 32768
         framer = ExtractionFramer(FakeStream([samples[:100], samples[100:500], samples[500:]]))

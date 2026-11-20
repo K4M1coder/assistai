@@ -1,7 +1,7 @@
 """Framing adapter for a stateful 16 kHz speaker-extraction stream.
 
 Call feed from a worker, never from an audio callback or event-loop thread.
-This component does not create or enroll a model and is not wired into the client.
+This component does not create or enroll a model.
 """
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -12,11 +12,15 @@ import numpy as np
 class ExtractionFramer:
     FRAME_SAMPLES = 320
 
-    def __init__(self, stream, *, max_pending_samples=1600):
+    def __init__(self, stream, *, max_pending_samples=1600, batch_frames=1):
         if max_pending_samples < self.FRAME_SAMPLES:
             raise ValueError('Pending sample limit must hold at least one frame')
+        if batch_frames not in (1, 2):
+            raise ValueError('Batch must contain one or two frames')
         self._stream = stream
         self._pending = np.empty(0, dtype=np.float32)
+        self._input = np.empty(0, dtype=np.float32)
+        self._batch_samples = batch_frames * self.FRAME_SAMPLES
         self._limit = max_pending_samples
         self._failed = False
 
@@ -27,7 +31,11 @@ class ExtractionFramer:
             raise ValueError('Expected one 20 ms mono 16 kHz PCM16 frame')
         try:
             samples = np.frombuffer(pcm, dtype='<i2').astype(np.float32) / 32768.0
-            output = np.asarray(self._stream.push(samples), dtype=np.float32)
+            self._input = np.concatenate((self._input, samples))
+            if len(self._input) < self._batch_samples:
+                return []
+            output = np.asarray(self._stream.push(self._input), dtype=np.float32)
+            self._input = np.empty(0, dtype=np.float32)
             if output.ndim != 1 or not np.isfinite(output).all():
                 raise ValueError('Invalid extractor output')
             if len(self._pending) + len(output) > self._limit:
@@ -42,6 +50,7 @@ class ExtractionFramer:
         except Exception:
             self._failed = True
             self._pending = np.empty(0, dtype=np.float32)
+            self._input = np.empty(0, dtype=np.float32)
             raise
 
 

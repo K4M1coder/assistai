@@ -1,7 +1,8 @@
-param([int]$TimeoutSeconds=90,[switch]$CrossRecording,[ValidateSet(1,2,4)][int]$Threads=2,[ValidateSet(20,40,80)][int]$ChunkMs=20,[switch]$TargetOnly,[switch]$Paced)
+param([int]$TimeoutSeconds=90,[switch]$CrossRecording,[ValidateSet(1,2,4)][int]$Threads=2,[ValidateSet(20,40,80)][int]$ChunkMs=20,[switch]$TargetOnly,[switch]$Paced,[switch]$Framer)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
-if(!$CrossRecording -and ($Threads -ne 2 -or $ChunkMs -ne 20 -or $TargetOnly -or $Paced)){throw 'Thread, chunk, target and pacing options require CrossRecording'}
+if(!$CrossRecording -and ($Threads -ne 2 -or $ChunkMs -ne 20 -or $TargetOnly -or $Paced -or $Framer)){throw 'Thread, chunk, target, pacing and framer options require CrossRecording'}
+if($Framer -and $ChunkMs -ne 40){throw 'Framer comparison requires 40 ms chunks'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -17,7 +18,7 @@ $previousEncoding=[Environment]::GetEnvironmentVariable('PYTHONIOENCODING','Proc
 try {
   $env:PYTHONIOENCODING='utf-8'
   $probe=if($CrossRecording){'scripts/probe-voxlock-cross-recording.py'}else{'scripts/probe-voxlock-natural-overlap.py'}
-  $probeArgs=@((Join-Path $root $probe));if($CrossRecording){$probeArgs+=@('--threads',[string]$Threads,'--chunk-ms',[string]$ChunkMs);if($TargetOnly){$probeArgs+='--target-only'};if($Paced){$probeArgs+='--paced'}}
+  $probeArgs=@((Join-Path $root $probe));if($CrossRecording){$probeArgs+=@('--threads',[string]$Threads,'--chunk-ms',[string]$ChunkMs);if($TargetOnly){$probeArgs+='--target-only'};if($Paced){$probeArgs+='--paced'};if($Framer){$probeArgs+='--framer'}}
   $p=Start-Process -FilePath (Join-Path $root '.venv-voice/Scripts/python.exe') -ArgumentList $probeArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 } finally {[Environment]::SetEnvironmentVariable('PYTHONIOENCODING',$previousEncoding,'Process')}
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
