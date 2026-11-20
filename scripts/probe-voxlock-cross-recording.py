@@ -1,6 +1,7 @@
 """Offline target-speaker diagnostic using separate public recordings."""
 import asyncio
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import importlib.util
 import json
@@ -57,6 +58,7 @@ async def main():
         if args.target_only and label != 'target': continue
         if np.max(np.abs(enrollment)) >= 1: raise ValueError('Enrollment clips')
         stream = model.stream(enrollment)
+        extraction_started = datetime.now(timezone.utc).isoformat()
         started = time.perf_counter(); durations = []; end_to_end = []; chunks = []; chunk_samples = args.chunk_ms * 16
         for i in range(0, len(mixture), chunk_samples):
             available_at = started + min(i + chunk_samples, len(mixture)) / 16000
@@ -68,7 +70,9 @@ async def main():
             durations.append((time.perf_counter()-chunk_started)*1000)
             if args.paced: end_to_end.append((time.perf_counter()-available_at)*1000)
         chunks.append(stream.flush()); output = np.concatenate(chunks)[:len(mixture)]
+        extraction_ended = datetime.now(timezone.utc).isoformat()
         results[label] = {'processing_seconds': round(time.perf_counter()-started, 3), 'transcript': await probe.recognize(output),
+                          'extraction_started_utc': extraction_started, 'extraction_ended_utc': extraction_ended,
                           'push_latency_ms': {'p50': round(float(np.percentile(durations, 50)), 2), 'p95': round(float(np.percentile(durations, 95)), 2), 'max': round(max(durations), 2)},
                           'availability_to_push_end_ms': ({'p50': round(float(np.percentile(end_to_end, 50)), 2), 'p95': round(float(np.percentile(end_to_end, 95)), 2), 'max': round(max(end_to_end), 2)} if args.paced else None),
                           'source_correlations': {key: metrics.peak_correlation(output, value) for key, value in references.items()}}

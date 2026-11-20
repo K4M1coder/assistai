@@ -56,7 +56,7 @@ try {
   const status=await (await fetch(`http://127.0.0.1:${port}/services`)).json();
   const tts=status.services.find(item=>item.role==='Task notification synthesis');
   client=new WebSocket(`ws://127.0.0.1:${port}/voice`);
-  let taskId=null,initialEnd=false,notification=false,notificationTurn=null,notificationBytes=0,rate=null,text='',capability=null,notificationError=null;
+  let taskId=null,initialEnd=false,notification=false,notificationTurn=null,notificationBytes=0,rate=null,text='',capability=null,notificationError=null,taskStartedAt=null,taskCompletedAt=null;
   const audio=[];
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(Error('Notification probe timed out; task may still be running')),90000);
@@ -67,7 +67,8 @@ try {
       const event=JSON.parse(raw);
       if(event.type==='session.capabilities')capability=event.notification_synthesis;
       else if(event.type==='asr.ready'){client.send(JSON.stringify({type:'audio.start'}));client.send(Buffer.alloc(3200));client.send(JSON.stringify({type:'audio.end'}));}
-      else if(event.type==='task.completed'){taskId=event.task_id;maybeNotify();}
+      else if(event.type==='task.started'){taskStartedAt=new Date().toISOString();}
+      else if(event.type==='task.completed'){taskCompletedAt=new Date().toISOString();taskId=event.task_id;maybeNotify();}
       else if(event.type==='notification.started'){notification=true;notificationTurn=event.turn_id;}
       else if(event.type==='speech.start'&&notification)rate=event.sample_rate;
       else if(event.type==='assistant.text'&&notification)text=event.text;
@@ -82,7 +83,7 @@ try {
     await writeFile(audioPath,Buffer.concat([wav,...audio]),{flag:'wx'});
     await writeFile(metadataPath,JSON.stringify({notification_text:text})+'\n',{flag:'wx'});
   }
-  console.log(JSON.stringify({notificationBytes,rate,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,notificationError,audioFile:saveAudio?audioPath:null,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:unavailableTts?'unavailable loopback endpoint':'real local service',physicalDevicesOpened:false}));
+  console.log(JSON.stringify({notificationBytes,rate,text,capability,ttsAvailable:tts?.available,ttsEngine:tts?.engine,notificationError,taskStartedAt,taskCompletedAt,audioFile:saveAudio?audioPath:null,nativeModel:'simulated',agent:realAgent?'real read-only fixture':'simulated',tts:unavailableTts?'unavailable loopback endpoint':'real local service',physicalDevicesOpened:false}));
   if(!text.includes('BLUEBIRD')||capability!=='local-tts'||requests!==2||
      (unavailableTts ? tts?.available!==false||notificationBytes!==0||notificationError!=='Task notification speech failed.' : !notificationBytes||!tts?.available))process.exitCode=1;
 } finally {
