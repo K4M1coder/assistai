@@ -14,6 +14,9 @@ const windowsFollowup=process.argv.includes('--windows-followup');
 const agentFixture=process.argv.includes('--agent-fixture');
 const agentTts=process.argv.includes('--agent-tts');
 if(agentTts&&!agentFixture)throw Error('Agent TTS requires --agent-fixture');
+const waitArg=process.argv.find(arg=>arg.startsWith('--wait-seconds='));
+const waitSeconds=waitArg?Number(waitArg.slice('--wait-seconds='.length)):50;
+if(!Number.isInteger(waitSeconds)||waitSeconds<10||waitSeconds>90)throw Error('Wait must be 10 to 90 seconds');
 if(agentFixture&&(different||windowsFollowup))throw Error('Agent fixture uses a fixed capital follow-up');
 const gapArg=process.argv.find(arg=>arg.startsWith('--agent-gap-ms='));
 const gapMs=gapArg?Number(gapArg.slice('--agent-gap-ms='.length)):0;
@@ -62,9 +65,11 @@ try{
    AudioBufferSourceNode.prototype.start=function(...args){if(${Boolean(captureId)}&&this.buffer?.numberOfChannels===1&&this.buffer.sampleRate===24000&&document.querySelector('#log').textContent.includes('Playback interrupted: microphone detected speech.')){const data=this.buffer.getChannelData(0);window.__afterCount+=data.length;if(window.__afterCount>2000000)window.__afterOverflow=true;else {const copy=Array.from(data);window.__afterChunks.push(copy);if(${agentTts}&&document.querySelector('#log').textContent.includes('Speaking agent result.'))window.__notificationChunks.push(copy);}}return originalStart.apply(this,args);};
    document.querySelector('#speaker-safe').checked=false;document.querySelector('#start').click();true`);
  let state={};
- for(let i=0;i<500;i++){
+ const waitDeadline=Date.now()+waitSeconds*1000;
+ while(Date.now()<waitDeadline){
    state=await evaluate("({status:document.querySelector('#status').textContent,log:document.querySelector('#log').textContent,before:window.__before,after:window.__after})");
    if(state.status.includes('Microphone unavailable'))throw Error(state.status);
+   if(agentFixture&&state.log.includes('Error:'))break;
    const conversation=agentFixture?state.log.split('Agent completed:')[0]:state.log;
    if((state.log.match(/You:/g)||[]).length>=2&&plausibleFollowupTranscript(followupTranscript(state.log),different)&&correctFollowup(followupAnswer(conversation),different)&&state.after>0&&(!agentFixture||(/Agent completed:.*BLUEBIRD/i.test(state.log)&&(!agentTts||state.log.includes('Agent result audio received.')))))break;
    await new Promise(resolve=>setTimeout(resolve,100));
@@ -95,6 +100,6 @@ try{
  const agentResult=state.log.match(/(?:^|\n)Agent completed: ([^\n]+)/)?.[1]??null;
  const announcement=state.log.split('Speaking agent result.')[1]?.match(/(?:^|\n)Assistant: ([^\n]+)/)?.[1]??null;
  const notificationMatches=agentTts&&agentResult!==null&&announcement===formatTaskNotification(agentResult)&&state.log.includes('Agent result audio received.');
- console.log(JSON.stringify({...state,interruption,transcripts,differentFollowup:different,windowsFollowup,agentFixture,agentTts,gapMs,interruptedDuringTask,agentResult,announcement,notificationMatches,followupTranscript:transcript,transcriptPlausible,followupAnswer:answer,followupCorrect:correct,microphoneSource:'Chromium fake WAV device',browserAudioMuted:true,profile},null,2));
+ console.log(JSON.stringify({...state,interruption,transcripts,differentFollowup:different,windowsFollowup,agentFixture,agentTts,gapMs,waitSeconds,interruptedDuringTask,agentResult,announcement,notificationMatches,followupTranscript:transcript,transcriptPlausible,followupAnswer:answer,followupCorrect:correct,microphoneSource:'Chromium fake WAV device',browserAudioMuted:true,profile},null,2));
  if(!interruption||transcripts<2||!state.before||!state.after||!correct||!transcriptPlausible||(agentFixture&&(!interruptedDuringTask||!/Agent completed:.*BLUEBIRD/i.test(state.log)||(agentTts&&!notificationMatches))))process.exitCode=1;
 }finally{socket?.close();browser?.kill();gateway.kill();await Promise.race([once(gateway,'exit').catch(()=>{}),new Promise(resolve=>setTimeout(resolve,3000))]);}
