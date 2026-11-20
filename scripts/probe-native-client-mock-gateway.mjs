@@ -83,8 +83,13 @@ try {
   assert.equal(code, 0, `${error}\nSynthetic probe output: ${output}`);
   const result = JSON.parse(output.trim().split(/\r?\n/).at(-1));
   assert.deepEqual(result.modes, ['native-speech']);
-  assert.ok(audioBytes > 0, 'mock native model received no audio');
-  assert.ok(result.output_nonzero_samples > 1000);
+  if (result.fixture === 'natural-background') {
+    assert.equal(audioBytes, 0, 'background-only audio reached the native backend');
+    assert.equal(result.output_nonzero_samples, 0, 'background-only audio triggered playback');
+  } else {
+    assert.ok(audioBytes > 0, 'mock native model received no audio');
+    assert.ok(result.output_nonzero_samples > 1000);
+  }
   assert.equal(result.physical_devices_opened, false);
   if (testInterrupt) {
     assert.equal(result.interruptions, 1);

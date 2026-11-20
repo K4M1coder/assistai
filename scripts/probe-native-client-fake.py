@@ -16,10 +16,10 @@ import numpy as np
 from prototype import native_audio_client as client
 
 fixture = os.environ.get('ASSISTAI_TEST_FIXTURE', 'question')
-if fixture not in ('question', 'overlap', 'natural-overlap', 'natural-other'):
+if fixture not in ('question', 'overlap', 'natural-overlap', 'natural-other', 'natural-background'):
     raise ValueError('Unknown synthetic fixture')
-fixture_path = Path({'question':'.cache/reset-question.wav', 'overlap':'.cache/assistant/browser-noisy-test.wav', 'natural-overlap':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-other':'.cache/mls-sidon-natural/native-mixture-16k.wav'}[fixture])
-expected_words = {'question':('quel est le mot secret',), 'overlap':('raconter', 'lune'), 'natural-overlap':('génie', 'mourir'), 'natural-other':('cavaliers', 'équitation')}[fixture]
+fixture_path = Path({'question':'.cache/reset-question.wav', 'overlap':'.cache/assistant/browser-noisy-test.wav', 'natural-overlap':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-other':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-background':'.cache/mls-sidon-natural/native-background-only-16k.wav'}[fixture])
+expected_words = {'question':('quel est le mot secret',), 'overlap':('raconter', 'lune'), 'natural-overlap':('génie', 'mourir'), 'natural-other':('cavaliers', 'équitation'), 'natural-background':()}[fixture]
 with wave.open(str(fixture_path), 'rb') as source:
     if source.getframerate() != 16000 or source.getnchannels() != 1 or source.getsampwidth() != 2:
         raise ValueError('Expected 16 kHz mono PCM16 fixture')
@@ -135,11 +135,11 @@ async def main():
     with redirect_stdout(captured):
         task = asyncio.create_task(client.run(os.environ.get('ASSISTAI_TEST_VOICE_URL', 'ws://127.0.0.1:18088/voice'), threshold=float(os.environ.get('ASSISTAI_TEST_THRESHOLD', '0.01')), aec=os.environ.get('ASSISTAI_TEST_AEC') == '1', vad=os.environ.get('ASSISTAI_TEST_VAD', 'energy'), speaker_enrollment=os.environ.get('ASSISTAI_TEST_SPEAKER_ENROLLMENT'), speaker_chunk_ms=int(os.environ.get('ASSISTAI_TEST_SPEAKER_CHUNK_MS', '20')), end_silence_ms=int(os.environ.get('ASSISTAI_TEST_END_SILENCE_MS', '700'))))
         try:
-            deadline = time.monotonic() + 25
+            deadline = time.monotonic() + (20 if fixture == 'natural-background' else 25)
             while not finished.is_set() and time.monotonic() < deadline:
                 if task.done(): await task
                 await asyncio.sleep(0.1)
-            if not finished.is_set(): raise TimeoutError(f'No synthetic output; events: {captured.getvalue()}')
+            if not finished.is_set() and fixture != 'natural-background': raise TimeoutError(f'No synthetic output; events: {captured.getvalue()}')
             if task.done(): await task
         finally:
             task.cancel()
@@ -151,9 +151,10 @@ async def main():
     interrupt_events = [json.loads(line) for line in messages.splitlines() if line.startswith('{') and '"type": "playback.interrupted"' in line]
     trace = {'frames':len(echo_rms), 'raw_rms_p95':round(float(np.percentile([x[0] for x in echo_rms],95)),4), 'clean_rms_p95':round(float(np.percentile([x[1] for x in echo_rms],95)),4), 'clean_frames_above_threshold':sum(x[1]>float(os.environ.get('ASSISTAI_TEST_THRESHOLD','0.01')) for x in echo_rms)} if echo_rms else None
     modes = [json.loads(line).get('mode') for line in messages.splitlines() if line.startswith('{') and '"type": "client.mode"' in line]
-    expected_observed = all(word in ' '.join(transcripts).lower() for word in expected_words)
+    expected_observed = all(word in ' '.join(transcripts).lower() for word in expected_words) if expected_words else not transcripts
     print(json.dumps({'fixture':fixture,'modes':modes,'input_streams':sum(s.is_input for s in streams),'output_streams':sum(not s.is_input for s in streams),'streams_closed':all(s.closed for s in streams),'user_transcript_observed':expected_observed,'transcript_count':transcript_count,'synthetic_transcripts':transcripts,'interruptions':interruptions,'interruption_elapsed_ms':[event.get('elapsed_ms') for event in interrupt_events],'simulated_echo':simulate_echo,'manual_interrupt_sent':manual_requested,'aec_trace':trace,'output_nonzero_samples':output_nonzero,'notification_output_nonzero_samples':notification_output_nonzero,'physical_devices_opened':False}, ensure_ascii=False))
-    if not all(s.closed for s in streams) or not expected_observed or output_nonzero <= 1000 or (test_notification and notification_output_nonzero <= 1000) or (simulate_echo and (transcript_count != 1 or interruptions)) or (simulate_manual and (not manual_requested or interruptions != 1)):
+    output_ok = output_nonzero == 0 if fixture == 'natural-background' else output_nonzero > 1000
+    if not all(s.closed for s in streams) or not expected_observed or not output_ok or (test_notification and notification_output_nonzero <= 1000) or (simulate_echo and (transcript_count != 1 or interruptions)) or (simulate_manual and (not manual_requested or interruptions != 1)):
         raise RuntimeError('Synthetic device client probe failed')
 
 
