@@ -143,8 +143,12 @@ test('speaker-safe and held push-to-talk can work together', async () => {
   assert.deepEqual(Array.from(vm.runInContext('pendingNotifications', context)), ['waiting-task']);
   vm.runInContext("pendingNotifications.length = 0; currentNotification = 'completed'; ws.onmessage({data: JSON.stringify({type:'speech.start', sample_rate:24000})}); ws.onmessage({data: new ArrayBuffer(480)}); ws.onmessage({data: JSON.stringify({type:'speech.end'})}); [...playbackSources][0].onended()", context);
   assert.equal(vm.runInContext('currentNotification', context), null);
-  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
+  vm.runInContext("responsePending = true; notificationPending = true; ws.onmessage({data: JSON.stringify({type:'speech.start', turn_id:'failed-turn', sample_rate:24000})}); ws.onmessage({data: JSON.stringify({type:'error', message:'unrelated validation error'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), true);
+  assert.equal(vm.runInContext('responsePending', context), true);
+  assert.equal(vm.runInContext('notificationPending', context), true);
+  vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'old-turn', message:'late error'})})", context);
+  assert.equal(vm.runInContext('responsePending', context), true);
   vm.runInContext("ws.onmessage({data: JSON.stringify({type:'error', turn_id:'failed-turn', message:'TTS failed'})})", context);
   assert.equal(vm.runInContext('speechOpen', context), false);
   assert.equal(elements.status.textContent, 'TTS failed');
