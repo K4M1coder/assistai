@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=60,[switch]$Overlap,[int]$EndSilenceMs=700)
+param([int]$TimeoutSeconds=60,[switch]$Overlap,[int]$EndSilenceMs=700,[switch]$NoExtraction)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
 if($EndSilenceMs -lt 200 -or $EndSilenceMs -gt 3000 -or $EndSilenceMs % 20 -ne 0){throw 'Invalid end silence'}
@@ -16,8 +16,9 @@ $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $roo
 $names=@('ASSISTAI_TEST_SPEAKER_ENROLLMENT','ASSISTAI_TEST_SPEAKER_CHUNK_MS','ASSISTAI_TEST_LEADING_SILENCE_FRAMES','ASSISTAI_TEST_FIXTURE','ASSISTAI_TEST_END_SILENCE_MS')
 $previous=@{};foreach($name in $names){$previous[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 try {
-  $env:ASSISTAI_TEST_SPEAKER_ENROLLMENT=Join-Path $root '.cache/tse-enroll-batched-test-16k.wav'
-  $env:ASSISTAI_TEST_SPEAKER_CHUNK_MS='40';$env:ASSISTAI_TEST_LEADING_SILENCE_FRAMES=if($Overlap){'0'}else{'50'}
+  if($NoExtraction){Remove-Item Env:ASSISTAI_TEST_SPEAKER_ENROLLMENT -ErrorAction SilentlyContinue;$env:ASSISTAI_TEST_SPEAKER_CHUNK_MS='20'}
+  else {$env:ASSISTAI_TEST_SPEAKER_ENROLLMENT=Join-Path $root '.cache/tse-enroll-batched-test-16k.wav';$env:ASSISTAI_TEST_SPEAKER_CHUNK_MS='40'}
+  $env:ASSISTAI_TEST_LEADING_SILENCE_FRAMES=if($Overlap){'0'}else{'50'}
   $env:ASSISTAI_TEST_FIXTURE=if($Overlap){'overlap'}else{'question'}
   $env:ASSISTAI_TEST_END_SILENCE_MS=[string]$EndSilenceMs
   $p=Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @((Join-Path $root 'scripts/probe-native-client-mock-gateway.mjs')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
