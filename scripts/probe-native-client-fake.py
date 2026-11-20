@@ -16,10 +16,10 @@ import numpy as np
 from prototype import native_audio_client as client
 
 fixture = os.environ.get('ASSISTAI_TEST_FIXTURE', 'question')
-if fixture not in ('question', 'overlap'):
+if fixture not in ('question', 'overlap', 'natural-overlap'):
     raise ValueError('Unknown synthetic fixture')
-fixture_path = Path('.cache/reset-question.wav' if fixture == 'question' else '.cache/assistant/browser-noisy-test.wav')
-expected_words = ('quel est le mot secret',) if fixture == 'question' else ('raconter', 'lune')
+fixture_path = Path({'question':'.cache/reset-question.wav', 'overlap':'.cache/assistant/browser-noisy-test.wav', 'natural-overlap':'.cache/mls-sidon-natural/native-mixture-16k.wav'}[fixture])
+expected_words = {'question':('quel est le mot secret',), 'overlap':('raconter', 'lune'), 'natural-overlap':('génie', 'mourir')}[fixture]
 with wave.open(str(fixture_path), 'rb') as source:
     if source.getframerate() != 16000 or source.getnchannels() != 1 or source.getsampwidth() != 2:
         raise ValueError('Expected 16 kHz mono PCM16 fixture')

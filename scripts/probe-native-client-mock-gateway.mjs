@@ -20,6 +20,8 @@ let audioBytes = 0;
 let cancellationCount = 0;
 let lateAudioSent = false;
 const testInterrupt = process.env.ASSISTAI_TEST_MANUAL_INTERRUPT === '1';
+const responseDelayMs = Number(process.env.ASSISTAI_TEST_RESPONSE_DELAY_MS || '0');
+if (!Number.isInteger(responseDelayMs) || responseDelayMs < 0 || responseDelayMs > 5000) throw Error('Invalid response delay');
 sockets.on('connection', socket => {
   socket.send(JSON.stringify({ type: 'session.created', session: { audio: { input: { format: { rate: 16000 } }, output: { format: { rate: 24000 } } } } }));
   socket.on('message', raw => {
@@ -39,8 +41,11 @@ sockets.on('connection', socket => {
       const pcm = Buffer.alloc(24000 * 2);
       for (let i = 0; i < pcm.length; i += 2) pcm.writeInt16LE(2000, i);
       socket.send(JSON.stringify({ type: 'response.created', response: { id } }));
-      socket.send(JSON.stringify({ type: 'response.output_audio.delta', response_id: id, delta: pcm.toString('base64') }));
-      if (!testInterrupt) socket.send(JSON.stringify({ type: 'response.done', response: { id, status: 'completed', output: [] } }));
+      setTimeout(() => {
+        if (socket.readyState !== 1) return;
+        socket.send(JSON.stringify({ type: 'response.output_audio.delta', response_id: id, delta: pcm.toString('base64') }));
+        if (!testInterrupt) socket.send(JSON.stringify({ type: 'response.done', response: { id, status: 'completed', output: [] } }));
+      }, responseDelayMs);
     }
   });
 });
