@@ -1,6 +1,8 @@
-param([int]$TimeoutSeconds=120,[switch]$Infer,[switch]$PreflightOnly)
+param([int]$TimeoutSeconds=120,[switch]$Infer,[switch]$Stream,[switch]$StopAfterFirst,[switch]$PreflightOnly)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 300){throw 'Invalid timeout'}
+if($Stream -and !$Infer){throw 'Stream requires Infer'}
+if($StopAfterFirst -and !$Stream){throw 'StopAfterFirst requires Stream'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -14,6 +16,7 @@ $allowed=$base.availableRam -ge 10GB -and $base.dedicated -le 18GB -and $base.sh
 if($PreflightOnly -or !$allowed){@{allowed=$allowed;baseline=$base}|ConvertTo-Json -Compress;if(!$allowed){exit 1};exit 0}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/assistant/openvino-omni-$stamp"
 $argsList=@((Join-Path $root 'scripts/probe-openvino-omni.py'));if($Infer){$argsList+=@('--infer','--output',"$prefix.wav")}
+if($Stream){$argsList+='--stream'};if($StopAfterFirst){$argsList+='--stop-after-first'}
 $env:HF_HUB_OFFLINE='1';$env:HF_HUB_DISABLE_TELEMETRY='1';$env:PYTHONIOENCODING='utf-8'
 $p=Start-Process -FilePath (Join-Path $root '.cache/lfm3-openvino-research-py312/Scripts/python.exe') -ArgumentList $argsList -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
