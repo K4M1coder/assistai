@@ -1,4 +1,4 @@
-param([switch]$PreflightOnly, [ValidateRange(10, 300)][int]$TimeoutSeconds = 120)
+param([switch]$PreflightOnly, [switch]$Arithmetic, [ValidateRange(10, 300)][int]$TimeoutSeconds = 120)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $adapter = 'luid_0x00000000_0x00013269_phys_0'
@@ -26,7 +26,8 @@ if ($PreflightOnly) { $initial | ConvertTo-Json -Compress; return }
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
 $prefix = Join-Path $root ".cache/assistant/controller-baseline-$stamp"
 $env:LOCAL_MODEL_URL = 'http://127.0.0.1:18084/v1'
-$probe = Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @((Join-Path $root 'scripts/probe-controller-delegation.mjs')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
+$probeName=if($Arithmetic){'scripts/probe-controller-arithmetic.mjs'}else{'scripts/probe-controller-delegation.mjs'}
+$probe = Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @((Join-Path $root $probeName)) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 $null = $probe.Handle
 $reason = 'timeout'
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
