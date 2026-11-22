@@ -11,8 +11,9 @@ import numpy as np
 import onnxruntime as ort
 
 root = Path(__file__).resolve().parents[1] / '.cache/voxlock/onnx/v2'
-parser = argparse.ArgumentParser(); parser.add_argument('--precision', choices=('int8', 'fp16'), default='int8'); parser.add_argument('--audio', action='store_true')
+parser = argparse.ArgumentParser(); parser.add_argument('--precision', choices=('int8', 'fp16'), default='int8'); parser.add_argument('--audio', action='store_true'); parser.add_argument('--output')
 args = parser.parse_args()
+if args.output and not args.audio: parser.error('--output requires --audio')
 models = ([('enroll.onnx', '81f305c9b7a32f13d1401f53bb4c6301826a607c9e807e60912f36ef1b9fae29'),
            ('chunk_int8.onnx', 'c50ffdc8d723fd4f91cb08889f3d0143491f95967b705f35c444a0b4afe88172')] if args.precision == 'int8' else
           [('enroll_fp16.onnx', '96515a725cf0466450a41c565887a07e8c0fb0c89f6bbfbc01214433029a2f6c'),
@@ -59,7 +60,14 @@ if args.audio:
         started = time.perf_counter(); chunks.append(stream.push(mixture[offset:offset + 640])); timings.append(time.perf_counter() - started)
     chunks.append(stream.flush()); output = np.concatenate(chunks)[:len(mixture)]
     if len(output) != len(mixture) or not np.isfinite(output).all(): raise ValueError('Invalid output')
+    output_hash = None
+    if args.output:
+        path = Path(args.output)
+        pcm = np.rint(np.clip(output, -1, 32767 / 32768) * 32768).astype('<i2')
+        with path.open('xb') as target, wave.open(target, 'wb') as wav:
+            wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000); wav.writeframes(pcm.tobytes())
+        output_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     print(json.dumps({'inference_performed': True, 'audio_seconds':len(mixture)/16000, 'enrollment_seconds':round(enrollment_seconds,3),
                       'push_median_ms':round(float(np.median(timings))*1000,2), 'push_p95_ms':round(float(np.percentile(timings,95))*1000,2),
                       'output_rms':round(float(np.sqrt(np.mean(output.astype(np.float64)**2))),6), 'output_samples':len(output),
-                      'physical_devices_opened':False}), flush=True)
+                      'output_sha256':output_hash, 'physical_devices_opened':False}), flush=True)
