@@ -77,13 +77,13 @@ try {
   let output = '', error = '';
   child.stdout.on('data', data => { output += data; });
   child.stderr.on('data', data => { error += data; });
-  const timeout = setTimeout(() => child.kill(), 30000);
+  const timeout = setTimeout(() => child.kill(), 55000);
   const [code] = await once(child, 'exit');
   clearTimeout(timeout);
   assert.equal(code, 0, `${error}\nSynthetic probe output: ${output}`);
   const result = JSON.parse(output.trim().split(/\r?\n/).at(-1));
   assert.deepEqual(result.modes, ['native-speech']);
-  if (result.fixture === 'natural-background') {
+  if (result.fixture.startsWith('natural-background')) {
     assert.equal(audioBytes, 0, 'background-only audio reached the native backend');
     assert.equal(result.output_nonzero_samples, 0, 'background-only audio triggered playback');
   } else {

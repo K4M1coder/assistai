@@ -1,10 +1,12 @@
-param([int]$TimeoutSeconds=60,[switch]$Overlap,[switch]$NaturalOverlap,[int]$EndSilenceMs=700,[switch]$NoExtraction,[switch]$OtherEnrollment,[switch]$BackgroundOnly)
+param([int]$TimeoutSeconds=60,[switch]$Overlap,[switch]$NaturalOverlap,[int]$EndSilenceMs=700,[switch]$NoExtraction,[switch]$OtherEnrollment,[switch]$BackgroundOnly,[switch]$LoudBackground,[double]$Threshold=0.01)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
 if($Overlap -and $NaturalOverlap){throw 'Choose one overlap fixture'}
 if($OtherEnrollment -and (!$NaturalOverlap -or $NoExtraction)){throw 'Other enrollment requires filtered natural overlap'}
 if($BackgroundOnly -and (!$NaturalOverlap -or $OtherEnrollment)){throw 'Background control requires natural overlap and excludes other enrollment'}
+if($LoudBackground -and !$BackgroundOnly){throw 'Loud background requires background-only mode'}
 if($EndSilenceMs -lt 200 -or $EndSilenceMs -gt 3000 -or $EndSilenceMs % 20 -ne 0){throw 'Invalid end silence'}
+if([double]::IsNaN($Threshold) -or $Threshold -le 0 -or $Threshold -ge 1){throw 'Invalid threshold'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
 function Resources {
@@ -16,15 +18,16 @@ function Resources {
 $base=Resources
 if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 256MB){throw 'Insufficient preflight headroom'}
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/assistant/native-batched-extractor-$stamp"
-$names=@('ASSISTAI_TEST_SPEAKER_ENROLLMENT','ASSISTAI_TEST_SPEAKER_CHUNK_MS','ASSISTAI_TEST_LEADING_SILENCE_FRAMES','ASSISTAI_TEST_FIXTURE','ASSISTAI_TEST_END_SILENCE_MS','ASSISTAI_TEST_RESPONSE_DELAY_MS','PYTHONIOENCODING')
+$names=@('ASSISTAI_TEST_SPEAKER_ENROLLMENT','ASSISTAI_TEST_SPEAKER_CHUNK_MS','ASSISTAI_TEST_LEADING_SILENCE_FRAMES','ASSISTAI_TEST_FIXTURE','ASSISTAI_TEST_END_SILENCE_MS','ASSISTAI_TEST_RESPONSE_DELAY_MS','ASSISTAI_TEST_THRESHOLD','PYTHONIOENCODING')
 $previous=@{};foreach($name in $names){$previous[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 try {
   if($NoExtraction){Remove-Item Env:ASSISTAI_TEST_SPEAKER_ENROLLMENT -ErrorAction SilentlyContinue;$env:ASSISTAI_TEST_SPEAKER_CHUNK_MS='20'}
   else {$env:ASSISTAI_TEST_SPEAKER_ENROLLMENT=Join-Path $root $(if($OtherEnrollment){'.cache/mls-sidon-natural/native-other-enrollment-16k.wav'}elseif($NaturalOverlap){'.cache/mls-sidon-natural/native-enrollment-16k.wav'}else{'.cache/tse-enroll-batched-test-16k.wav'});$env:ASSISTAI_TEST_SPEAKER_CHUNK_MS='40'}
   $env:ASSISTAI_TEST_LEADING_SILENCE_FRAMES=if($Overlap -or $NaturalOverlap){'0'}else{'50'}
-  $env:ASSISTAI_TEST_FIXTURE=if($BackgroundOnly){'natural-background'}elseif($OtherEnrollment){'natural-other'}elseif($NaturalOverlap){'natural-overlap'}elseif($Overlap){'overlap'}else{'question'}
+  $env:ASSISTAI_TEST_FIXTURE=if($LoudBackground){'natural-background-loud'}elseif($BackgroundOnly){'natural-background'}elseif($OtherEnrollment){'natural-other'}elseif($NaturalOverlap){'natural-overlap'}elseif($Overlap){'overlap'}else{'question'}
   $env:ASSISTAI_TEST_END_SILENCE_MS=[string]$EndSilenceMs
   $env:ASSISTAI_TEST_RESPONSE_DELAY_MS=if($NaturalOverlap){'2000'}else{'0'}
+  $env:ASSISTAI_TEST_THRESHOLD=$Threshold.ToString([System.Globalization.CultureInfo]::InvariantCulture)
   $env:PYTHONIOENCODING='utf-8'
   $p=Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @((Join-Path $root 'scripts/probe-native-client-mock-gateway.mjs')) -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 } finally {foreach($name in $names){[Environment]::SetEnvironmentVariable($name,$previous[$name],'Process')}}
