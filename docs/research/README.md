@@ -1,5 +1,7 @@
 # Research notebook — local voice assistant
 
+The [OpenVINO LFM3 Omni candidate](2026-11-22-openvino-omni-candidate.md) records a newly available quantized conversion, verified local files and GPU enumeration; its first guarded model load is still pending resource headroom.
+
 Recent experiment: [Piper French voice with DirectML](2026-11-19-piper-directml-candidate.md) found that strict no-CPU-fallback initialization fails; no speech was generated.
 
 [Process-level GPU counters](2026-11-19-process-gpu-counters.md) supplement whole-adapter readings, with explicit limitations on attribution and residency.
