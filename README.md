@@ -10,6 +10,8 @@ The initial interface and project code are in English; a multilingual UI is plan
 
 The experimental client uses Vosk French recognition, an LFM3 text voice controller served by llama.cpp, and Kyutai Pocket TTS. A separate Gemma model handles image questions and the configured OpenCode server uses a disposable editable fixture. This is a cascade, not native speech-to-speech; the browser shows the configured service and model names. The current gateway is at [http://127.0.0.1:18131/](http://127.0.0.1:18131/) while its local services run. See the [resumption record](docs/research/2026-11-15-resumption.md) for startup history, observed results and demonstration criteria; service readiness alone does not establish a successful voice or agent session.
 
+The current source explicitly reports when a model server returns an empty model list, and preserves a synthesis engine name if its OpenAPI title is missing. Existing gateway processes need a restart to use this change; reported names and health are not a guarantee of model residency or successful inference.
+
 On the latest resumption preflight, service health checks passed but system resource readings exceeded the existing trial guard. Physical French conversation and audible playback were not tested in that preflight. Existing gateway processes may run older source. See [EXP-180](docs/research/2026-11-13-resumption-preflight.md) before starting a new trial or interpreting health as end-to-end readiness.
 
 An earlier gateway was started on port 18094 with volatile history and existing local services. Its startup and physical test procedure are documented in [EXP-182](docs/research/2026-11-14-current-gateway.md). That gateway has since been stopped.

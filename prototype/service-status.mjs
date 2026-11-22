@@ -15,7 +15,9 @@ export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, 
   const models = async (role, base) => {
     try {
       const data = await get(`${base.replace(/\/$/, '')}/models`);
-      return { role, server: displayUrl(base), available: true, models: (data.data ?? []).map(item => ({ name: String(item.id ?? '').split(/[\\/]/).pop(), engine: item.owned_by === 'llamacpp' ? 'llama.cpp' : item.owned_by || null, context: item.meta?.n_ctx ?? null })) };
+      if (!Array.isArray(data.data)) throw Error('Invalid model list');
+      const reported = data.data.filter(item => typeof item?.id === 'string' && item.id.trim()).map(item => ({ name: item.id.split(/[\\/]/).pop(), engine: item.owned_by === 'llamacpp' ? 'llama.cpp' : item.owned_by || null, context: item.meta?.n_ctx ?? null }));
+      return { role, server: displayUrl(base), available: true, models: reported, ...(reported.length ? {} : { message: 'Server reported no models' }) };
     } catch { return { role, server: displayUrl(base), available: false, models: [] }; }
   };
   const httpAsr = new URL(nativeSpeech && nativeTranscriptUrl ? nativeTranscriptUrl : asrUrl); httpAsr.protocol = httpAsr.protocol === 'wss:' ? 'https:' : 'http:'; httpAsr.pathname = '/health'; httpAsr.search = '';
@@ -28,7 +30,10 @@ export async function getServiceStatus({ voiceUrl, asrUrl, ttsUrl, opencodeUrl, 
   const tts = nativeSpeech && !nativeNotificationTts ? null : (async () => {
     const result = await service(nativeSpeech ? 'Task notification synthesis' : 'Speech synthesis', `${ttsUrl.replace(/\/$/, '')}/health`);
     if (result.available) {
-      try { result.engine = (await get(`${ttsUrl.replace(/\/$/, '')}/openapi.json`)).info?.title ?? null; } catch {}
+      try {
+        const title = (await get(`${ttsUrl.replace(/\/$/, '')}/openapi.json`)).info?.title;
+        if (typeof title === 'string' && title.trim()) result.engine = title;
+      } catch {}
     }
     return result;
   })();

@@ -55,6 +55,21 @@ test('reports buffered recognition mode when the provider supplies it', async ()
   assert.equal(asr.mode,'buffered-utterance');
 });
 
+test('distinguishes an empty model list from an invalid list', async () => {
+  const config = {voiceUrl:'http://127.0.0.1:18084/v1',asrUrl:'ws://127.0.0.1:18082/asr',ttsUrl:'http://127.0.0.1:18081'};
+  const empty = await getServiceStatus(config, async () => ({ok:true,json:async()=>({data:[]})}));
+  assert.equal(empty[0].available, true);
+  assert.equal(empty[0].message, 'Server reported no models');
+  const invalid = await getServiceStatus(config, async () => ({ok:true,json:async()=>({})}));
+  assert.equal(invalid[0].available, false);
+});
+
+test('retains the reported TTS engine if OpenAPI has no title', async () => {
+  const config = {voiceUrl:'http://127.0.0.1:18084/v1',asrUrl:'ws://127.0.0.1:18082/asr',ttsUrl:'http://127.0.0.1:18081'};
+  const services = await getServiceStatus(config, async url => ({ok:true,json:async()=>url.includes('/health') ? {status:'ready',engine:'Pocket TTS'} : url.endsWith('/openapi.json') ? {} : {data:[]}}));
+  assert.equal(services.find(service => service.role === 'Speech synthesis').engine, 'Pocket TTS');
+});
+
 test('redacts URL credentials, query parameters and fragments in reported endpoints', async () => {
   const fetcher = async url => {
     if (url.includes('/config')) return {ok:true,json:async()=>({model:'local/gemma',provider:{local:{options:{baseURL:'http://user:secret@127.0.0.1:18080/v1?token=secret#secret'}}}})};

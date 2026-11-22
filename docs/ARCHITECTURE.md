@@ -2,6 +2,8 @@
 
 ## Experimental local voice stack
 
+Service discovery reports an empty model list explicitly and treats a malformed model-list response as unavailable. An incomplete synthesis OpenAPI description does not erase an engine name returned by its health endpoint. These are provider reports, not proof of inference readiness or model residency; existing gateways must be restarted to use updated code.
+
 The browser client in `prototype/client` connects to the loopback gateway in `prototype/gateway.mjs`. Its current voice path is microphone PCM -> Vosk French ASR -> LFM3 text controller -> Pocket TTS -> browser audio. A separate Gemma vision/agent model serves image requests and an OpenCode harness can run background tasks. Gateway conversation and task events are stored in SQLite under `.cache/assistant` or the configured database path. Provider URLs are constrained to loopback by the gateway.
 
 In cascade mode, a selected image can accompany the final transcript of the next spoken question if the gateway advertises this capability. One synthetic French question and generated red image passed through the real gateway and local services; live browser and real-world vision behavior remain unverified. The native speech bridge does not support image input. Image bytes are sent to the configured local vision endpoint and are not placed in gateway event history. A separate speech projection removes common markup and substitutes cues for code and links before Pocket TTS; the displayed answer retains these details except for explicit reasoning blocks. This is heuristic and can omit content from speech.
