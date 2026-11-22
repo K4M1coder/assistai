@@ -1,9 +1,10 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PairedInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
 if($FixtureOnly -and $VoiceCases){throw 'Choose one case set'}
 if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
+if($PairedInput -and !$VoiceLoopback){throw 'PairedInput requires VoiceLoopback'}
 if($KyutaiInput -and !$VoiceLoopback){throw 'KyutaiInput requires -VoiceLoopback'}
 if($PersistentTrial -and ($VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'PersistentTrial is a separate probe'}
 if($ProcessMetrics -and !$PersistentTrial){throw 'ProcessMetrics requires -PersistentTrial'}
@@ -32,7 +33,7 @@ if($base.availableRam -lt 8GB -or $base.dedicated -gt 22GB -or $base.shared -gt 
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/asr-coding-$stamp"
 $env:PYTHONIOENCODING='utf-8'
 $probeArgs=@((Join-Path $root 'scripts/probe-asr-coding.py'))
-if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')}}
+if($VoiceLoopback){$probeArgs=@((Join-Path $root 'scripts/probe-voice-loopback.py'),'--scenario',$VoiceScenario);if($KyutaiInput){$probeArgs+=@('--input-asr','kyutai')};if($PairedInput){$probeArgs+='--paired-input'}}
 if($PersistentTrial){$probeArgs=@((Join-Path $root 'scripts/probe-kyutai-persistent.py'),'--scenario',$VoiceScenario,'--threads',[string]$ASRThreads)}
 if($NativeOutput){$probeArgs=@((Join-Path $root 'scripts/probe-native-output.py'))}
 if($NotificationTts){$probeArgs=@((Join-Path $root 'scripts/probe-notification-tts.py'))}
