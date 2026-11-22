@@ -64,6 +64,8 @@ The current editable-fixture demonstration is available at `http://127.0.0.1:181
 
 The separate mockup runs with `npm run dev` at `http://localhost:3000/`. For a lower-memory static server, run `npm run build` and `npm run start:mockup`. The page identifies itself as a mockup and links to the experimental local voice client; its example actions and telemetry are not proof of real execution. On Windows, stop any owned OpenCode harness before `npm ci` so its executable is not locked. The mockup and local voice gateway are separate systems. See [direct delegation and audio tests](docs/research/2026-11-17-direct-delegation-audio-loopback.md).
 
+On Windows, `node scripts/probe-web-render.mjs` checks that the running mockup renders in a temporary headless Chrome profile; it does not validate its simulated controls or the voice system.
+
 A second synthetic spoken-image check on the running cascade returned the expected blue color and produced audio. It did not use a physical microphone or speaker; see the [spoken-image notes](docs/research/2026-11-12-spoken-image.md).
 
 The installed French Vosk vocabulary lacks exact entries for `fixture` and `calculator`, so transcription review remains important for file tasks. A local CPU comparison with quantized Kyutai STT recovered parts of those names but not the exact paths; its streaming and real-room performance remain unverified. See the [ASR notes](docs/research/2026-11-17-vosk-vocabulary-kyutai.md).
