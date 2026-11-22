@@ -20,6 +20,7 @@ assert.match(await readFile(file, 'utf8'), /return\s+a\s*-\s*b/, 'Fixture must s
 
 const socket = new WebSocket(gatewayUrl);
 const checkNotification = process.env.ASSISTAI_PROBE_NOTIFICATION === '1';
+const misheardControl = process.env.ASSISTAI_PROBE_MISHEARD === '1';
 const startedAt = performance.now();
 const timer = setTimeout(() => { console.error('Timed out waiting for edit task'); process.exitCode = 1; socket.terminate(); }, 120000);
 let sent = false, taskCount = 0, taskStart = null, taskEnd = null, followup = null, audioBytes = 0, task = '', taskTurn = null;
@@ -39,7 +40,7 @@ function finish() {
     followup_ms: followup, followup_before_completion: followup !== null && followup < taskEnd,
     task_mentions_fixture: /calculator\.py/i.test(task), audio_bytes: audioBytes,
     notification_requested: checkNotification, notification_started: notificationStarted, notification_audio_bytes: notificationAudioBytes,
-    static_fixture_check_exit: check.status, static_fixture_check_error: check.stderr.trim(),
+    static_fixture_check_exit: check.status, static_fixture_check_error: check.stderr.trim(), task, agent_result:completed?.text ?? '', misheard_control:misheardControl,
     note: 'Synthetic text and a disposable fixture; static arithmetic check is not an OS sandbox or a general coding benchmark.' };
   console.log(JSON.stringify(result));
   if (taskCount !== 1 || !result.task_mentions_fixture || !result.followup_before_completion || audioBytes === 0 || check.status !== 0 || (checkNotification && (!notificationStarted || !notificationAudioBytes))) process.exitCode = 1;
@@ -52,7 +53,10 @@ socket.on('message', async (data, binary) => {
   }
   if (event.type === 'asr.ready' && !sent) {
     sent = true;
-    socket.send(JSON.stringify({ type: 'text', text: 'Délègue à ton agent la tâche suivante : dans calculator.py, corrige la fonction add pour retourner la somme de a et b au lieu de leur différence. Ne modifie aucun autre fichier.' }));
+    const request = misheardControl
+      ? "dans le fichier calculateur point pis corrige la fonction hadès pour faire une addition au lieu d'une soustraction ne change rien d'autre"
+      : 'Délègue à ton agent la tâche suivante : dans calculator.py, corrige la fonction add pour retourner la somme de a et b au lieu de leur différence. Ne modifie aucun autre fichier.';
+    socket.send(JSON.stringify({ type: 'text', text: request }));
   } else if (event.type === 'task.started') {
     taskCount++; task = event.task; taskTurn = event.turn_id; taskStart = Math.round(performance.now() - startedAt);
     socket.send(JSON.stringify({ type: 'text', text: 'Dis-moi bonjour en français.' }));

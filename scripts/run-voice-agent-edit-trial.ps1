@@ -5,10 +5,12 @@ param(
   [int]$TimeoutSeconds = 120,
   [switch]$PreflightOnly,
   [switch]$SpokenInput,
+  [switch]$MisheardControl,
   [switch]$Notification,
   [switch]$InteractiveApproval
 )
 $ErrorActionPreference = 'Stop'
+if ($MisheardControl -and $SpokenInput) { throw 'MisheardControl is a text-only control' }
 $root = Split-Path -Parent $PSScriptRoot
 $workspacePath = (Resolve-Path -LiteralPath $Workspace).Path
 $cachePath = (Resolve-Path -LiteralPath (Join-Path $root '.cache')).Path
@@ -79,6 +81,7 @@ try {
   if (!$healthy) { throw 'Gateway startup timeout' }
   $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL="ws://127.0.0.1:$GatewayPort/voice"
   $env:ASSISTAI_PROBE_NOTIFICATION=if($Notification){'1'}else{'0'}
+  $env:ASSISTAI_PROBE_MISHEARD=if($MisheardControl){'1'}else{'0'}
   $env:PYTHONIOENCODING='utf-8'
   $probeFile = if ($SpokenInput) { Join-Path $root '.venv-voice/Scripts/python.exe' } else { $node }
   $probeScript = if ($SpokenInput) { Join-Path $root 'scripts/probe-spoken-agent-edit.py' } else { Join-Path $root 'scripts/probe-voice-agent-edit.mjs' }
