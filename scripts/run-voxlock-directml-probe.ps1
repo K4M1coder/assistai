@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=60,[ValidateSet('int8','fp16')][string]$Precision='int8',[switch]$Audio)
+param([int]$TimeoutSeconds=60,[ValidateSet('int8','fp16')][string]$Precision='int8',[switch]$Audio,[switch]$Cpu)
 $ErrorActionPreference='Stop'
 if($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120){throw 'Invalid timeout'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -10,11 +10,13 @@ function Resources {
   @{at=[DateTimeOffset]::UtcNow.ToString('o');dedicated=[long]$d[0].CookedValue;shared=[long]$s[0].CookedValue;availableRam=[long](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory*1024}
 }
 $base=Resources
-if($base.availableRam -lt 10GB -or $base.dedicated -gt 18GB -or $base.shared -gt 128MB){
+$minimumRam=if($Cpu){8GB}else{10GB};$maximumDedicated=if($Cpu){22GB}else{18GB};$maximumShared=if($Cpu){256MB}else{128MB}
+if($base.availableRam -lt $minimumRam -or $base.dedicated -gt $maximumDedicated -or $base.shared -gt $maximumShared){
   @{reason='insufficient preflight headroom';baseline=$base}|ConvertTo-Json -Compress;exit 1
 }
 $stamp=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff');$prefix=Join-Path $root ".cache/assistant/voxlock-directml-$stamp"
 $probeArgs=@((Join-Path $root 'scripts/probe-voxlock-directml.py'),'--precision',$Precision);if($Audio){$probeArgs+=@('--audio','--output',"$prefix.wav")}
+if($Cpu){$probeArgs+='--cpu'}
 $p=Start-Process -FilePath (Join-Path $root '.cache/piper-directml-clean/Scripts/python.exe') -ArgumentList $probeArgs -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput "$prefix.stdout" -RedirectStandardError "$prefix.stderr" -PassThru
 $null=$p.Handle;$reason='timeout';$deadline=[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 try {

@@ -11,7 +11,7 @@ import numpy as np
 import onnxruntime as ort
 
 root = Path(__file__).resolve().parents[1] / '.cache/voxlock/onnx/v2'
-parser = argparse.ArgumentParser(); parser.add_argument('--precision', choices=('int8', 'fp16'), default='int8'); parser.add_argument('--audio', action='store_true'); parser.add_argument('--output')
+parser = argparse.ArgumentParser(); parser.add_argument('--precision', choices=('int8', 'fp16'), default='int8'); parser.add_argument('--audio', action='store_true'); parser.add_argument('--output'); parser.add_argument('--cpu', action='store_true')
 args = parser.parse_args()
 if args.output and not args.audio: parser.error('--output requires --audio')
 models = ([('enroll.onnx', '81f305c9b7a32f13d1401f53bb4c6301826a607c9e807e60912f36ef1b9fae29'),
@@ -27,10 +27,14 @@ for name, expected in models:
     options = ort.SessionOptions()
     options.enable_mem_pattern = False
     options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-    options.add_session_config_entry('session.disable_cpu_ep_fallback', '1')
+    if not args.cpu: options.add_session_config_entry('session.disable_cpu_ep_fallback', '1')
+    else:
+        options.intra_op_num_threads = 2
+        options.add_session_config_entry('session.intra_op.allow_spinning', '0')
     started = time.monotonic()
     try:
-        session = ort.InferenceSession(str(path), sess_options=options, providers=[('DmlExecutionProvider', {'device_id': 0})])
+        providers = ['CPUExecutionProvider'] if args.cpu else [('DmlExecutionProvider', {'device_id': 0})]
+        session = ort.InferenceSession(str(path), sess_options=options, providers=providers)
     except Exception as error:
         print(json.dumps({'model': name, 'loaded': False, 'elapsed_seconds': round(time.monotonic()-started, 3),
                           'error': str(error), 'runtime': ort.__version__}), flush=True)
