@@ -24,6 +24,8 @@ The corrected measurement was verified in a second real-model synthetic trial, w
 
 The gateway submits delegated tasks directly to the configured OpenCode harness. The editable demonstration uses a disposable workspace; its rules are not an OS sandbox and the gateway is not authenticated.
 
+The updated speech formatter retains simple inline identifiers such as `calculator.py` rather than replacing them with a generic code placeholder. Filename pronunciation is still experimental; complex expressions and code blocks remain on screen. Existing gateways need a restart to use the change.
+
 The updated source asks the agent to inspect the permitted workspace for unambiguous matches when a requested file or symbol is missing. This is an experimental prompt instruction, not automatic proof of an identifier match; a real spoken-edit test remains pending resource headroom. Existing gateway processes need restarting to use it.
 
 Speaker-safe mode prevents voice interruption during playback; the Interrupt button remains available. Hold-to-talk and the experimental playback-reference echo filter can be combined with other settings. The filter has not been validated as effective for speakers; false self-interruptions were reported. The noise detection slider controls the microphone threshold.

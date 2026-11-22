@@ -15,7 +15,11 @@ export function visibleAnswer(input) {
 export function speechText(input) {
   return visibleAnswer(input)
     .replace(/```[\s\S]*?(?:```|$)/g, ' Code affiché. ')
-    .replace(/`[^`\n]+`/g, ' code affiché ')
+    .replace(/`([^`\n]+)`/g, (_, code) => {
+      // Speak simple identifiers and filenames; leave expressions and paths on screen.
+      if (!/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(code)) return ' code affiché ';
+      return ` ${code.replace(/\./g, ' point ').replace(/_/g, ' tiret bas ').replace(/-/g, ' tiret ')} `;
+    })
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/[^\s<>]+/gi, ' lien affiché ')

@@ -1,4 +1,4 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$EditCase, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PairedInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$EditCase, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PairedInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [switch]$NotificationTtsIdentifier, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
@@ -20,6 +20,7 @@ if($NativeSample -and (!$NativeOutput -or $NativeConcurrentOutput)){throw 'Nativ
 if($NativeBrowserRunId -and (!$NativeOutput -or $NativeSample -notin @('browser-agent-notification','browser-barge-math'))){throw 'NativeBrowserRunId requires a supported browser sample'}
 if($NotificationTts -and ($NativeOutput -or $PersistentTrial -or $VoiceLoopback -or $CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding -or $KyutaiInput)){throw 'NotificationTts is a separate probe'}
 if($NotificationTtsControl -and !$NotificationTts){throw 'NotificationTtsControl requires NotificationTts'}
+if($NotificationTtsIdentifier -and (!$NotificationTts -or $NotificationTtsControl -or $NotificationTtsSpelling)){throw 'NotificationTtsIdentifier requires NotificationTts and excludes other controls'}
 if($NotificationTtsSpelling -and (!$NotificationTts -or $NotificationTtsControl)){throw 'NotificationTtsSpelling requires NotificationTts and excludes NotificationTtsControl'}
 $root=Split-Path -Parent $PSScriptRoot
 $adapter='luid_0x00000000_0x00013269_phys_0'
@@ -40,6 +41,7 @@ if($NativeOutput){$probeArgs=@((Join-Path $root 'scripts/probe-native-output.py'
 if($NotificationTts){$probeArgs=@((Join-Path $root 'scripts/probe-notification-tts.py'))}
 if($NotificationTtsControl){$probeArgs+='--language-control'}
 if($NotificationTtsSpelling){$probeArgs+='--spelling-control'}
+if($NotificationTtsIdentifier){$probeArgs+='--identifier-control'}
 if($NativeConcurrentOutput){$probeArgs+='--concurrent'}
 if($NativeSample){$probeArgs+=@('--sample',$NativeSample)}
 if($NativeBrowserRunId){$probeArgs+=@('--browser-run-id',$NativeBrowserRunId)}

@@ -28,3 +28,12 @@ test('avoids sending markup, URLs and code to the speech engine', () => {
   assert.match(spoken, /Résultat Corrigé détails Code affiché\. OK/);
   assert.doesNotMatch(spoken, /https|```|<b>|const x|🙂|\*\*/);
 });
+
+test('speaks simple filenames and symbols while keeping expressions on screen', () => {
+  const spoken = formatTaskNotification('In `calculator.py`, did you mean the `add` function? See `a - b` and `my_helper`.');
+  assert.match(spoken, /calculator point py/);
+  assert.match(spoken, /\badd\b/);
+  assert.match(spoken, /my tiret bas helper/);
+  assert.match(spoken, /code affiché/);
+  assert.doesNotMatch(spoken, /`|a - b/);
+});

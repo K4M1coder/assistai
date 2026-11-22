@@ -16,12 +16,12 @@ def load(name, filename):
     return module
 
 
-async def main(language_control=False, spelling_control=False):
+async def main(language_control=False, spelling_control=False, identifier_control=False):
     spoken = load('spoken', 'probe-spoken-session-recall.py')
     asr = load('asr', 'probe-asr-coding.py')
     executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
     model = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
-    cases = ('Le mot secret est citron.', 'Le mot secret est mirabelle.', 'Le mot secret est BLUEBIRD.') if language_control else (
+    cases = ('Dans calculator point py, vouliez-vous dire la fonction add ?',) if identifier_control else ('Le mot secret est citron.', 'Le mot secret est mirabelle.', 'Le mot secret est BLUEBIRD.') if language_control else (
         "Le mot secret s'écrit B L U E B I R D.", "Le mot secret s'épelle B, L, U, E, B, I, R, D.") if spelling_control else (
         'Le mot secret est BLUEBIRD.', 'La tâche est terminée. Le résultat est affiché.',
         'La tâche en arrière-plan est terminée. Extrait du résultat : Le mot secret est BLUEBIRD.')
@@ -42,5 +42,6 @@ if __name__ == '__main__':
     controls = parser.add_mutually_exclusive_group()
     controls.add_argument('--language-control', action='store_true')
     controls.add_argument('--spelling-control', action='store_true')
+    controls.add_argument('--identifier-control', action='store_true')
     options = parser.parse_args()
-    asyncio.run(main(options.language_control, options.spelling_control))
+    asyncio.run(main(options.language_control, options.spelling_control, options.identifier_control))
