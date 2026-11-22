@@ -30,6 +30,9 @@ VOICE_CASES = [
     ('math', 'Combien font deux plus trois ? Réponds en un mot.', ('deux', 'trois')),
     ('capital', 'Quelle est la capitale de la France ? Réponds en un mot.', ('capitale', 'france')),
 ]
+EDIT_CASES = [
+    ('full-edit', "Dans le fichier calculator point py, corrige la fonction add pour faire une addition au lieu d'une soustraction. Ne change rien d'autre.", ('calculator', 'py', 'add', 'addition', 'soustraction')),
+]
 
 
 def tokens(text):
@@ -129,7 +132,8 @@ if __name__ == '__main__':
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--fixture-only', action='store_true', help='Use synthetic filename-focused phrases')
     group.add_argument('--voice-only', action='store_true', help='Use synthetic conversational control phrases')
+    group.add_argument('--edit-only', action='store_true', help='Use the full synthetic coding request')
     args = parser.parse_args()
     if bool(args.crisp_executable) != bool(args.crisp_model): parser.error('Provide both CrispASR executable and model')
-    cases = FIXTURE_CASES if args.fixture_only else VOICE_CASES if args.voice_only else CASES
+    cases = FIXTURE_CASES if args.fixture_only else VOICE_CASES if args.voice_only else EDIT_CASES if args.edit_only else CASES
     asyncio.run(main(args.crisp_executable, args.crisp_model, cases, args.crisp_backend, args.compare_padding))

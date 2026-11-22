@@ -1,7 +1,8 @@
-param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PairedInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
+param([int]$TimeoutSeconds=180, [switch]$CompareCrisp, [switch]$FixtureOnly, [switch]$VoiceCases, [switch]$EditCase, [switch]$Kyutai, [switch]$ComparePadding, [switch]$VoiceLoopback, [switch]$KyutaiInput, [switch]$PairedInput, [switch]$PersistentTrial, [switch]$NativeOutput, [switch]$NativeConcurrentOutput, [switch]$NotificationTts, [switch]$NotificationTtsControl, [switch]$NotificationTtsSpelling, [ValidateSet('audio-f16','interleaved-f16','audio-q8','interleaved-q8','interleaved-q8-reasoning-off','interleaved-q8-reasoning-off-repeat2','agent-notification','browser-agent-notification','browser-capture-roundtrip','pocket-agent-notification','math-windows','browser-barge-math')][string]$NativeSample, [ValidatePattern('^[A-Za-z0-9_-]{1,40}$')][string]$NativeBrowserRunId, [switch]$ProcessMetrics, [switch]$LocalCrispBuild, [switch]$FixedSyntheticFixture, [switch]$NaturalFixture, [ValidateSet(1,8,64)][int]$NaturalGain=1, [ValidateSet('male','female')][string]$NaturalVoice='male', [ValidateSet(2,4)][int]$ASRThreads=2, [ValidateSet('math','capital')][string]$VoiceScenario='math')
 $ErrorActionPreference='Stop'
 if($Kyutai -and !$CompareCrisp){throw 'Kyutai requires -CompareCrisp'}
 if($ComparePadding -and !$CompareCrisp){throw 'Padding comparison requires -CompareCrisp'}
+if($EditCase -and ($FixtureOnly -or $VoiceCases -or $VoiceLoopback -or $PersistentTrial -or $NativeOutput -or $NotificationTts)){throw 'EditCase is a separate case set'}
 if($FixtureOnly -and $VoiceCases){throw 'Choose one case set'}
 if($VoiceLoopback -and ($CompareCrisp -or $FixtureOnly -or $VoiceCases -or $Kyutai -or $ComparePadding)){throw 'VoiceLoopback is a separate probe'}
 if($PairedInput -and !$VoiceLoopback){throw 'PairedInput requires VoiceLoopback'}
@@ -46,6 +47,7 @@ if($FixedSyntheticFixture){$probeArgs+='--fixed-synthetic-fixture'}
 if($NaturalFixture){$probeArgs+=@('--natural-fixture','--natural-gain',[string]$NaturalGain,'--natural-voice',$NaturalVoice)}
 if($FixtureOnly){$probeArgs+='--fixture-only'}
 if($VoiceCases){$probeArgs+='--voice-only'}
+if($EditCase){$probeArgs+='--edit-only'}
 if($ComparePadding){$probeArgs+='--compare-padding'}
 $crisp=Join-Path $root '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
 if($LocalCrispBuild){
