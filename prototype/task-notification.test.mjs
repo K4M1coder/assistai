@@ -37,3 +37,11 @@ test('speaks simple filenames and symbols while keeping expressions on screen', 
   assert.match(spoken, /code affiché/);
   assert.doesNotMatch(spoken, /`|a - b/);
 });
+
+test('does not speak an unfinished inline code span or raw backtick', () => {
+  const input = 'La fonction est `nom_partiel';
+  assert.equal(visibleAnswer(input), input);
+  assert.equal(speechText(input), 'La fonction est code affiché');
+  assert.doesNotMatch(formatTaskNotification(input), /`|nom_partiel/);
+  assert.doesNotMatch(speechText('Texte avec `` code incomplet'), /`/);
+});

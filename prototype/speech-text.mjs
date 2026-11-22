@@ -20,12 +20,14 @@ export function speechText(input) {
       if (!/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(code)) return ' code affiché ';
       return ` ${code.replace(/\./g, ' point ').replace(/_/g, ' tiret bas ').replace(/-/g, ' tiret ')} `;
     })
+    // A response cut off mid-span must not send raw Markdown delimiters to TTS.
+    .replace(/`[^`\n]*(?=\n|$)/g, ' code affiché ')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/[^\s<>]+/gi, ' lien affiché ')
     .replace(/<\/?[a-z][^>]*>/gi, ' ')
     .replace(/(?:^|\n)\s{0,3}(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/g, ' ')
-    .replace(/[*_~|\\]/g, ' ')
+    .replace(/[*_~|\\`]/g, ' ')
     .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, ' ')
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
     .replace(/\s+/g, ' ').trim();

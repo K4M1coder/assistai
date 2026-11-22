@@ -132,6 +132,10 @@ test('opt-in session resume isolates clients and restores bounded history after 
   await turn(a, 'reported unmatched thinking tag');
   assert.equal(visibleResponse, expectedAnswer);
   assert.equal(lastTtsText, visibleResponse);
+  modelResponse = 'La fonction est `nom_partiel';
+  await turn(a, 'truncated code span');
+  assert.equal(visibleResponse, modelResponse);
+  assert.equal(lastTtsText, 'La fonction est code affiché');
   modelResponse = '<think>PRIVATE REASONING</think>OK';
   await turn(a, 'verify filtered history');
   assert.ok(prompts.at(-1).some(message => message.content === expectedAnswer));

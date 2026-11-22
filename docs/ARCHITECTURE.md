@@ -4,6 +4,8 @@
 
 Spoken text keeps simple inline identifiers and filenames, expanding dots, underscores and hyphens into French words; more complex inline expressions and code blocks remain screen-only. This avoids replacing every inline identifier with a generic placeholder, but does not guarantee pronunciation or intelligibility. The transformation applies to cascade speech and locally synthesized native task notifications, not audio generated directly by a native speech model. Existing gateway processes require a restart to use it.
 
+An unfinished inline code span is omitted from speech and replaced by a short placeholder while the original answer remains visible. A simulated gateway integration test verifies the separate display and TTS text; the change does not validate real-model audio.
+
 When the original request accompanies a delegated task, the agent prompt now asks the harness to inspect the permitted workspace if a named file or symbol is missing, and to use a match only when evidence is unambiguous. This is an instruction to a probabilistic model, not a filesystem restriction, identifier resolver or correctness guarantee. Unit tests cover prompt construction; a real spoken-edit trial of this wording has not yet run because the resource preflight rejected insufficient RAM. Existing gateway processes require a restart to receive it.
 
 Service discovery reports an empty model list explicitly and treats a malformed model-list response as unavailable. An incomplete synthesis OpenAPI description does not erase an engine name returned by its health endpoint. These are provider reports, not proof of inference readiness or model residency; existing gateways must be restarted to use updated code.
