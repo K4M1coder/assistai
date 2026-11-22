@@ -55,5 +55,6 @@ if args.infer:
                       'text':result.texts,'audio_samples':sum(map(len,waveforms)), 'audio_sample_rate':24000,
                       'streamed':bool(capture), 'stream_chunks':len(capture.chunks) if capture else None,
                       'first_chunk_ms':capture.first_ms if capture else None, 'requested_stop_after_first':args.stop_after_first,
+                      'discarded_after_stop':capture.discarded_after_stop if capture else None,
                       'output_sha256':hashlib.sha256(args.output.read_bytes()).hexdigest(),
                       'physical_devices_opened':False},ensure_ascii=False),flush=True)
