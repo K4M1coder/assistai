@@ -2,6 +2,8 @@
 
 ## Actual local voice and agent boundaries
 
+The agent prompt's workspace-inspection wording does not add or change permissions. OpenCode configuration and any operating-system restrictions still determine what the harness can access; the prompt cannot enforce correct identification or prevent unintended edits.
+
 The experimental voice gateway, including its opt-in LFM realtime path, does not authenticate users or enforce the React mockup's RBAC settings. It binds to loopback and rejects non-loopback provider URLs, but local processes can still access its services. SQLite event history is local and is not an immutable security audit.
 
 Service discovery strips URL userinfo, query strings and fragments from displayed endpoint addresses. This does not sanitize arbitrary provider-supplied model metadata or secrets embedded in URL paths, authenticate local callers, or protect other service endpoints. Existing gateways require a restart to load this change.

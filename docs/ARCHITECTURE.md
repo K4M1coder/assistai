@@ -2,6 +2,8 @@
 
 ## Experimental local voice stack
 
+When the original request accompanies a delegated task, the agent prompt now asks the harness to inspect the permitted workspace if a named file or symbol is missing, and to use a match only when evidence is unambiguous. This is an instruction to a probabilistic model, not a filesystem restriction, identifier resolver or correctness guarantee. Unit tests cover prompt construction; a real spoken-edit trial of this wording has not yet run because the resource preflight rejected insufficient RAM. Existing gateway processes require a restart to receive it.
+
 Service discovery reports an empty model list explicitly and treats a malformed model-list response as unavailable. An incomplete synthesis OpenAPI description does not erase an engine name returned by its health endpoint. These are provider reports, not proof of inference readiness or model residency; existing gateways must be restarted to use updated code.
 
 The browser client in `prototype/client` connects to the loopback gateway in `prototype/gateway.mjs`. Its current voice path is microphone PCM -> Vosk French ASR -> LFM3 text controller -> Pocket TTS -> browser audio. A separate Gemma vision/agent model serves image requests and an OpenCode harness can run background tasks. Gateway conversation and task events are stored in SQLite under `.cache/assistant` or the configured database path. Provider URLs are constrained to loopback by the gateway.

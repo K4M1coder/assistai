@@ -71,6 +71,7 @@ async def main():
                 trace = {'event': kind, 'elapsed_ms': elapsed, 'turn_id': event.get('turn_id')}
                 if kind == 'user.text': trace['synthetic_transcript'] = event.get('text', '')[:2000]
                 if kind == 'task.started': trace['synthetic_task'] = event.get('task', '')[:2000]
+                if kind == 'task.completed': trace['synthetic_result'] = event.get('text', '')[:2000]
                 if kind == 'assistant.text': trace['synthetic_response'] = event.get('text', '')[:2000]
                 print(json.dumps(trace, ensure_ascii=False), file=sys.stderr, flush=True)
             if kind == 'user.text' and not transcript_recorded:
@@ -96,6 +97,7 @@ async def main():
             if done:
                 check = subprocess.run([sys.executable, '-I', str(root / 'scripts' / 'verify-add-fixture.py'), str(fixture)], capture_output=True, text=True, timeout=5)
                 result = {'input':'synthetic_french_speech', 'transcript':transcript, 'task':task, 'task_count':tasks,
+                          'agent_result':completed.get('text', ''),
                           'task_preserves_spec':task_preserves_spec(task),
                           'followup_ms':followup, 'task_end_ms':task_end, 'audio_bytes':audio_bytes, 'static_fixture_check_exit':check.returncode,
                           'notification_requested':notification_requested, 'notification_started':notification_started,

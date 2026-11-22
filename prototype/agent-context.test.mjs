@@ -34,6 +34,8 @@ test('keeps the complete original user request when a controller reverses the ta
   assert.ok(prompt.includes(JSON.stringify(original)));
   assert.match(prompt, /operation direction, negation and scope/);
   assert.match(prompt, /ask for clarification/);
+  assert.match(prompt, /inspect the permitted workspace/);
+  assert.match(prompt, /only when the evidence identifies it unambiguously/);
   assert.throws(() => buildAgentPrompt('Task', [], 80, ''), /Invalid original request/);
 });
 
