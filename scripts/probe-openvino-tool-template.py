@@ -1,9 +1,12 @@
 """Inspect local tool-template rendering without loading inference weights."""
 import json
+import sys
 from pathlib import Path
 import openvino_genai as genai
 
 root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from prototype.openvino_tool_calls import parse_tool_calls
 tokenizer = genai.Tokenizer(str(root / '.cache/lfm3-omni-openvino-int4'))
 tool = {'type':'function','function':{'name':'delegate_task','description':'Delegate a local task',
         'parameters':{'type':'object','properties':{'task':{'type':'string'}},'required':['task']}}}
@@ -19,6 +22,10 @@ checks = {'tool_definition':'"name": "delegate_task"' in rendered,
           'tool_call':'<function=delegate_task>' in rendered,
           'arguments':'Read fixture.txt' in rendered,
           'tool_response':'<tool_response>' in rendered and 'BLUEBIRD' in rendered}
+start = rendered.index('<tool_call>')
+end = rendered.index('</tool_call>', start) + len('</tool_call>')
+parsed = parse_tool_calls(rendered[start:end])
+checks['parser_roundtrip'] = parsed['tool_calls'] == [{'name':'delegate_task', 'arguments':{'task':'Read fixture.txt'}}]
 messages = history.get_messages()
 messages[1]['tool_calls'][0]['function']['arguments'] = json.dumps({'task':'Read fixture.txt'})
 history.set_messages(messages)

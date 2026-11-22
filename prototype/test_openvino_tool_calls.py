@@ -14,7 +14,7 @@ class ToolCallTests(unittest.TestCase):
         with self.assertRaises(ValueError): parse_tool_calls(block * 5)
 
     def test_rejects_incomplete_unknown_duplicate_and_nested_markup(self):
-        invalid = ['<tool_call>', '<tool_call><function=other><parameter=task>x</parameter></function></tool_call>',
+        invalid = ['<tool_call>', 'Bonjour <tool_cal', 'Bonjour </paramet', '<tool_call><function=other><parameter=task>x</parameter></function></tool_call>',
                    '<tool_call><function=delegate_task><parameter=task>x</parameter><parameter=task>y</parameter></function></tool_call>',
                    '<tool_call><function=delegate_task><parameter=task>x<tool_call>y</parameter></function></tool_call>',
                    '<tool_call><function=delegate_task><parameter=task> </parameter></function></tool_call>']
