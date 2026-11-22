@@ -16,10 +16,10 @@ import numpy as np
 from prototype import native_audio_client as client
 
 fixture = os.environ.get('ASSISTAI_TEST_FIXTURE', 'question')
-if fixture not in ('question', 'overlap', 'natural-overlap', 'natural-other', 'natural-background', 'natural-background-loud'):
+if fixture not in ('question', 'overlap', 'natural-overlap', 'natural-quiet-target', 'natural-other', 'natural-background', 'natural-background-loud'):
     raise ValueError('Unknown synthetic fixture')
-fixture_path = Path({'question':'.cache/reset-question.wav', 'overlap':'.cache/assistant/browser-noisy-test.wav', 'natural-overlap':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-other':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-background':'.cache/mls-sidon-natural/native-background-only-16k.wav', 'natural-background-loud':'.cache/mls-sidon-natural/native-background-loud-16k.wav'}[fixture])
-expected_words = {'question':('quel est le mot secret',), 'overlap':('raconter', 'lune'), 'natural-overlap':('génie', 'mourir'), 'natural-other':('cavaliers', 'équitation'), 'natural-background':(), 'natural-background-loud':()}[fixture]
+fixture_path = Path({'question':'.cache/reset-question.wav', 'overlap':'.cache/assistant/browser-noisy-test.wav', 'natural-overlap':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-quiet-target':'.cache/mls-sidon-natural/native-quiet-target-16k.wav', 'natural-other':'.cache/mls-sidon-natural/native-mixture-16k.wav', 'natural-background':'.cache/mls-sidon-natural/native-background-only-16k.wav', 'natural-background-loud':'.cache/mls-sidon-natural/native-background-loud-16k.wav'}[fixture])
+expected_words = {'question':('quel est le mot secret',), 'overlap':('raconter', 'lune'), 'natural-overlap':('génie', 'mourir'), 'natural-quiet-target':('génie', 'mourir'), 'natural-other':('cavaliers', 'équitation'), 'natural-background':(), 'natural-background-loud':()}[fixture]
 background_only = fixture.startswith('natural-background')
 with wave.open(str(fixture_path), 'rb') as source:
     if source.getframerate() != 16000 or source.getnchannels() != 1 or source.getsampwidth() != 2:
