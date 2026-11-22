@@ -20,7 +20,7 @@ class FakeSocket:
     def __init__(self):
         self.events = iter([
             {'type':'asr.ready'}, {'type':'user.text','text':'synthetic request','turn_id':'task-turn'},
-            {'type':'task.started','task':'Fix calculator.py','turn_id':'task-turn'},
+            {'type':'task.started','task':"Dans calculator.py, corrige add pour faire une addition au lieu d'une soustraction. Ne change rien d'autre.",'turn_id':'task-turn'},
             {'type':'user.text','text':'synthetic follow-up','turn_id':'followup-turn'},
             {'type':'assistant.text','text':'Bonjour','turn_id':'followup-turn'},
             b'\x01\x00', {'type':'task.completed'},
@@ -60,7 +60,7 @@ class SpokenAgentProbeTests(unittest.IsolatedAsyncioTestCase):
             (Path(folder) / 'calculator.py').write_text('def add(a, b):\n    return a - b\n', encoding='utf-8')
             socket = FakeSocket()
             socket.events = iter([{'type':'asr.ready'}, {'type':'user.text','text':'request'},
-                {'type':'task.started','task':'Fix calculator.py','turn_id':'task-turn'},
+                {'type':'task.started','task':"Dans calculator.py, corrige add pour faire une addition au lieu d'une soustraction. Ne change rien d'autre.",'turn_id':'task-turn'},
                 {'type':'assistant.text','turn_id':'followup-turn'}, b'12',
                 {'type':'task.completed','task_id':'task-1'}, {'type':'speech.end','turn_id':'followup-turn'},
                 {'type':'notification.started'}, b'1234', {'type':'speech.end'}])
@@ -76,6 +76,14 @@ class SpokenAgentProbeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result['notification_audio_bytes'], 4)
             self.assertIn({'type':'notification.speak','task_id':'task-1'},
                           [json.loads(item) for item in socket.sent if isinstance(item, str)])
+
+    def test_task_diagnostic_rejects_missing_or_reversed_requirements(self):
+        correct = "Dans calculator.py, corrige add pour faire une addition au lieu d'une soustraction. Ne change rien d'autre."
+        self.assertTrue(probe.task_preserves_spec(correct))
+        self.assertFalse(probe.task_preserves_spec(correct.replace('add', 'ad')))
+        self.assertFalse(probe.task_preserves_spec(correct.replace('addition', 'TEMP').replace('soustraction', 'addition').replace('TEMP', 'soustraction')))
+        self.assertFalse(probe.task_preserves_spec(correct.replace("Ne change rien d'autre.", '')))
+        self.assertFalse(probe.task_preserves_spec(correct.replace('faire une addition', 'ne fais pas une addition')))
 
 
 if __name__ == '__main__': unittest.main()

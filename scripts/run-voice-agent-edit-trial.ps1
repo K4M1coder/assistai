@@ -79,6 +79,7 @@ try {
   if (!$healthy) { throw 'Gateway startup timeout' }
   $env:ASSISTAI_PROBE_WORKSPACE=$workspacePath; $env:ASSISTAI_TEST_VOICE_URL="ws://127.0.0.1:$GatewayPort/voice"
   $env:ASSISTAI_PROBE_NOTIFICATION=if($Notification){'1'}else{'0'}
+  $env:PYTHONIOENCODING='utf-8'
   $probeFile = if ($SpokenInput) { Join-Path $root '.venv-voice/Scripts/python.exe' } else { $node }
   $probeScript = if ($SpokenInput) { Join-Path $root 'scripts/probe-spoken-agent-edit.py' } else { Join-Path $root 'scripts/probe-voice-agent-edit.mjs' }
   if ($InteractiveApproval) {

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -14,6 +15,17 @@ from websockets.asyncio.client import connect
 spec = importlib.util.spec_from_file_location('spoken_recall_probe', Path(__file__).with_name('probe-spoken-session-recall.py'))
 spoken_recall = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(spoken_recall)
+
+
+def task_preserves_spec(task):
+    """Conservative diagnostic for the fixed synthetic request, not a task validator."""
+    text = ' '.join(task.lower().split())
+    identifiers = 'calculator.py' in text and bool(re.search(r'\badd\b', text))
+    addition_first = re.search(r'addition\b.{0,80}(?:au lieu|plut[oô]t que).{0,40}soustraction\b', text)
+    subtraction_first = re.search(r'soustraction\b.{0,80}(?:par|en faveur d[’\'])\s+(?:une?\s+|l[’\'])?addition\b', text)
+    scope = re.search(r'(?:ne\s+(?:change|modifie|modifier)\s+rien\s+d[’\']autre|sans\s+(?:autre|autres)\s+modification)', text)
+    negated_addition = re.search(r'\b(?:pas|jamais|sans)\b.{0,35}\baddition\b', text)
+    return bool(identifiers and (addition_first or subtraction_first) and scope and not negated_addition)
 
 
 async def main():
@@ -84,12 +96,13 @@ async def main():
             if done:
                 check = subprocess.run([sys.executable, '-I', str(root / 'scripts' / 'verify-add-fixture.py'), str(fixture)], capture_output=True, text=True, timeout=5)
                 result = {'input':'synthetic_french_speech', 'transcript':transcript, 'task':task, 'task_count':tasks,
+                          'task_preserves_spec':task_preserves_spec(task),
                           'followup_ms':followup, 'task_end_ms':task_end, 'audio_bytes':audio_bytes, 'static_fixture_check_exit':check.returncode,
                           'notification_requested':notification_requested, 'notification_started':notification_started,
                           'notification_audio_bytes':notification_audio_bytes,
                           'physical_audio_devices_opened':False, 'audio_listened_to':False}
                 print(json.dumps(result, ensure_ascii=False), flush=True)
-                if tasks != 1 or 'calculator.py' not in task.lower() or followup is None or followup >= task_end or not audio_bytes or check.returncode or (check_notification and (not notification_started or not notification_audio_bytes)):
+                if tasks != 1 or not result['task_preserves_spec'] or followup is None or followup >= task_end or not audio_bytes or check.returncode or (check_notification and (not notification_started or not notification_audio_bytes)):
                     raise RuntimeError('Spoken coding probe assertions failed')
                 return
             if kind in ('error','task.error','task.rejected','asr.empty','notification.rejected'):
