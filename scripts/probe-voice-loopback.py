@@ -63,9 +63,14 @@ async def main(scenario='math', input_asr='vosk', paired_input=False):
     pcm = await asyncio.to_thread(spoken.synthesize, question)
     paired_text, paired_ms = None, None
     if paired_input:
-        candidate = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
-        executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
-        paired_text, paired_ms = await asyncio.to_thread(asr.recognize_crisp, pcm + bytes(32000), executable, candidate, 'kyutai-stt', allow_empty=True)
+        if input_asr == 'kyutai':
+            started = time.monotonic()
+            paired_text = await asr.recognize(pcm)
+            paired_ms = round((time.monotonic() - started) * 1000)
+        else:
+            candidate = ROOT / '.cache/kyutai-crisp-research/kyutai-stt-1b-q4_k.gguf'
+            executable = ROOT / '.cache/crispasr-v0.8.53-windows-cpu/crispasr-windows-x86_64-cpu/crispasr.exe'
+            paired_text, paired_ms = await asyncio.to_thread(asr.recognize_crisp, pcm + bytes(32000), executable, candidate, 'kyutai-stt', allow_empty=True)
     # A synthetic WAV exercises the same file-based input path requested by the operator.
     with tempfile.NamedTemporaryFile(prefix='voice-loopback-', suffix='.wav', dir=ROOT / '.cache', delete=False) as temp:
         filename = Path(temp.name)
@@ -138,7 +143,7 @@ async def main(scenario='math', input_asr='vosk', paired_input=False):
         audio_ok = straightforward_answer(heard, scenario)
         print(json.dumps({'question':question, 'input_transcript':transcript, 'assistant_text':answer,
                           'output_asr':heard, 'normalized_wer':asr.word_error(answer, heard),
-                          'input_engine':input_asr, 'paired_input_engine':'kyutai-file' if paired_input else None,
+                          'input_engine':input_asr, 'paired_input_engine':('vosk' if input_asr == 'kyutai' else 'kyutai-file') if paired_input else None,
                           'paired_input_transcript':paired_text, 'paired_input_ms':paired_ms,
                           'paired_input_intent_preserved':input_intent_preserved(paired_text, scenario) if paired_input else None,
                           'output_engine':'vosk' if input_asr == 'kyutai' else 'kyutai',
@@ -164,6 +169,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--scenario', choices=('math', 'capital'), default='math')
     parser.add_argument('--input-asr', choices=('vosk', 'kyutai'), default='vosk')
-    parser.add_argument('--paired-input', action='store_true', help='Also transcribe the same synthetic input using file-mode Kyutai')
+    parser.add_argument('--paired-input', action='store_true', help='Also transcribe the same synthetic input with the other recognizer')
     args = parser.parse_args()
     asyncio.run(main(args.scenario, args.input_asr, args.paired_input))
