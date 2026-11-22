@@ -58,6 +58,8 @@ The separate LocalVQE physical research probe opens default audio devices, retai
 
 The optional resource admission check is an operational safeguard, not an authorization control; it does not establish an identity or grant or restrict filesystem permissions. Its process-local estimates account for concurrent accepted tasks but do not control actual allocations, external processes or work still running after gateway restart.
 
+The updated admission policy rejects a new task when sampled total shared GPU use exceeds its conservative threshold even if configured baseline growth is small. It remains advisory and does not constrain direct harness clients or running tasks.
+
 The optional speech-activity classifier is not speaker verification or an authorization control; background speakers and television dialogue may still activate it.
 
 The optional native-mode transcription sidecar receives the same captured audio over loopback. Final transcripts and native assistant text are stored in the local SQLite event database and may be included in bounded context when the speech session resets. The database is not an authenticated or encrypted security boundary; transcripts can be inaccurate.

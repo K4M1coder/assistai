@@ -22,6 +22,12 @@ test('explains the absolute shared-memory check when no baseline is known', () =
   assert.match(decision.reasons.join(' '), /Total shared GPU memory is 300 MiB, above the 256 MiB limit/);
 });
 
+test('rejects excessive total shared memory even when its growth from baseline is small', () => {
+  const decision = evaluateBudget({ ...baseline, sharedBytes: 400 * MiB, baselineSharedBytes: 390 * MiB });
+  assert.equal(decision.allowed, false);
+  assert.match(decision.reasons.join(' '), /Total shared GPU memory is 400 MiB/);
+});
+
 test('fails closed if telemetry is missing or the next allocation would consume reserves', () => {
   assert.equal(evaluateBudget(null).allowed, false);
   assert.equal(evaluateBudget(baseline, null).allowed, false);

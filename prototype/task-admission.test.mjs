@@ -18,6 +18,13 @@ test('task admission fails closed for stale, missing, malformed or over-budget t
   assert.throws(() => createTaskAdmission({ ...options, requestedVramBytes: 0 }), /positive/);
 });
 
+test('task admission rejects high total shared usage even with a high baseline', async () => {
+  const MiB = 1024 ** 2;
+  const admit = createTaskAdmission({ ...options, baselineSharedBytes: 390 * MiB,
+    read: async () => JSON.stringify({ ...sample, sharedBytes: 400 * MiB }) });
+  await assert.rejects(admit(), /Total shared GPU memory/);
+});
+
 test('serializes simultaneous admissions and accounts for active estimates', async () => {
   const admit = createTaskAdmission({ ...options, requestedVramBytes: 1.5 * GiB, requestedRamBytes: 0.25 * GiB,
     read: async () => { await new Promise(resolve => setTimeout(resolve, 5)); return JSON.stringify({ ...sample, dedicatedBytes: 20 * GiB }); } });

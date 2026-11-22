@@ -6,6 +6,7 @@ export const DEFAULT_BUDGET = Object.freeze({
   dedicatedReserveBytes: 2 * GiB,
   minAvailableRamBytes: 6 * GiB,
   maxSharedGrowthBytes: 256 * MiB,
+  maxSharedTotalBytes: 256 * MiB,
 });
 
 export function evaluateBudget(measurement, requested = {}, budget = DEFAULT_BUDGET) {
@@ -35,12 +36,15 @@ export function evaluateBudget(measurement, requested = {}, budget = DEFAULT_BUD
   if (measurement.dedicatedBytes + vram > budget.maxDedicatedBytes - budget.dedicatedReserveBytes) {
     reasons.push('Dedicated GPU budget or safety reserve exceeded');
   }
-  if (measurement.sharedBytes - measurement.baselineSharedBytes > budget.maxSharedGrowthBytes) {
+  if (measurement.sharedBytes > budget.maxSharedTotalBytes) {
+    const observed = Math.ceil(measurement.sharedBytes / MiB);
+    const limit = Math.floor(budget.maxSharedTotalBytes / MiB);
+    reasons.push(`Total shared GPU memory is ${observed} MiB, above the ${limit} MiB limit`);
+  }
+  if (measurement.baselineSharedBytes > 0 && measurement.sharedBytes - measurement.baselineSharedBytes > budget.maxSharedGrowthBytes) {
     const observed = Math.ceil((measurement.sharedBytes - measurement.baselineSharedBytes) / MiB);
     const limit = Math.floor(budget.maxSharedGrowthBytes / MiB);
-    reasons.push(measurement.baselineSharedBytes === 0
-      ? `Total shared GPU memory is ${observed} MiB, above the ${limit} MiB limit`
-      : `Shared GPU memory growth is ${observed} MiB, above the ${limit} MiB limit`);
+    reasons.push(`Shared GPU memory growth is ${observed} MiB, above the ${limit} MiB limit`);
   }
   if (measurement.availableRamBytes - ram < budget.minAvailableRamBytes) {
     reasons.push('Available system RAM would fall below the configured reserve');

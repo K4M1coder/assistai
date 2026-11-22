@@ -48,6 +48,8 @@ The Windows audio client has also been exercised against the native gateway usin
 
 An optional sampled resource check can reject new background tasks when measured headroom is insufficient. It accounts conservatively for estimated concurrent tasks within one gateway process, but does not reserve memory or enforce a GPU ceiling.
 
+In the updated source, this check considers both total shared GPU usage and growth above the configured baseline. A running gateway must be restarted to use it; shared usage includes other processes and is not a measurement of model spill.
+
 An experimental, disabled-by-default `-CancelOnPressure` Windows launcher option can request cancellation of a running agent task after consecutive low-resource samples. It is reactive, cannot guarantee cancellation or prevent memory overshoot, and has only been exercised with simulated resources and harness responses.
 
 LFM3-Omni-2B is an additional native audio-and-vision research candidate. A guarded Windows trial loaded its Q4 weights with Q8 or F16 projector and returned correct text for a synthetic French question, but generated audio was often short or did not match that text in independent ASR checks. Full-duplex, intelligible speech and concurrent agent tasks remain unverified. See the [candidate notes](docs/research/2026-11-17-lfm3-omni-candidate.md).

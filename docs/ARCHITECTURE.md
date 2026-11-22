@@ -94,6 +94,8 @@ In experimental native speech mode, interrupting while a tool submission is pend
 
 The optional Windows resource sample can include total system pagefile usage. This is not attributed to a process, is not a hard memory limit, and does not prove where model data resides. Resource status warns above the conservative total shared-GPU threshold independently of whether task admission is configured.
 
+Advisory task admission now checks both total shared GPU memory and growth from the configured baseline; a high baseline can no longer hide an excessive total. This applies only to newly started gateways using the updated code and remains sampled, system-wide telemetry rather than proof of model placement or a hard GPU limit.
+
 An optional shared SQLite reservation ledger serializes estimated task admission among gateways configured with the same path. It stores reservation IDs, process IDs, timestamps, estimated RAM/VRAM and, once created, the OpenCode session ID; it does not store conversation text. Estimates remain after a crash or uncertain task and require deliberate reconciliation after independently confirming work has stopped. Older gateways, direct inference clients and services outside that ledger remain unaccounted for; measured snapshots and reservations do not enforce physical memory limits.
 
 During polling, transitions between OpenCode's busy and retry states are sent as sanitized task-progress events and added to the bounded session context. The browser displays them without interrupting speech; the assistant may use them in a later response. Raw provider error messages and agent reasoning are not included in these events. Polling can miss short transitions and is not proof of ongoing execution.
